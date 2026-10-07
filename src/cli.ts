@@ -5,6 +5,7 @@ import { ConfigError, findConfig, PROVIDERS } from "./config.js";
 import { realExec } from "./exec.js";
 import { formatBlock } from "./format.js";
 import { guard, type GuardDeps } from "./guard.js";
+import { claudeHook } from "./hooks/claude.js";
 import { providers } from "./providers/index.js";
 
 /** Exit code for a blocked command, distinct from the usual 1 and 2. */
@@ -15,6 +16,7 @@ const USAGE = `cloudpin: a seatbelt for your cloud CLIs
 Usage:
   cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
   cloudpin exec -- <cmd...>   Run <cmd> only if it would act on the pinned account
+  cloudpin hook claude        Claude Code PreToolUse hook (reads the hook JSON on stdin)
   cloudpin --version
 
 Exit codes: 0 ok, 1 usage or check failure, ${EXIT_BLOCKED} command blocked.`;
@@ -84,6 +86,22 @@ async function exec(argv: string[]): Promise<number> {
   });
 }
 
+async function readStdin(): Promise<string> {
+  let data = "";
+  for await (const chunk of process.stdin) data += String(chunk);
+  return data;
+}
+
+async function hook(agent: string | undefined): Promise<number> {
+  if (agent !== "claude") {
+    console.error(`cloudpin hook: unsupported agent "${agent ?? ""}" (supported: claude)`);
+    return 1;
+  }
+  const out = await claudeHook(await readStdin(), deps, process.env);
+  if (out) process.stdout.write(`${out}\n`);
+  return 0;
+}
+
 export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   switch (command) {
@@ -91,6 +109,8 @@ export async function main(argv: string[]): Promise<number> {
       return check();
     case "exec":
       return exec(rest[0] === "--" ? rest.slice(1) : rest);
+    case "hook":
+      return hook(rest[0]);
     case "--version":
     case "-v": {
       const pkg = createRequire(import.meta.url)("../package.json") as { version: string };

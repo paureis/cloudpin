@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 import spawn from "cross-spawn";
+import { existsSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { ConfigError, findConfig, PROVIDERS } from "./config.js";
+import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
+import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
 import { realExec } from "./exec.js";
 import { formatBlock } from "./format.js";
 import { guard, type GuardDeps } from "./guard.js";
 import { claudeHook } from "./hooks/claude.js";
+import { discover, renderConfig } from "./init.js";
 import { providers } from "./providers/index.js";
 
 /** Exit code for a blocked command, distinct from the usual 1 and 2. */
@@ -14,6 +18,8 @@ export const EXIT_BLOCKED = 3;
 const USAGE = `cloudpin: a seatbelt for your cloud CLIs
 
 Usage:
+  cloudpin init [--yes] [--force]
+                              Pin the accounts you are logged into now, in ./.cloudpin.yml
   cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
   cloudpin exec -- <cmd...>   Run <cmd> only if it would act on the pinned account
   cloudpin hook claude        Claude Code PreToolUse hook (reads the hook JSON on stdin)
@@ -22,6 +28,39 @@ Usage:
 Exit codes: 0 ok, 1 usage or check failure, ${EXIT_BLOCKED} command blocked.`;
 
 const deps: GuardDeps = { providers, exec: realExec, findConfig };
+
+async function init(flags: string[]): Promise<number> {
+  const path = join(process.cwd(), CONFIG_FILE);
+  if (existsSync(path) && !flags.includes("--force")) {
+    console.error(`cloudpin init: ${path} already exists (use --force to replace it)`);
+    return 1;
+  }
+  console.log("cloudpin: reading the accounts your CLIs are logged into...");
+  const { found, skipped } = await discover(providers, realExec, process.env, process.cwd());
+  for (const line of skipped) console.log(`  skipped ${line}`);
+  if (found.length === 0) {
+    console.error("cloudpin init: no logged-in CLI found; log in to the accounts this project uses first.");
+    return 1;
+  }
+  const text = renderConfig(found);
+  console.log(`\nProposed ${CONFIG_FILE}:\n\n${text}`);
+  if (!flags.includes("--yes")) {
+    if (!process.stdin.isTTY) {
+      console.error("cloudpin init: not a terminal; re-run with --yes to write the file.");
+      return 1;
+    }
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await rl.question(`Pin these accounts to this project? [y/N] `);
+    rl.close();
+    if (!/^y(es)?$/i.test(answer.trim())) {
+      console.log("cloudpin init: nothing written.");
+      return 1;
+    }
+  }
+  writeFileSync(path, text);
+  console.log(`cloudpin: wrote ${path}. Commit it so everyone on the project is protected.`);
+  return 0;
+}
 
 async function check(): Promise<number> {
   let config;
@@ -105,6 +144,8 @@ async function hook(agent: string | undefined): Promise<number> {
 export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   switch (command) {
+    case "init":
+      return init(rest);
     case "check":
       return check();
     case "exec":

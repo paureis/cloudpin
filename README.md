@@ -58,7 +58,7 @@ always lets you run login and account-switching commands.
 | Claude Code hook | Working, not yet installable with one command |
 | Shell wrappers (bash, zsh, PowerShell) | Planned |
 | Cursor, Codex, Gemini CLI, Copilot CLI hooks | Planned |
-| `cloudpin init` | Planned |
+| `cloudpin init` (writes the file from your current logins) | Working |
 
 ## Try it (from source)
 

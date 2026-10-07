@@ -1,0 +1,82 @@
+import { basename } from "node:path";
+import { ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
+import type { Exec, ProviderDef } from "./types.js";
+
+export interface GuardRequest {
+  /** The executable as typed or resolved, e.g. "az" or "C:\\...\\gh.exe". */
+  bin: string;
+  args: string[];
+  env: NodeJS.ProcessEnv;
+  cwd: string;
+  /** "agent" ignores CLOUDPIN_SKIP, so an agent cannot opt itself out. */
+  mode: "shell" | "agent";
+}
+
+export interface GuardDeps {
+  providers: ProviderDef[];
+  exec: Exec;
+  findConfig: (cwd: string) => FoundConfig | null;
+}
+
+export type Verdict =
+  | {
+      action: "allow";
+      reason: "not-guarded" | "no-config" | "not-pinned" | "exempt" | "match" | "skipped";
+    }
+  | {
+      action: "block";
+      provider?: Provider;
+      configPath?: string;
+      problems: string[];
+      fix?: string;
+    };
+
+/** Normalises "C:\\x\\GH.EXE" or "/usr/bin/az" to "gh" / "az". */
+export function commandName(bin: string): string {
+  return basename(bin.replace(/\\/g, "/"))
+    .toLowerCase()
+    .replace(/\.(exe|cmd|bat|ps1)$/, "");
+}
+
+export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict> {
+  const name = commandName(req.bin);
+  const provider = deps.providers.find((p) => p.bins.includes(name));
+  if (!provider) return { action: "allow", reason: "not-guarded" };
+
+  let config: FoundConfig | null;
+  try {
+    config = deps.findConfig(req.cwd);
+  } catch (err) {
+    // A broken pin file must not silently switch protection off.
+    if (err instanceof ConfigError) {
+      return { action: "block", provider: provider.name, problems: [`invalid config: ${err.message}`] };
+    }
+    throw err;
+  }
+  if (!config) return { action: "allow", reason: "no-config" };
+
+  const pin = config.pins[provider.name];
+  if (!pin) return { action: "allow", reason: "not-pinned" };
+  if (provider.isExempt(req.args)) return { action: "allow", reason: "exempt" };
+  if (req.mode === "shell" && req.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
+
+  const base = { action: "block" as const, provider: provider.name, configPath: config.path };
+  const res = await provider.resolve({ args: req.args, env: req.env, cwd: req.cwd }, deps.exec);
+  switch (res.kind) {
+    case "logged-out":
+      return { ...base, problems: ["not logged in"], fix: res.hint };
+    case "error":
+      // Fail closed: if we cannot tell who the command will act as, we cannot
+      // promise it is the right account.
+      return { ...base, problems: [`could not determine the active account: ${res.message}`] };
+    case "identity": {
+      // The provider and its pin come from the same key, so the cast is safe.
+      const p = provider as ProviderDef<typeof provider.name>;
+      const problems = p.compare(pin as never, res.identity);
+      if (problems.length === 0) return { action: "allow", reason: "match" };
+      return { ...base, problems, fix: p.switchHint(pin as never) };
+    }
+  }
+}
+
+export const defaultFindConfig = findConfig;

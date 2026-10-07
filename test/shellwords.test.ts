@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { commandName } from "../src/guard.js";
 import { findInvocations } from "../src/shellwords.js";
@@ -73,5 +74,33 @@ describe("findInvocations", () => {
   it("does not mistake an argument for a command", () => {
     expect(find("echo gh is great")).toEqual([]);
     expect(find("git commit -m 'use az later'")).toEqual([]);
+  });
+
+  it.each([
+    ["timeout 30 gh pr list", ["pr", "list"]],
+    ["timeout -s KILL 30s gh pr list", ["pr", "list"]],
+    ["xargs -n 1 gh repo delete", ["repo", "delete"]],
+    ["xargs -I {} gh repo view {}", ["repo", "view", "{}"]],
+  ])("sees through %j", (cmd, args) => {
+    expect(find(cmd)).toEqual([{ bin: "gh", args, env: {} }]);
+  });
+});
+
+describe("findInvocations with cd", () => {
+  const base = resolve("/work/app");
+
+  it("checks a call after cd against the folder it moved to", () => {
+    expect(findInvocations("cd ../other && vercel deploy", GUARDED, base)).toEqual([
+      { bin: "vercel", args: ["deploy"], env: {}, cwd: resolve("/work/other") },
+    ]);
+  });
+
+  it("follows an absolute cd and later cds", () => {
+    const calls = findInvocations("cd /srv/a; gh pr list; cd b && az vm list", GUARDED, base);
+    expect(calls.map((c) => c.cwd)).toEqual([resolve("/srv/a"), resolve("/srv/a/b")]);
+  });
+
+  it("leaves cwd unset when there is no cd", () => {
+    expect(findInvocations("gh pr list", GUARDED, base)[0]?.cwd).toBeUndefined();
   });
 });

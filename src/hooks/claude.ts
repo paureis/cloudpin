@@ -29,9 +29,9 @@ export async function claudeHook(stdin: string, deps: GuardDeps, env: NodeJS.Pro
   const bins = deps.providers.flatMap((p) => p.bins);
   const cwd = input.cwd ?? process.cwd();
   const reasons: string[] = [];
-  for (const call of findInvocations(command, bins)) {
+  for (const call of findInvocations(command, bins, cwd)) {
     const verdict = await guard(
-      { bin: call.bin, args: call.args, env: { ...env, ...call.env }, cwd, mode: "agent" },
+      { bin: call.bin, args: call.args, env: { ...env, ...call.env }, cwd: call.cwd ?? cwd, mode: "agent" },
       deps,
     );
     if (verdict.action === "block") {

@@ -1,3 +1,5 @@
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 import { commandName } from "./guard.js";
 
 export interface Invocation {
@@ -6,6 +8,8 @@ export interface Invocation {
   args: string[];
   /** VAR=value assignments written before the command. */
   env: Record<string, string>;
+  /** Folder the call runs in, when a `cd` earlier in the line changed it. */
+  cwd?: string;
 }
 
 type Token = { kind: "word"; value: string } | { kind: "op" };
@@ -117,10 +121,30 @@ const RUNNER_SUBCOMMANDS: Record<string, string[]> = {
   npm: ["exec", "x"],
   bun: ["x"],
 };
+// Wrappers with flags that take a value, and how many positional words
+// (e.g. timeout's duration) come before the wrapped command.
+const VALUE_WRAPPERS: Record<string, { valueFlags: string[]; positionals: number }> = {
+  timeout: { valueFlags: ["-s", "-k", "--signal", "--kill-after"], positionals: 1 },
+  xargs: { valueFlags: ["-n", "-I", "-i", "-P", "-L", "-l", "-d", "-a", "-E", "-e", "-s"], positionals: 0 },
+};
 const SHELLS = new Set(["bash", "sh", "zsh", "dash"]);
 const POWERSHELLS = new Set(["pwsh", "powershell"]);
 
-function analyse(words: string[], guarded: Set<string>, out: Invocation[]): void {
+interface State {
+  /** Working directory after any `cd` seen so far; undefined until one is. */
+  cwd?: string;
+  base?: string;
+}
+
+function analyse(words: string[], guarded: Set<string>, out: Invocation[], state: State): void {
+  if (words[0] === "cd") {
+    const target = words[1];
+    if (target !== undefined && target !== "-") {
+      const expanded = target === "~" || target.startsWith("~/") ? homedir() + target.slice(1) : target;
+      state.cwd = resolve(state.cwd ?? state.base ?? ".", expanded);
+    }
+    return;
+  }
   const env: Record<string, string> = {};
   let i = 0;
   for (;;) {
@@ -128,9 +152,17 @@ function analyse(words: string[], guarded: Set<string>, out: Invocation[]): void
     if (word === undefined) return;
     const assignment = ASSIGNMENT.exec(word);
     const name = commandName(word);
+    const wrapper = VALUE_WRAPPERS[name];
     if (assignment) {
       env[assignment[1]!] = assignment[2]!;
       i++;
+    } else if (wrapper) {
+      i++;
+      while (words[i]?.startsWith("-")) {
+        const flag = words[i]!;
+        i += wrapper.valueFlags.includes(flag) ? 2 : 1;
+      }
+      i += wrapper.positionals;
     } else if (name === "env" || PASS_THROUGH.has(name)) {
       i++;
       // Skip the wrapper's own flags (sudo -u root, npx --yes, env -i).
@@ -146,24 +178,24 @@ function analyse(words: string[], guarded: Set<string>, out: Invocation[]): void
   const name = commandName(bin);
   const args = words.slice(i + 1);
   if (guarded.has(name)) {
-    out.push({ bin, args, env });
+    out.push(state.cwd === undefined ? { bin, args, env } : { bin, args, env, cwd: state.cwd });
   } else if (SHELLS.has(name) || POWERSHELLS.has(name)) {
     const flag = args.findIndex((a) =>
       SHELLS.has(name) ? /^-[a-z]*c$/.test(a) : /^-(c|command)$/i.test(a),
     );
     const script = flag === -1 ? undefined : args[flag + 1];
-    if (script !== undefined) collect(script, guarded, out);
+    if (script !== undefined) collect(script, guarded, out, state);
   }
 }
 
-function collect(input: string, guarded: Set<string>, out: Invocation[]): void {
-  const tokens = tokenize(input, (inner) => collect(inner, guarded, out));
+function collect(input: string, guarded: Set<string>, out: Invocation[], state: State): void {
+  const tokens = tokenize(input, (inner) => collect(inner, guarded, out, state));
   let segment: string[] = [];
   for (const token of [...tokens, { kind: "op" } as const]) {
     if (token.kind === "word") {
       segment.push(token.value);
     } else if (segment.length > 0) {
-      analyse(segment, guarded, out);
+      analyse(segment, guarded, out, state);
       segment = [];
     }
   }
@@ -172,9 +204,12 @@ function collect(input: string, guarded: Set<string>, out: Invocation[]): void {
 /**
  * Finds every call to a guarded CLI in a shell command line, including inside
  * pipelines, lists, subshells, command substitutions and `bash -c` strings.
+ * With `baseCwd`, a `cd` earlier in the line sets the call's `cwd`, so
+ * `cd ../other && vercel deploy` is checked against ../other's pins. Subshell
+ * scoping of `cd` is not modelled: a later call may get a deeper folder.
  */
-export function findInvocations(command: string, guardedBins: string[]): Invocation[] {
+export function findInvocations(command: string, guardedBins: string[], baseCwd?: string): Invocation[] {
   const out: Invocation[] = [];
-  collect(command, new Set(guardedBins), out);
+  collect(command, new Set(guardedBins), out, { base: baseCwd });
   return out;
 }

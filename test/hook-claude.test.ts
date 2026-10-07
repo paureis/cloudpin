@@ -65,6 +65,18 @@ describe("claudeHook", () => {
     expect(await claudeHook(input("gh auth switch --user paureis"), deps, { FAKE_GH_USER: "someone" })).toBe("");
   });
 
+  it("checks a call after cd against the pins of the folder it moved to", async () => {
+    const perFolder: GuardDeps = {
+      ...deps,
+      findConfig: (cwd) =>
+        cwd.endsWith("other")
+          ? { path: `${cwd}/.cloudpin.yml`, pins: { github: { user: "someone-else" } } }
+          : config,
+    };
+    const out = await claudeHook(input("cd ../other && gh pr list"), perFolder, {});
+    expect(JSON.parse(out).hookSpecificOutput.permissionDecisionReason).toContain('expected "someone-else"');
+  });
+
   it("stays out of the way when the input is not valid hook JSON", async () => {
     expect(await claudeHook("not json", deps, {})).toBe("");
   });

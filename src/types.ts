@@ -1,0 +1,37 @@
+import type { Pins, Provider } from "./config.js";
+
+/** Runs a CLI and returns its output; injected so providers are testable. */
+export type Exec = (
+  bin: string,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+) => Promise<{ code: number; stdout: string; stderr: string }>;
+
+export interface CommandContext {
+  /** Arguments after the CLI binary, e.g. ["deploy", "--prod"]. */
+  args: string[];
+  env: NodeJS.ProcessEnv;
+  cwd: string;
+}
+
+/** The identity a command will act as, keyed like the provider's pin section. */
+export type Identity = Record<string, string>;
+
+export type Resolution =
+  | { kind: "identity"; identity: Identity; source: string }
+  | { kind: "logged-out"; hint: string }
+  | { kind: "error"; message: string };
+
+export interface ProviderDef<P extends Provider = Provider> {
+  name: P;
+  /** Executable names this provider guards. */
+  bins: string[];
+  /** Commands always allowed: login, logout, switch, whoami, version, help. */
+  isExempt(args: string[]): boolean;
+  /** Resolves who the command in `ctx` will act as. */
+  resolve(ctx: CommandContext, exec: Exec): Promise<Resolution>;
+  /** Compares pinned fields to the identity; returns one line per mismatch. */
+  compare(pin: NonNullable<Pins[P]>, identity: Identity): string[];
+  /** Command a human would run to switch to the pinned identity. */
+  switchHint(pin: NonNullable<Pins[P]>): string;
+}

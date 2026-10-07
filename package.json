@@ -39,9 +39,11 @@
     "url": "git+https://github.com/paureis/cloudpin.git"
   },
   "dependencies": {
+    "cross-spawn": "7.0.6",
     "yaml": "2.9.1"
   },
   "devDependencies": {
+    "@types/cross-spawn": "6.0.6",
     "@types/node": "26.6.4",
     "typescript": "7.0.2",
     "vitest": "5.0.3"

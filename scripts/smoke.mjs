@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { realExec } from "../dist/exec.js";
 import { azure } from "../dist/providers/azure.js";
+import { aws } from "../dist/providers/aws.js";
 import { github } from "../dist/providers/github.js";
 
 const ctx = { args: ["--cloudpin-smoke"], env: process.env, cwd: process.cwd() };
@@ -21,6 +22,21 @@ async function smokeGithub() {
     show("pin = other", github.compare({ user: "cloudpin-nobody" }, res.identity));
   }
   show("bad GH_TOKEN", await github.resolve({ ...ctx, env: { ...process.env, GH_TOKEN: "invalid" } }, realExec));
+}
+
+async function smokeAws() {
+  const res = await aws.resolve(ctx, realExec);
+  show("aws resolve", res);
+  if (res.kind === "identity") {
+    show("pin = active", aws.compare({ account: res.identity.account }, res.identity));
+    show("pin = other", aws.compare({ account: "000000000000" }, res.identity));
+  }
+  show("--profile unknown", await aws.resolve({ ...ctx, args: ["s3", "ls", "--profile", "cloudpin-nope"] }, realExec));
+  const dir = mkdtempSync(join(tmpdir(), "cloudpin-aws-"));
+  const env = { ...process.env, AWS_CONFIG_FILE: join(dir, "c"), AWS_SHARED_CREDENTIALS_FILE: join(dir, "k"), AWS_EC2_METADATA_DISABLED: "true" };
+  for (const k of ["AWS_PROFILE", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"]) delete env[k];
+  show("logged out (empty dir)", await aws.resolve({ ...ctx, env }, realExec));
+  rmSync(dir, { recursive: true, force: true });
 }
 
 async function smokeAzure() {
@@ -38,7 +54,7 @@ async function smokeAzure() {
 }
 
 const wanted = process.argv.slice(2);
-const all = { github: smokeGithub, azure: smokeAzure };
+const all = { github: smokeGithub, azure: smokeAzure, aws: smokeAws };
 for (const [name, run] of Object.entries(all)) {
   if (wanted.length === 0 || wanted.includes(name)) await run();
 }

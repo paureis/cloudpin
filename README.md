@@ -1,6 +1,6 @@
 # <picture><img width="32" height="32" alt="" src="assets/logomark.svg"></picture> cloudpin
 
-[![CI](https://github.com/paureis/cloudpin/actions/workflows/ci.yml/badge.svg)](https://github.com/paureis/cloudpin/actions/workflows/ci.yml)
+[![Tests](https://github.com/paureis/cloudpin/actions/workflows/nightly.yml/badge.svg)](https://github.com/paureis/cloudpin/actions/workflows/nightly.yml)
 [![npm](https://img.shields.io/npm/v/cloudpin?color=2f81f7)](https://www.npmjs.com/package/cloudpin)
 [![Node](https://img.shields.io/node/v/cloudpin?color=2f81f7)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2f81f7)](LICENSE)

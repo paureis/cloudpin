@@ -1,4 +1,6 @@
+import { join } from "node:path";
 import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
 const EXEMPT_COMMANDS = new Set(["configure", "login", "logout", "help"]);
@@ -10,6 +12,17 @@ export const aws: ProviderDef<"aws"> = {
   name: "aws",
   bins: ["aws"],
   statusCommand: "aws sts get-caller-identity",
+
+  cacheInputs(env) {
+    const dir = join(home(env), ".aws");
+    return {
+      // Every AWS_* variable: profiles, keys, role and web-identity settings.
+      env: ["AWS_*"],
+      files: [env.AWS_CONFIG_FILE ?? join(dir, "config"), env.AWS_SHARED_CREDENTIALS_FILE ?? join(dir, "credentials")],
+      // SSO and assumed-role credential caches.
+      dirs: [join(dir, "sso", "cache"), join(dir, "cli", "cache")],
+    };
+  },
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version"])) return true;

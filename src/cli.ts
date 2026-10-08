@@ -4,12 +4,14 @@ import { existsSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
+import { cachedExec } from "./cache.js";
 import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
 import { realExec } from "./exec.js";
 import { formatBlock } from "./format.js";
 import { guard, type GuardDeps } from "./guard.js";
 import { claudeHook } from "./hooks/claude.js";
 import { discover, renderConfig } from "./init.js";
+import { cacheDir } from "./paths.js";
 import { providers } from "./providers/index.js";
 
 /** Exit code for a blocked command, distinct from the usual 1 and 2. */
@@ -27,7 +29,14 @@ Usage:
 
 Exit codes: 0 ok, 1 usage or check failure, ${EXIT_BLOCKED} command blocked.`;
 
+// `check` always asks the CLIs directly; `exec` and the hooks use the short-lived
+// identity cache (src/cache.ts), which CLOUDPIN_NO_CACHE=1 turns off.
 const deps: GuardDeps = { providers, exec: realExec, findConfig };
+const cachedDeps: GuardDeps = {
+  ...deps,
+  wrapExec: (provider, env, exec) =>
+    cachedExec(exec, provider.cacheInputs(env), { cacheDir: cacheDir(), env: process.env }),
+};
 
 async function init(flags: string[]): Promise<number> {
   const path = join(process.cwd(), CONFIG_FILE);
@@ -118,7 +127,7 @@ async function exec(argv: string[]): Promise<number> {
     console.error("cloudpin exec: missing command after --");
     return 1;
   }
-  const verdict = await guard({ bin, args, env: process.env, cwd: process.cwd(), mode: "shell" }, deps);
+  const verdict = await guard({ bin, args, env: process.env, cwd: process.cwd(), mode: "shell" }, cachedDeps);
   if (verdict.action === "block") {
     console.error(formatBlock(verdict, argv, "shell"));
     return EXIT_BLOCKED;
@@ -144,7 +153,7 @@ async function hook(agent: string | undefined): Promise<number> {
     console.error(`cloudpin hook: unsupported agent "${agent ?? ""}" (supported: claude)`);
     return 1;
   }
-  const out = await claudeHook(await readStdin(), deps, process.env);
+  const out = await claudeHook(await readStdin(), cachedDeps, process.env);
   if (out) process.stdout.write(`${out}\n`);
   return 0;
 }

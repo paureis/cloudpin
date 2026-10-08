@@ -55,6 +55,16 @@ export const vercel: ProviderDef<"vercel"> = {
   bins: ["vercel", "vc"],
   statusCommand: "vercel whoami",
 
+  cacheInputs(env) {
+    // config.json holds currentTeam (`vercel switch` rewrites it); auth.json is
+    // only stat'ed, never read. The linked project is read fresh every time.
+    return {
+      env: ["VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID", "XDG_DATA_HOME", "APPDATA", "HOME"],
+      files: loginDirs(env).flatMap((d) => [join(d, "config.json"), join(d, "auth.json")]),
+      dirs: [],
+    };
+  },
+
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "-v", "--help", "-h"])) return true;
     const [first, second] = leadingWords(args);

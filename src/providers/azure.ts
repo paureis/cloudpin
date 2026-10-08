@@ -1,4 +1,6 @@
+import { join } from "node:path";
 import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
 const EXEMPT_COMMANDS = new Set(["login", "logout", "version", "upgrade"]);
@@ -9,6 +11,18 @@ export const azure: ProviderDef<"azure"> = {
   name: "azure",
   bins: ["az"],
   statusCommand: "az account show",
+
+  cacheInputs(env) {
+    // `az login` and `az account set` rewrite azureProfile.json (observed).
+    const dir = env.AZURE_CONFIG_DIR ?? join(home(env), ".azure");
+    return {
+      env: ["AZURE_CONFIG_DIR"],
+      files: ["azureProfile.json", "clouds.config", "msal_token_cache.json", "msal_token_cache.bin"].map((f) =>
+        join(dir, f),
+      ),
+      dirs: [],
+    };
+  },
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;

@@ -13,6 +13,7 @@ const gh: ProviderDef<"github"> = {
   compare: (pin, id) => (pin.user === id.user ? [] : [`user: expected "${pin.user}", active is "${id.user}"`]),
   switchHint: (pin) => `gh auth switch --user ${pin.user}`,
   statusCommand: "gh auth status",
+  cacheInputs: () => ({ env: [], files: [], dirs: [] }),
 };
 const config: FoundConfig = { path: "/repo/.cloudpin.yml", pins: { github: { user: "paureis" } } };
 const deps: GuardDeps = {

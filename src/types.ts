@@ -1,3 +1,4 @@
+import type { CacheInputs } from "./cache.js";
 import type { Pins, Provider } from "./config.js";
 
 /** Runs a CLI and returns its output; injected so providers are testable. */
@@ -42,4 +43,6 @@ export interface ProviderDef<P extends Provider = Provider> {
   switchHint(pin: NonNullable<Pins[P]>): string;
   /** Command that shows the CLI's login state, suggested when resolving fails. */
   statusCommand: string;
+  /** Environment variables and files that decide the identity (cache invalidation). */
+  cacheInputs(env: NodeJS.ProcessEnv): CacheInputs;
 }

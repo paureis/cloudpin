@@ -1,4 +1,6 @@
+import { join } from "node:path";
 import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { appData, home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
 const DEFAULT_HOST = "github.com";
@@ -11,6 +13,17 @@ export const github: ProviderDef<"github"> = {
   name: "github",
   bins: ["gh"],
   statusCommand: "gh auth status",
+
+  cacheInputs(env) {
+    // hosts.yml holds the active user per host; `gh auth switch` rewrites it.
+    const dirs = [env.GH_CONFIG_DIR, env.XDG_CONFIG_HOME && join(env.XDG_CONFIG_HOME, "gh"),
+      appData(env) && join(appData(env)!, "GitHub CLI"), join(home(env), ".config", "gh")];
+    return {
+      env: [...TOKEN_VARS, "GH_HOST", "GH_CONFIG_DIR", "XDG_CONFIG_HOME"],
+      files: dirs.filter((d): d is string => Boolean(d)).map((d) => join(d, "hosts.yml")),
+      dirs: [],
+    };
+  },
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;

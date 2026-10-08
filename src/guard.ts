@@ -16,6 +16,8 @@ export interface GuardDeps {
   providers: ProviderDef[];
   exec: Exec;
   findConfig: (cwd: string) => FoundConfig | null;
+  /** Optional wrapper around `exec` per provider, e.g. the identity cache. */
+  wrapExec?: (provider: ProviderDef, env: NodeJS.ProcessEnv, exec: Exec) => Exec;
 }
 
 export type Verdict =
@@ -66,8 +68,9 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
   // Track whether the CLI itself is missing: then the command would fail on
   // its own, so there is no account to protect (DESIGN.md, edge cases).
   let cliMissing = false;
+  const inner = deps.wrapExec ? deps.wrapExec(provider, req.env, deps.exec) : deps.exec;
   const exec: Exec = async (bin, args, env) => {
-    const result = await deps.exec(bin, args, env);
+    const result = await inner(bin, args, env);
     if (result.notFound) cliMissing = true;
     return result;
   };

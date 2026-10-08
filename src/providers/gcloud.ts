@@ -1,4 +1,6 @@
+import { join } from "node:path";
 import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { appData, home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
 // Setup and housekeeping groups: logins, local config, SDK components, docs.
@@ -13,6 +15,17 @@ export const gcloud: ProviderDef<"gcloud"> = {
   name: "gcloud",
   bins: ["gcloud"],
   statusCommand: "gcloud config list",
+
+  cacheInputs(env) {
+    const dir =
+      env.CLOUDSDK_CONFIG ??
+      (appData(env) ? join(appData(env)!, "gcloud") : join(home(env), ".config", "gcloud"));
+    return {
+      env: ["CLOUDSDK_*"],
+      files: [join(dir, "active_config")],
+      dirs: [join(dir, "configurations")],
+    };
+  },
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;

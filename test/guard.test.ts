@@ -12,6 +12,7 @@ function fakeGithub(resolution: Resolution): ProviderDef<"github"> {
     compare: (pin, id) => (pin.user === id.user ? [] : [`user: expected "${pin.user}", active is "${id.user}"`]),
     switchHint: (pin) => `gh auth switch --user ${pin.user}`,
     statusCommand: "gh auth status",
+    cacheInputs: () => ({ env: [], files: [], dirs: [] }),
   };
 }
 

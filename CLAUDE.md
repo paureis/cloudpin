@@ -34,9 +34,11 @@ Run typecheck and tests as separate calls, and read each exit code; a pipe (`| g
 
 - `src/config.ts`: parses and finds `.cloudpin.yml` (YAML failsafe schema, so every value is a string).
 - `src/types.ts`: `ProviderDef` is the interface every CLI implements: `isExempt`, `resolve`, `compare`, `switchHint`.
-- `src/providers/<name>.ts`: one file per CLI. Done: `github`, `azure`, `aws`, `gcloud`. To do: `vercel`.
+- `src/providers/<name>.ts`: one file per CLI: `github`, `azure`, `aws`, `gcloud`, `vercel`.
 - `src/guard.ts`: allow/block decision; `src/format.ts`: messages; `src/shellwords.ts`: finds CLI calls in a
-  command line; `src/hooks/<agent>.ts`: agent hooks; `src/init.ts`: writes `.cloudpin.yml`; `src/cli.ts`: entry.
+  command line; `src/hooks/agents.ts`: one adapter per agent; `src/install.ts`: install-hook;
+  `src/cache.ts`: identity cache; `src/shell-init.ts`: wrappers; `src/init.ts`: writes `.cloudpin.yml`;
+  `src/cli.ts`: entry point.
 - `src/exec.ts`: the only place that spawns processes (`realExec`).
 - `src/args.ts`: flag parsing shared by providers.
 

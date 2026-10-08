@@ -60,10 +60,14 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
   (never inline `-m` with quotes or backticks). End with:
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - **One branch per issue** (owner decision, 2026-10-08), e.g. `feat/12-environments`, `fix/7-heredocs`,
-  `docs/...`, cut from an up-to-date `main` in this folder (no worktree). Push the branch after each green
-  commit, open a PR whose body says `Closes #N`, and squash-merge it only when CI is green on all three OSes
-  (`gh pr checks`). Free private repos can't enforce branch protection, so this is a habit until go-public (#8),
-  then turn protection on (it also helps #20). `main` stays releasable: half-done work waits on its branch.
+  `docs/...`, cut from an up-to-date `main` in this folder (no worktree). Run typecheck and tests locally,
+  push the branch once when the issue is done (every push to an open PR costs a CI run), open a PR whose body
+  says `Closes #N`, and squash-merge it when the `check` job is green (`gh pr checks`). Free private repos
+  can't enforce branch protection, so this is a habit until go-public (#8), then turn protection on (it also
+  helps #20). `main` stays releasable: half-done work waits on its branch.
+- **CI budget** (owner rule): PRs run one Linux job (`ci.yml`); Windows and the newest Node run nightly only
+  when `main` changed (`nightly.yml`; run it by hand before a release); no macOS. Read
+  `node scripts/ci-minutes.mjs` at every session close (1,348 billed minutes on 2026-10-08, 76% macOS).
 - Switching branches never changes the owner's installed cloudpin; only `node scripts/dogfood.mjs install` does.
 - Before any `gh` call that writes, confirm `gh auth status --active` shows `paureis`.
 - **Releasing needs the owner:** bump the version and CHANGELOG, tag, then run `npm publish --access public

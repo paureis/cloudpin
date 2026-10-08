@@ -12,7 +12,7 @@ npm run build
 npm test
 ```
 
-Node.js 22 or later. CI runs the tests on Windows, macOS and Linux with Node 22 and 24.
+Node.js 22 or later. Pull requests run the tests on Linux with Node 22; Windows and Node 24 run nightly.
 
 ## Ground rules
 

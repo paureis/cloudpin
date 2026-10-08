@@ -69,6 +69,10 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
 - **CI budget** (owner rule): PRs run one Linux job (`ci.yml`); Windows and the newest Node run nightly only
   when `main` changed (`nightly.yml`; run it by hand before a release); no macOS. Read
   `node scripts/ci-minutes.mjs` at every session close (1,348 billed minutes on 2026-10-08, 76% macOS).
+- **Personal details stay out of the repo** (owner rule, 2026-10-08; the repo is public): no emails, usernames,
+  home or drive paths, machine specifics, real account IDs or session notes in tracked files or commit messages.
+  Commits use the owner's GitHub noreply address (this checkout's git config); machine notes go in the
+  gitignored `HANDOFF.md`. A local pre-commit hook blocks staged personal strings; never bypass it (`--no-verify`).
 - Switching branches never changes the owner's installed cloudpin; only `node scripts/dogfood.mjs install` does.
 - Before any `gh` call that writes, confirm `gh auth status --active` shows `paureis`.
 - **Releasing needs the owner:** bump the version and CHANGELOG, tag, then run `npm publish --access public

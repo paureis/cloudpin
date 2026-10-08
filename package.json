@@ -38,6 +38,10 @@
     "type": "git",
     "url": "git+https://github.com/paureis/cloudpin.git"
   },
+  "homepage": "https://github.com/paureis/cloudpin#readme",
+  "bugs": {
+    "url": "https://github.com/paureis/cloudpin/issues"
+  },
   "dependencies": {
     "cross-spawn": "7.0.6",
     "yaml": "2.9.1"

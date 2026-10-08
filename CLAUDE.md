@@ -55,6 +55,9 @@ Run typecheck and tests as separate calls, and read each exit code; a pipe (`| g
 6. **Never spawn with `shell: true`**; use `realExec` (cross-spawn escapes Windows `.cmd` shims).
 7. **Real-account smoke test with a control** for every provider that is installed here: the active
    identity must pass and a wrong pin must fail (`scripts/smoke.mjs`). A check that cannot fail proves nothing.
+   Real-account tests run **read-only commands only** (list, show, whoami, GraphQL queries): never send a
+   request body, `-X POST/PATCH/DELETE`, deploy or set anything on the owner's real accounts (2026-10-08: a
+   stdin test turned `gh api user` into a PATCH; GitHub rejected it, but it should never have been sent).
 8. Login, logout, switch, whoami, version and help commands are always exempt (`isExempt`).
 
 ## Commits

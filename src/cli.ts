@@ -12,6 +12,7 @@ import { guard, type GuardDeps } from "./guard.js";
 import { claudeHook } from "./hooks/claude.js";
 import { discover, renderConfig } from "./init.js";
 import { cacheDir } from "./paths.js";
+import { shellInit } from "./shell-init.js";
 import { providers } from "./providers/index.js";
 
 /** Exit code for a blocked command, distinct from the usual 1 and 2. */
@@ -25,6 +26,8 @@ Usage:
   cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
   cloudpin exec -- <cmd...>   Run <cmd> only if it would act on the pinned account
   cloudpin hook claude        Claude Code PreToolUse hook (reads the hook JSON on stdin)
+  cloudpin shell-init <bash|zsh|pwsh>
+                              Print shell functions that guard az, aws, gcloud, vercel and gh
   cloudpin --version
 
 Exit codes: 0 ok, 1 usage or check failure, ${EXIT_BLOCKED} command blocked.`;
@@ -169,6 +172,14 @@ export async function main(argv: string[]): Promise<number> {
       return exec(rest[0] === "--" ? rest.slice(1) : rest);
     case "hook":
       return hook(rest[0]);
+    case "shell-init":
+      try {
+        process.stdout.write(shellInit(rest[0] ?? "", providers.flatMap((p) => p.bins)));
+        return 0;
+      } catch (err) {
+        console.error(`cloudpin shell-init: ${(err as Error).message}`);
+        return 1;
+      }
     case "--version":
     case "-v": {
       const pkg = createRequire(import.meta.url)("../package.json") as { version: string };

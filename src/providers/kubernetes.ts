@@ -178,6 +178,11 @@ function allNamespaces(args: string[]): boolean {
   return own.some((a) => a === "-A" || a === "--all-namespaces" || a === "--all-namespaces=true");
 }
 
+/** Drops `user:password@` from a server URL, so it never reaches a message or `status`. */
+function withoutUserinfo(server: string): string {
+  return server.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/@]*@/i, "$1");
+}
+
 function normaliseServer(server: string): string {
   try {
     const url = new URL(server);
@@ -236,7 +241,11 @@ export const kubernetes: ProviderDef<"kubernetes"> = {
       server = cluster.server;
     }
     const namespace = allNamespaces(args) ? ALL_NAMESPACES : (sel.namespace ?? context?.namespace ?? "default");
-    return { kind: "identity", identity: { server, namespace, context: contextName ?? "" }, source: "kubeconfig" };
+    return {
+      kind: "identity",
+      identity: { server: withoutUserinfo(server), namespace, context: contextName ?? "" },
+      source: "kubeconfig",
+    };
   },
 
   compare(pin, identity) {

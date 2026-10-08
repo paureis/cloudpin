@@ -299,3 +299,11 @@ aliases:
     expect(await resolve(["upgrade", "x", "./c"], { HOME: withKuberc() }, "helm")).toMatchObject({ kind: "identity" });
   });
 });
+
+describe("kubernetes: credentials in a server URL (#22)", () => {
+  it("never shows user:password from a kubeconfig server URL", async () => {
+    const res = await resolve(["get", "pods"], { HOME: home(CONFIG_A.replace("https://dev.example.com:6443", "https://admin:s3cr3t@dev.example.com:6443")) });
+    expect(res).toMatchObject({ identity: { server: "https://dev.example.com:6443" } });
+    expect(JSON.stringify(res)).not.toContain("s3cr3t");
+  });
+});

@@ -78,9 +78,10 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
 - **Releasing needs the owner:** in one `release/x.y.z` PR, bump the version and update the docs (owner rule): the
   CHANGELOG entry, README's `**Latest release: x.y.z**` line, ROADMAP's Shipped list, the bug-report form's example
   version, and any README/DESIGN/AGENTS text the release changes; `test/release-docs.test.ts` fails until the
-  first four match `package.json`. Run Nightly on the branch, merge, tag, then start `npm publish --access public
-  --auth-type=web` in the Terminal panel (if npm says 404, run `npm login --auth-type=web` first); the owner approves
-  in the browser, waits for "Validating" to end, then approves under npmjs.com > Staged Packages.
+  first four match `package.json`. Run Nightly on the branch, merge, then push the `vX.Y.Z` tag: `release.yml`
+  stages the version on npm with provenance (trusted publishing, no token); the owner waits for "Validating" to end,
+  then approves under npmjs.com > Staged Packages. Fallback if the workflow can't publish: start `npm publish
+  --access public --auth-type=web` in the Terminal panel (`npm login --auth-type=web` first if npm says 404).
 
 ## Editing
 

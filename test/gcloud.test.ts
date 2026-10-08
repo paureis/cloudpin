@@ -49,7 +49,7 @@ describe("gcloud.resolve", () => {
       identity: { account: "me@x.com", project: "proj-1" },
       source: "gcloud config list",
     });
-    expect(calls[0]?.args).toEqual(["config", "list", "--format=json"]);
+    expect(calls[0]?.args).toEqual(["config", "list", "--format=json(core.account,core.project)"]);
   });
 
   it("passes the command's --account, --project and --configuration flags through", async () => {
@@ -59,7 +59,7 @@ describe("gcloud.resolve", () => {
       exec,
     );
     expect(calls[0]?.args).toEqual([
-      "config", "list", "--format=json",
+      "config", "list", "--format=json(core.account,core.project)",
       "--account", "a2@x.com", "--project", "p2", "--configuration", "work",
     ]);
   });

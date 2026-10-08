@@ -31,6 +31,9 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Fixed
 
+- The identity cache no longer holds the whole `gcloud config list` output, which can include credentials such as
+  `proxy/password` (#22); only the account and project are requested. A kubeconfig server URL with
+  `user:password@` is shown without it.
 - Logins and account switches are recognised after global flags (#21), e.g. `aws --profile p sso login` or
   `vercel --scope t switch`; before, a logged-out command like these could be blocked.
 - Agent hooks fail closed: an unexpected error or a check slower than 45 seconds now blocks the command instead of

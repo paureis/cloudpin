@@ -41,8 +41,10 @@ export const gcloud: ProviderDef<"gcloud"> = {
   async resolve({ args, env }, exec) {
     // `gcloud config list` given the same flags and env reports the account
     // and project the command would use (verified for flags, CLOUDSDK_CORE_*
-    // and named configurations on SDK 588).
-    const query = ["config", "list", "--format=json"];
+    // and named configurations on SDK 588). The projection keeps only those two
+    // fields: the full list can hold credentials such as proxy/password, and the
+    // output is cached (checked on SDK 588 with a throwaway config).
+    const query = ["config", "list", "--format=json(core.account,core.project)"];
     for (const flag of IDENTITY_FLAGS) {
       const value = flagValue(args, [flag]);
       if (value !== undefined) query.push(flag, value);

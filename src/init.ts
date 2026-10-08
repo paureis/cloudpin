@@ -1,4 +1,5 @@
-import type { Provider } from "./config.js";
+import { parseDocument, type YAMLMap } from "yaml";
+import { ConfigError, isEnvironmentName, parseConfig, type Provider } from "./config.js";
 import type { Exec, Identity, ProviderDef } from "./types.js";
 
 export interface FoundIdentity {
@@ -17,12 +18,14 @@ const PIN_FIELDS: Record<Provider, { fields: string[]; comment?: string }> = {
 
 const DEFAULT_GITHUB_HOST = "github.com";
 
-/** Renders .cloudpin.yml. Values are double-quoted (JSON is valid YAML). */
-export function renderConfig(found: FoundIdentity[]): string {
-  const lines = [
-    "# cloudpin: the cloud accounts this project uses. Commit this file.",
-    "# Docs: https://github.com/paureis/cloudpin",
-  ];
+const HEADER = [
+  "# cloudpin: the cloud accounts this project uses. Commit this file.",
+  "# Docs: https://github.com/paureis/cloudpin",
+];
+
+/** One section per provider. Values are double-quoted (JSON is valid YAML). */
+function providerLines(found: FoundIdentity[]): string[] {
+  const lines: string[] = [];
   for (const { provider, identity } of found) {
     const { fields, comment } = PIN_FIELDS[provider];
     lines.push(`${provider}:`);
@@ -36,7 +39,51 @@ export function renderConfig(found: FoundIdentity[]): string {
       first = false;
     }
   }
-  return `${lines.join("\n")}\n`;
+  return lines;
+}
+
+/** Renders .cloudpin.yml in the flat format. */
+export function renderConfig(found: FoundIdentity[]): string {
+  return `${[...HEADER, ...providerLines(found)].join("\n")}\n`;
+}
+
+/**
+ * Adds (or with `force`, replaces) one environment in a .cloudpin.yml, or
+ * starts a new file with it. The `yaml` document API keeps the rest of an
+ * existing file as written, comments included. Throws ConfigError.
+ */
+export function addEnvironment(
+  existing: string | null,
+  name: string,
+  isProtected: boolean,
+  found: FoundIdentity[],
+  force: boolean,
+): string {
+  if (!isEnvironmentName(name)) {
+    throw new ConfigError(`invalid environment name "${name}" (use letters, digits, "-", "_" or ".")`);
+  }
+  const block = [`${name}:`, ...(isProtected ? ["  protected: true"] : []), ...providerLines(found).map((l) => `  ${l}`)];
+  const project = existing === null ? null : parseConfig(existing);
+  let text: string;
+  if (project === null || (project.environments === null && Object.keys(project.pins).length === 0)) {
+    const intro = existing?.trim() ? [existing.trimEnd()] : HEADER;
+    text = `${[...intro, "environments:", ...block.map((l) => `  ${l}`)].join("\n")}\n`;
+  } else if (project.environments === null) {
+    throw new ConfigError(
+      "this file uses the flat format; to add environments, move its provider sections under " +
+        '"environments:" and a name (see Environments in the README), then run this again',
+    );
+  } else {
+    if (project.environments.some((e) => e.name === name) && !force) {
+      throw new ConfigError(`environment "${name}" already exists (use --force to replace it)`);
+    }
+    const doc = parseDocument(existing!, { schema: "failsafe" });
+    const pair = (parseDocument(`${block.join("\n")}\n`, { schema: "failsafe" }).contents as YAMLMap).items[0]!;
+    (doc.get("environments", true) as YAMLMap).set(pair.key, pair.value);
+    text = doc.toString();
+  }
+  parseConfig(text); // Never write a file cloudpin itself would reject.
+  return text;
 }
 
 export interface Discovery {

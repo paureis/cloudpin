@@ -1,5 +1,6 @@
 import { basename } from "node:path";
-import { ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
+import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
+import { isReadOnly } from "./readonly.js";
 import type { Exec, ProviderDef } from "./types.js";
 
 export interface GuardRequest {
@@ -8,14 +9,15 @@ export interface GuardRequest {
   args: string[];
   env: NodeJS.ProcessEnv;
   cwd: string;
-  /** "agent" ignores CLOUDPIN_SKIP, so an agent cannot opt itself out. */
+  /** "agent" ignores CLOUDPIN_SKIP and CLOUDPIN_CONFIRM, so an agent cannot opt itself out. */
   mode: "shell" | "agent";
 }
 
 export interface GuardDeps {
   providers: ProviderDef[];
   exec: Exec;
-  findConfig: (cwd: string) => FoundConfig | null;
+  /** Finds the pin file and selects its environment (`env` carries CLOUDPIN_ENV). */
+  findConfig: (cwd: string, env: NodeJS.ProcessEnv) => FoundConfig | null;
   /** Optional wrapper around `exec` per provider, e.g. the identity cache. */
   wrapExec?: (provider: ProviderDef, env: NodeJS.ProcessEnv, exec: Exec) => Exec;
 }
@@ -23,7 +25,15 @@ export interface GuardDeps {
 export type Verdict =
   | {
       action: "allow";
-      reason: "not-guarded" | "no-config" | "not-pinned" | "exempt" | "match" | "skipped" | "not-installed";
+      reason:
+        | "not-guarded"
+        | "no-config"
+        | "not-pinned"
+        | "exempt"
+        | "match"
+        | "skipped"
+        | "confirmed"
+        | "not-installed";
     }
   | {
       action: "block";
@@ -31,8 +41,16 @@ export type Verdict =
       uncertain?: boolean;
       provider?: Provider;
       configPath?: string;
+      environment?: ActiveEnvironment;
       problems: string[];
       fix?: string;
+    }
+  | {
+      /** Right account, but a protected environment and a command that may change it. */
+      action: "confirm";
+      provider: Provider;
+      configPath: string;
+      environment: ActiveEnvironment;
     };
 
 /** Normalises "C:\\x\\GH.EXE" or "/usr/bin/az" to "gh" / "az". */
@@ -49,7 +67,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
 
   let config: FoundConfig | null;
   try {
-    config = deps.findConfig(req.cwd);
+    config = deps.findConfig(req.cwd, req.env);
   } catch (err) {
     // A broken pin file must not silently switch protection off.
     if (err instanceof ConfigError) {
@@ -64,7 +82,12 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
   if (provider.isExempt(req.args)) return { action: "allow", reason: "exempt" };
   if (req.mode === "shell" && req.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
 
-  const base = { action: "block" as const, provider: provider.name, configPath: config.path };
+  const base = {
+    action: "block" as const,
+    provider: provider.name,
+    configPath: config.path,
+    ...(config.environment ? { environment: config.environment } : {}),
+  };
   // Track whether the CLI itself is missing: then the command would fail on
   // its own, so there is no account to protect (DESIGN.md, edge cases).
   let cliMissing = false;
@@ -87,10 +110,26 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
       // The provider and its pin come from the same key, so the cast is safe.
       const p = provider as ProviderDef<typeof provider.name>;
       const problems = p.compare(pin as never, res.identity);
-      if (problems.length === 0) return { action: "allow", reason: "match" };
-      return { ...base, problems, fix: p.switchHint(pin as never) };
+      if (problems.length > 0) return { ...base, problems, fix: p.switchHint(pin as never) };
+      return protectedEnvironment(req, provider.name, config);
     }
   }
+}
+
+/**
+ * The account is right; on a protected environment a command that may change
+ * something still needs the user's yes (issue #12). Only a human can give it
+ * ahead of time, with CLOUDPIN_CONFIRM=<environment>.
+ */
+function protectedEnvironment(req: GuardRequest, provider: Provider, config: FoundConfig): Verdict {
+  const environment = config.environment;
+  if (!environment?.protected || isReadOnly(provider, req.args, req.env, config.readOnly ?? {})) {
+    return { action: "allow", reason: "match" };
+  }
+  if (req.mode === "shell" && req.env.CLOUDPIN_CONFIRM === environment.name) {
+    return { action: "allow", reason: "confirmed" };
+  }
+  return { action: "confirm", provider, configPath: config.path, environment };
 }
 
 export const defaultFindConfig = findConfig;

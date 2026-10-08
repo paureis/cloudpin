@@ -17,6 +17,10 @@ export function formatBlock(verdict: Block, argv: string[], mode: "shell" | "age
   if (verdict.provider && verdict.configPath) {
     lines.push(`  ${verdict.provider} is pinned in ${verdict.configPath}`);
   }
+  if (verdict.environment) {
+    const { name, source } = verdict.environment;
+    lines.push(`  environment: ${name}${verdict.environment.protected ? " (protected)" : ""}, chosen by ${source}`);
+  }
   for (const problem of verdict.problems) {
     lines.push(verdict.uncertain ? `  - reason: ${problem}` : `  - ${problem}`);
   }
@@ -32,4 +36,41 @@ export function formatBlock(verdict: Block, argv: string[], mode: "shell" | "age
       : `  (to run it anyway, once: CLOUDPIN_SKIP=1 ${command})`,
   );
   return lines.join("\n");
+}
+
+type Confirm = Extract<Verdict, { action: "confirm" }>;
+
+/**
+ * The confirmation for a protected environment: a terminal prompt, the stop
+ * message when no terminal can answer, the question an agent shows the user,
+ * or the refusal for an agent whose hook cannot ask.
+ */
+export function formatConfirm(
+  verdict: Confirm,
+  argv: string[],
+  mode: "prompt" | "no-terminal" | "agent-ask" | "agent-deny",
+): string {
+  const command = displayCommand(argv);
+  const { name, source } = verdict.environment;
+  switch (mode) {
+    case "prompt":
+      return `cloudpin: \`${command}\` will run on ${name.toUpperCase()}, a protected environment (chosen by ${source}).\nContinue? [y/N] `;
+    case "no-terminal":
+      return [
+        `cloudpin: stopped \`${command}\`: ${name} is a protected environment and there is no terminal to confirm`,
+        `  the ${verdict.provider} account matches ${verdict.configPath} (environment chosen by ${source})`,
+        `  to run it: CLOUDPIN_CONFIRM=${name} ${command}`,
+      ].join("\n");
+    case "agent-ask":
+      return (
+        `cloudpin: \`${command}\` would run on the protected environment "${name}" (chosen by ${source}). ` +
+        `The ${verdict.provider} account matches the pin, but this command may change something, so it needs your OK.`
+      );
+    case "agent-deny":
+      return [
+        `cloudpin: stopped \`${command}\`: it would run on the protected environment "${name}" (chosen by ${source}) and may change something.`,
+        "  This agent's hook cannot ask the user to confirm, so cloudpin blocks it.",
+        "  Do not work around this; ask the user to run it themselves.",
+      ].join("\n");
+  }
 }

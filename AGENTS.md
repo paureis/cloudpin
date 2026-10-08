@@ -25,7 +25,10 @@ Run the type-check and the tests as separate commands and read each exit code.
 
 | Path | What it is |
 |---|---|
-| `src/config.ts` | `.cloudpin.yml` parsing and lookup |
+| `src/config.ts` | `.cloudpin.yml` parsing and lookup, environments and which one applies |
+| `src/git.ts` | Branch and `cloudpin use` choice, read from the git folder without spawning git |
+| `src/readonly.ts` | Which commands only read, so they skip confirmation on a protected environment |
+| `src/confirm.ts`, `src/use.ts` | The terminal confirmation and `cloudpin use` |
 | `src/providers/` | One file per CLI, implementing `ProviderDef` from `src/types.ts` |
 | `src/guard.ts` | The allow-or-block decision |
 | `src/shellwords.ts` | Finds CLI calls inside a full shell command line |

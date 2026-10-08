@@ -10,6 +10,21 @@ All notable changes to cloudpin are listed here. The format follows
 
 - `cloudpin status`: each CLI's active account, the pins that apply here, and the installed agent hooks;
   `--json` for tools (the MCP server and editor extension build on it).
+- Environments (#12): one `.cloudpin.yml` can pin several environments (`environments:`), chosen by
+  `CLOUDPIN_ENV`, `cloudpin use <name>`, a `branches` mapping or the first listed. `cloudpin init --env <name>
+  [--protected]` adds one; `status`, `check` and every message name the active environment.
+- Protected environments: on the right account, commands that may change something ask first (a y/N prompt, the
+  agent's own "ask" in Claude Code, Copilot CLI and Cursor, a block in Codex and Gemini CLI, `CLOUDPIN_CONFIRM` in CI).
+  Read-only commands are listed per CLI and can be extended with `read_only:`.
+
+### Changed
+
+- The flat `.cloudpin.yml` format keeps working unchanged; it is now the single-environment case.
+
+### Fixed
+
+- An agent could skip the check by wrapping a command in `cloudpin exec` (shell mode, where `CLOUDPIN_SKIP` works);
+  the agent hook now checks the wrapped command as the agent's.
 
 ## [0.1.0] - 2026-10-08
 

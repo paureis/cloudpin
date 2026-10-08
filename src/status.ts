@@ -1,4 +1,4 @@
-import type { FoundConfig } from "./config.js";
+import type { ActiveEnvironment, FoundConfig } from "./config.js";
 import type { GuardDeps } from "./guard.js";
 import type { Exec, Identity } from "./types.js";
 
@@ -18,6 +18,8 @@ export type ProviderStatus =
 export interface Status {
   pinFile: string | null;
   configError?: string;
+  /** Set when the pin file defines environments. */
+  environment?: ActiveEnvironment;
   providers: ProviderStatus[];
   hooks: string[];
 }
@@ -36,7 +38,7 @@ export async function collectStatus(
   let config: FoundConfig | null = null;
   let configError: string | undefined;
   try {
-    config = deps.findConfig(cwd);
+    config = deps.findConfig(cwd, env);
   } catch (err) {
     configError = (err as Error).message;
   }
@@ -64,7 +66,13 @@ export async function collectStatus(
       providers.push({ name, state: "active", identity: res.identity, pin, match: problems.length === 0, problems });
     }
   }
-  return { pinFile: config?.path ?? null, ...(configError ? { configError } : {}), providers, hooks: hooks() };
+  return {
+    pinFile: config?.path ?? null,
+    ...(configError ? { configError } : {}),
+    ...(config?.environment ? { environment: config.environment } : {}),
+    providers,
+    hooks: hooks(),
+  };
 }
 
 // Identity fields shown in brackets after the main value, as context.
@@ -92,8 +100,13 @@ export async function buildStatus(
     status.configError
       ? `Pin file: invalid (${status.configError})`
       : `Pin file: ${status.pinFile ?? "none here or in any parent folder"}`,
-    "",
   ];
+  if (status.environment) {
+    const { name, source } = status.environment;
+    const kind = status.environment.protected ? " (protected: changing commands ask first)" : "";
+    lines.push(`Environment: ${name}${kind}, chosen by ${source}`);
+  }
+  lines.push("");
   const width = Math.max(...status.providers.map((p) => p.name.length));
   for (const p of status.providers) {
     const label = `  ${p.name.padEnd(width)}  `;

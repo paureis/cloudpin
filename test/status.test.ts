@@ -107,3 +107,33 @@ describe("buildStatus", () => {
     ]);
   });
 });
+
+describe("status with environments", () => {
+  const production = { name: "production", protected: true, source: 'branch "main"' };
+  const config = { path: "/repo/.cloudpin.yml", pins: { github: { user: "me" } }, environment: production };
+  const gh = provider("github", { kind: "identity", identity: { user: "me" }, source: "t" });
+
+  it("includes the active environment in --json", async () => {
+    const status = await collectStatus(deps(config, [gh]), "/repo", {}, () => []);
+    expect(status.environment).toEqual(production);
+  });
+
+  it("shows the active environment, why it applies and that it is protected", async () => {
+    const lines = await buildStatus(deps(config, [gh]), "/repo", {}, () => []);
+    expect(lines.slice(0, 2)).toEqual([
+      "Pin file: /repo/.cloudpin.yml",
+      'Environment: production (protected: changing commands ask first), chosen by branch "main"',
+    ]);
+  });
+
+  it("passes the environment variables to the config lookup", async () => {
+    let seen: NodeJS.ProcessEnv | undefined;
+    await collectStatus(
+      { ...deps(config, [gh]), findConfig: (_cwd, env) => ((seen = env), config) },
+      "/repo",
+      { CLOUDPIN_ENV: "staging" },
+      () => [],
+    );
+    expect(seen).toEqual({ CLOUDPIN_ENV: "staging" });
+  });
+});

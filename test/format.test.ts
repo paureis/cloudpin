@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatBlock } from "../src/format.js";
+import { formatBlock, formatConfirm } from "../src/format.js";
 
 const verdict = {
   action: "block" as const,
@@ -60,5 +60,52 @@ describe("formatBlock", () => {
         "  (to run it anyway, once: CLOUDPIN_SKIP=1 gh pr list)",
       ].join("\n"),
     );
+  });
+});
+
+describe("environment messages", () => {
+  const production = { name: "production", protected: true, source: 'branch "main"' };
+  const confirm = {
+    action: "confirm" as const,
+    provider: "github" as const,
+    configPath: "/repo/.cloudpin.yml",
+    environment: production,
+  };
+  const argv = ["gh", "pr", "merge", "12"];
+
+  it("names the environment when blocking", () => {
+    expect(formatBlock({ ...verdict, environment: production }, argv, "shell")).toContain(
+      '  environment: production (protected), chosen by branch "main"',
+    );
+  });
+
+  it("asks a human at the terminal", () => {
+    expect(formatConfirm(confirm, argv, "prompt")).toBe(
+      'cloudpin: `gh pr merge 12` will run on PRODUCTION, a protected environment (chosen by branch "main").\nContinue? [y/N] ',
+    );
+  });
+
+  it("tells a script how to confirm ahead of time", () => {
+    expect(formatConfirm(confirm, argv, "no-terminal")).toBe(
+      [
+        "cloudpin: stopped `gh pr merge 12`: production is a protected environment and there is no terminal to confirm",
+        '  the github account matches /repo/.cloudpin.yml (environment chosen by branch "main")',
+        "  to run it: CLOUDPIN_CONFIRM=production gh pr merge 12",
+      ].join("\n"),
+    );
+  });
+
+  it("explains the question an agent puts to the user", () => {
+    expect(formatConfirm(confirm, argv, "agent-ask")).toBe(
+      'cloudpin: `gh pr merge 12` would run on the protected environment "production" (chosen by branch "main"). ' +
+        "The github account matches the pin, but this command may change something, so it needs your OK.",
+    );
+  });
+
+  it("tells an agent that cannot ask to hand the command to the user", () => {
+    const text = formatConfirm(confirm, argv, "agent-deny");
+    expect(text).toContain('it would run on the protected environment "production"');
+    expect(text).toContain("ask the user to run it themselves");
+    expect(text).not.toContain("CLOUDPIN_CONFIRM");
   });
 });

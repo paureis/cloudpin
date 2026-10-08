@@ -1,0 +1,92 @@
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { hasAnyFlag, leadingWords } from "./args.js";
+import type { Provider, ReadOnlyRules } from "./config.js";
+import { home } from "./paths.js";
+
+/*
+ * Which commands only read, so they skip the confirmation on a protected
+ * environment (issue #12). The lists are deliberately short: anything not on
+ * them asks, so a mistake here can only make cloudpin too cautious. Only the
+ * leading words before the first flag count, so global flags placed before
+ * the command (`aws --region x ec2 ...`) also ask.
+ */
+
+const BUILT_IN: Record<Provider, (words: string[], args: string[], env: NodeJS.ProcessEnv) => boolean> = {
+  // Azure CLI command guidelines: list and show are "backed server-side by a GET
+  // request" (github.com/Azure/azure-cli/blob/dev/doc/command_guidelines.md).
+  // az takes names as flags, so the verb is the last leading word; the alias
+  // extension cannot redefine an existing command word.
+  azure: (words) => words.length >= 2 && ["list", "show"].includes(words.at(-1)!),
+
+  // `aws <service> <operation>`. AWS CLI aliases (~/.aws/cli/alias) can replace
+  // a built-in command (awscli/alias.py), so with an alias file nothing is
+  // trusted to be read-only.
+  aws: (words, _args, env) => {
+    if (awsAliasFiles(env).some((f) => existsSync(f))) return false;
+    if (words.length < 2) return false;
+    return /^(describe|list|get)-/.test(words[1]!) || (words[0] === "s3" && words[1] === "ls");
+  },
+
+  // gcloud puts a positional name after the verb ("compute instances describe
+  // INSTANCE_NAME", cloud.google.com/sdk/gcloud/reference). So `describe` is
+  // trusted only after a group, with at most one name after it, and with no
+  // other verb before it (`instances delete describe` deletes an instance named
+  // "describe").
+  gcloud: (words) => {
+    const i = words.findIndex((w) => w === "list" || w === "describe");
+    if (i < 1 || words.length - i > 2) return false;
+    // The top-level group (after alpha/beta) is never a verb, though some are
+    // named like one (`gcloud run`, `gcloud deploy`).
+    const groupAt = ["alpha", "beta", "preview"].includes(words[0]!) ? 1 : 0;
+    return !words.slice(groupAt + 1, i).some((w) => GCLOUD_VERB.test(w));
+  },
+
+  // Vercel CLI: bare `vercel <path>` deploys, `vercel alias` with no subcommand
+  // creates an alias, and `--yes` can set up a project (vercel.com/docs/cli).
+  vercel: (words, args) => {
+    if (hasAnyFlag(args, ["--yes", "-y"])) return false;
+    const [first, second] = words;
+    if (["ls", "list", "inspect", "logs"].includes(first ?? "")) return true;
+    if (["env", "domains", "dns", "certs", "project", "projects", "teams", "alias"].includes(first ?? "")) {
+      if (["ls", "list"].includes(second ?? "")) return true;
+      return second === "inspect" && ["domains", "project", "projects"].includes(first!);
+    }
+    return false;
+  },
+
+  // gh refuses an alias named like a built-in command (cli/cli pkg/cmd/alias/set),
+  // so `<core group> list|view|status` always means what it says.
+  github: (words) => {
+    if (words.length === 1) return words[0] === "status";
+    return GH_GROUPS.has(words[0] ?? "") && ["list", "view", "status"].includes(words[1] ?? "");
+  },
+};
+
+// Verbs that change something, or that suggest the word after them is a name.
+const GCLOUD_VERB =
+  /^(create|delete|update|deploy|set|unset|add|remove|start|stop|reset|resize|restart|suspend|resume|import|export|move|rename|enable|disable|apply|run|ssh|scp|attach|detach|patch|submit|cancel|rollback|promote|undelete|execute|call|get|describe|list)(-|$)/;
+
+const GH_GROUPS = new Set([
+  "pr", "issue", "repo", "release", "run", "workflow", "gist", "label", "secret", "variable",
+  "cache", "codespace", "project", "ruleset", "org", "ssh-key", "gpg-key", "extension", "alias",
+]);
+
+function awsAliasFiles(env: NodeJS.ProcessEnv): string[] {
+  const files = [join(home(env), ".aws", "cli", "alias")];
+  if (env.AWS_CONFIG_FILE) files.push(join(dirname(env.AWS_CONFIG_FILE), "cli", "alias"));
+  return files;
+}
+
+/** True when the command only reads, by the built-in list or the project's `read_only` rules. */
+export function isReadOnly(
+  provider: Provider,
+  args: string[],
+  env: NodeJS.ProcessEnv,
+  rules: ReadOnlyRules,
+): boolean {
+  const words = leadingWords(args);
+  const extra = rules[provider] ?? [];
+  if (extra.some((rule) => rule.length <= words.length && rule.every((w, i) => words[i] === w))) return true;
+  return BUILT_IN[provider](words, args, env);
+}

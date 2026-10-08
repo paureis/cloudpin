@@ -5,16 +5,19 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { cachedExec } from "./cache.js";
+import { confirmProtected } from "./confirm.js";
 import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
 import { realExec } from "./exec.js";
 import { formatBlock } from "./format.js";
 import { guard, type GuardDeps } from "./guard.js";
 import { AGENTS, runHook, type AgentName } from "./hooks/agents.js";
-import { discover, renderConfig } from "./init.js";
+import { flagValue } from "./args.js";
+import { addEnvironment, discover, renderConfig, type FoundIdentity } from "./init.js";
 import { hookFile, planInstall, planUninstall } from "./install.js";
 import { cacheDir } from "./paths.js";
 import { shellInit } from "./shell-init.js";
 import { buildStatus, collectStatus } from "./status.js";
+import { useCommand } from "./use.js";
 import { providers } from "./providers/index.js";
 
 /** Exit code for a blocked command, distinct from the usual 1 and 2. */
@@ -23,11 +26,15 @@ export const EXIT_BLOCKED = 3;
 const USAGE = `cloudpin: a seatbelt for your cloud CLIs
 
 Usage:
-  cloudpin init [--yes] [--force]
+  cloudpin init [--env <name> [--protected]] [--yes] [--force]
                               Pin the accounts you are logged into now, in ./.cloudpin.yml
+                              (--env adds them as one environment of the file)
   cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
   cloudpin status [--json]    Show each CLI's active account, the pins here, and installed hooks
+  cloudpin use [<env> | --clear]
+                              Show the environments, or choose the one to use in this clone
   cloudpin exec -- <cmd...>   Run <cmd> only if it would act on the pinned account
+                              (on a protected environment, changing commands ask first)
   cloudpin hook <agent>       Agent hook; reads the hook JSON on stdin
                               (claude, codex, copilot, gemini, cursor)
   cloudpin install-hook <agent> [--user] [--yes]
@@ -51,9 +58,25 @@ const cachedDeps: GuardDeps = {
 
 async function init(flags: string[]): Promise<number> {
   const path = join(process.cwd(), CONFIG_FILE);
-  if (existsSync(path) && !flags.includes("--force")) {
-    console.error(`cloudpin init: ${path} already exists (use --force to replace it)`);
+  const force = flags.includes("--force");
+  // --env <name> adds one environment (pinned to the accounts active now) to
+  // the file, or starts the file with it; without it, init writes the flat format.
+  const envName = flagValue(flags, ["--env"]);
+  const existing = existsSync(path) ? readFileSync(path, "utf8") : null;
+  const render = (found: FoundIdentity[]) =>
+    envName === undefined ? renderConfig(found) : addEnvironment(existing, envName, flags.includes("--protected"), found, force);
+  if (envName === undefined && existing !== null && !force) {
+    console.error(`cloudpin init: ${path} already exists (use --force to replace it, or --env <name> to add an environment)`);
     return 1;
+  }
+  try {
+    render([]); // Report a flat file, a taken name or an invalid file before asking the CLIs.
+  } catch (err) {
+    if (err instanceof ConfigError) {
+      console.error(`cloudpin init: ${path}: ${err.message}`);
+      return 1;
+    }
+    throw err;
   }
   console.log("cloudpin: reading the accounts your CLIs are logged into...");
   const { found, skipped } = await discover(providers, realExec, process.env, process.cwd());
@@ -62,7 +85,7 @@ async function init(flags: string[]): Promise<number> {
     console.error("cloudpin init: no logged-in CLI found; log in to the accounts this project uses first.");
     return 1;
   }
-  const text = renderConfig(found);
+  const text = render(found);
   console.log(`\nProposed ${CONFIG_FILE}:\n\n${text}`);
   if (!flags.includes("--yes")) {
     if (!process.stdin.isTTY) {
@@ -98,6 +121,10 @@ async function check(): Promise<number> {
     return 0;
   }
   console.log(`cloudpin: checking ${config.path}`);
+  if (config.environment) {
+    const { name, source } = config.environment;
+    console.log(`  environment: ${name}${config.environment.protected ? " (protected)" : ""}, chosen by ${source}`);
+  }
   let ok = true;
   for (const name of PROVIDERS) {
     if (!config.pins[name]) continue;
@@ -114,7 +141,8 @@ async function check(): Promise<number> {
     );
     if (verdict.action === "allow" && verdict.reason === "not-installed") {
       console.log(`  -  ${name}: ${provider.bins[0]} is not installed here, nothing to check`);
-    } else if (verdict.action === "allow") {
+    } else if (verdict.action === "allow" || verdict.action === "confirm") {
+      // "confirm" means the account matches on a protected environment.
       console.log(`  ok ${name}: active account matches the pin`);
     } else {
       ok = false;
@@ -142,6 +170,22 @@ async function exec(argv: string[]): Promise<number> {
   if (verdict.action === "block") {
     console.error(formatBlock(verdict, argv, "shell"));
     return EXIT_BLOCKED;
+  }
+  if (verdict.action === "confirm") {
+    // The prompt goes to stderr so `cmd | jq` keeps a clean stdout.
+    const confirmed = await confirmProtected(verdict, argv, {
+      isTTY: Boolean(process.stdin.isTTY && process.stderr.isTTY),
+      ask: async (question) => {
+        const rl = createInterface({ input: process.stdin, output: process.stderr });
+        try {
+          return await rl.question(question);
+        } finally {
+          rl.close();
+        }
+      },
+      print: (line) => console.error(line),
+    });
+    if (!confirmed) return EXIT_BLOCKED;
   }
   return new Promise((resolve) => {
     const child = spawn(bin, args, { stdio: "inherit" });
@@ -233,6 +277,11 @@ export async function main(argv: string[]): Promise<number> {
       return init(rest);
     case "check":
       return check();
+    case "use": {
+      const result = useCommand(rest, process.cwd(), process.env);
+      for (const line of result.lines) (result.code === 0 ? console.log : console.error)(line);
+      return result.code;
+    }
     case "exec":
       return exec(rest[0] === "--" ? rest.slice(1) : rest);
     case "hook":

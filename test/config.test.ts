@@ -19,7 +19,7 @@ vercel:
   team: team_x9K
 github:
   user: paureis
-`);
+`).pins;
     expect(pins).toEqual({
       azure: {
         subscription: "3f2a0000-0000-0000-0000-000000000c91",
@@ -33,13 +33,13 @@ github:
   });
 
   it("keeps an unquoted numeric AWS account ID intact as a string", () => {
-    expect(parseConfig("aws:\n  account: 012345678901\n")).toEqual({
+    expect(parseConfig("aws:\n  account: 012345678901\n").pins).toEqual({
       aws: { account: "012345678901" },
     });
   });
 
   it("returns an empty pin set for an empty file", () => {
-    expect(parseConfig("")).toEqual({});
+    expect(parseConfig("")).toEqual({ environments: null, pins: {}, branches: [], readOnly: {} });
   });
 
   it("rejects an unknown provider, naming it", () => {

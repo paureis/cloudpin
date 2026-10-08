@@ -100,3 +100,92 @@ describe("runHook: input that is not for us", () => {
     expect(await runHook(agent, "not json", deps, wrong)).toBe(agent.noObjection);
   });
 });
+
+describe("runHook: protected environments", () => {
+  const production: FoundConfig = {
+    ...config,
+    environment: { name: "production", protected: true, source: 'branch "main"' },
+  };
+  const staging: FoundConfig = { ...config, environment: { name: "staging", protected: false, source: "CLOUDPIN_ENV" } };
+  // CLOUDPIN_ENV=staging selects staging, as the real findConfig would.
+  const envDeps: GuardDeps = { ...deps, findConfig: (_cwd, env) => (env.CLOUDPIN_ENV === "staging" ? staging : production) };
+  const claude = (command: string) =>
+    JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command }, cwd: "/repo" });
+
+  it("claude asks the user, showing why", async () => {
+    const out = JSON.parse(await runHook(AGENTS.claude, claude("gh pr merge 12"), envDeps, {}));
+    expect(out.hookSpecificOutput).toMatchObject({ hookEventName: "PreToolUse", permissionDecision: "ask" });
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain('protected environment "production"');
+  });
+
+  it("says nothing for a read-only command", async () => {
+    expect(await runHook(AGENTS.claude, claude("gh pr list"), envDeps, {})).toBe("");
+  });
+
+  it("denies when another call in the same command is on the wrong account", async () => {
+    const out = JSON.parse(
+      await runHook(AGENTS.claude, claude("gh pr merge 12 && FAKE_GH_USER=someone gh pr list"), envDeps, {}),
+    );
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("codex denies, because its hooks ignore ask and would run the command", async () => {
+    // learn.chatgpt.com/docs/hooks: "ask" is parsed but not supported, and the tool call continues.
+    const out = JSON.parse(await runHook(AGENTS.codex, inputs.codex("gh pr merge 12"), envDeps, {}));
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain("ask the user to run it themselves");
+  });
+
+  it("copilot asks", async () => {
+    const out = JSON.parse(await runHook(AGENTS.copilot, inputs.copilot("gh pr merge 12"), envDeps, {}));
+    expect(out).toMatchObject({ permissionDecision: "ask" });
+    expect(out.permissionDecisionReason).toContain("needs your OK");
+  });
+
+  it("gemini denies, having no ask decision", async () => {
+    const out = JSON.parse(await runHook(AGENTS.gemini, inputs.gemini("gh pr merge 12"), envDeps, {}));
+    expect(out.decision).toBe("deny");
+  });
+
+  it("cursor asks, with messages for the user and the agent", async () => {
+    const out = JSON.parse(await runHook(AGENTS.cursor, inputs.cursor("gh pr merge 12"), envDeps, {}));
+    expect(out.permission).toBe("ask");
+    expect(out.user_message).toContain("needs your OK");
+    expect(out.agent_message).toContain("needs your OK");
+  });
+
+  it("ignores CLOUDPIN_ENV and CLOUDPIN_CONFIRM set inside the agent's command", async () => {
+    for (const prefix of ["CLOUDPIN_ENV=staging", "CLOUDPIN_CONFIRM=production"]) {
+      const out = JSON.parse(await runHook(AGENTS.claude, claude(`${prefix} gh pr merge 12`), envDeps, {}));
+      expect(out.hookSpecificOutput.permissionDecision).toBe("ask");
+    }
+  });
+
+  it("honours CLOUDPIN_ENV the user set before starting the agent", async () => {
+    expect(await runHook(AGENTS.claude, claude("gh pr merge 12"), envDeps, { CLOUDPIN_ENV: "staging" })).toBe("");
+  });
+
+  it("asks before an agent switches environment with cloudpin use", async () => {
+    const out = JSON.parse(await runHook(AGENTS.claude, claude("cloudpin use staging && gh pr merge 12"), envDeps, {}));
+    expect(out.hookSpecificOutput.permissionDecision).toBe("ask");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain("cloudpin use staging");
+    const codex = JSON.parse(await runHook(AGENTS.codex, inputs.codex("npx cloudpin use --clear"), deps, {}));
+    expect(codex.hookSpecificOutput.permissionDecision).toBe("deny");
+  });
+
+  it("lets an agent read the current environment with a bare cloudpin use", async () => {
+    expect(await runHook(AGENTS.claude, claude("cloudpin use"), deps, {})).toBe("");
+  });
+});
+
+describe("runHook: cloudpin exec inside an agent's command", () => {
+  const claude = (command: string) =>
+    JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command }, cwd: "/repo" });
+
+  it("checks the wrapped command in agent mode, so CLOUDPIN_SKIP cannot skip it", async () => {
+    for (const command of ["CLOUDPIN_SKIP=1 cloudpin exec -- gh pr list", "cloudpin exec gh pr list"]) {
+      const out = JSON.parse(await runHook(AGENTS.claude, claude(command), deps, wrong));
+      expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    }
+  });
+});

@@ -54,6 +54,12 @@ Commit `.cloudpin.yml` so everyone on the project gets the same protection.
 # Write .cloudpin.yml from the accounts you are logged into now
 cloudpin init
 
+# ...or add them as one environment of the file (see Environments)
+cloudpin init --env production --protected
+
+# Show the environments, or choose the one to use in this clone
+cloudpin use [<env> | --clear]
+
 # Check every pinned account; exit 1 on a mismatch (handy in CI and scripts)
 cloudpin check
 
@@ -110,6 +116,54 @@ command's own flags and environment, and compares the answer with the file:
 Logging in, logging out, switching accounts, `--help` and `--version` are never blocked. A folder without a
 `.cloudpin.yml` is never affected. Monorepos work: the nearest `.cloudpin.yml` above the current folder wins.
 
+## Environments
+
+One file can pin staging and production separately. Mark an environment `protected` and, even on the right
+account, any command that could change something asks first:
+
+```yaml
+environments:
+  staging:
+    vercel: { team: "team_staging" }
+    aws: { account: "111111111111" }
+  production:
+    protected: true
+    vercel: { team: "team_prod" }
+    aws: { account: "222222222222" }
+branches:          # optional: which environment a git branch uses
+  main: production
+  "release/*": production
+  "*": staging
+read_only:         # optional: more commands that never need confirmation
+  azure: ["webapp log tail"]
+```
+
+**Which environment applies**, first match wins:
+
+1. `CLOUDPIN_ENV=<name>` in the environment.
+2. `cloudpin use <name>`: remembered for this clone, inside `.git`, so it is never committed.
+3. The `branches` mapping for the checked-out branch: an exact name first, then the first matching pattern.
+4. The first environment listed.
+
+An unknown name is an error, so the command is stopped rather than checked against the wrong pins. `cloudpin
+status` and every message say which environment applies and why.
+
+**On a protected environment**, read-only commands run as usual. Everything else asks:
+
+- In a terminal: `Continue? [y/N]`.
+- Without a terminal (CI, scripts): the command stops unless `CLOUDPIN_CONFIRM=<name>` is set.
+- Claude Code, Copilot CLI and Cursor ask you through the agent's own prompt. Codex and Gemini CLI have no working
+  "ask" in their hooks, so the command is blocked and the agent is told to hand it to you.
+
+The built-in read-only list is short on purpose (`az ... list|show`, `aws <service> describe-*|list-*|get-*` and
+`s3 ls`, `gcloud ... list|describe`, `vercel ls|inspect|logs` and `<group> ls`, `gh <group> list|view|status`), so
+anything it doesn't know asks. `read_only` can add commands, matched by their leading words, but never remove
+any. A wrong account is still blocked outright, protected or not.
+
+**Upgrading from the flat format:** nothing to do; a file without `environments` keeps working exactly as before.
+To split it, move the provider sections under `environments:` and a name, or start a fresh file with
+`cloudpin init --env <name>` and run it again per environment (after switching accounts).
+
 ## Protect your terminal
 
 Add one line to your shell profile. Removing it uninstalls.
@@ -134,7 +188,8 @@ cloudpin install-hook claude
 
 The hook goes into the project's agent settings (`--user` for your personal settings). cloudpin shows the file before
 writing it, keeps a backup, and `uninstall-hook` removes only its own entry. When a command is blocked, the agent is
-told why and asked to check with you. Agents can't use `CLOUDPIN_SKIP`.
+told why and asked to check with you. Agents can't use `CLOUDPIN_SKIP` or `CLOUDPIN_CONFIRM`, can't pick an
+environment by setting `CLOUDPIN_ENV` in their own command, and need your OK to run `cloudpin use`.
 
 | Agent | Settings file | Status |
 |---|---|---|
@@ -152,6 +207,8 @@ cloudpin reads the whole command line the agent is about to run, so it also catc
 | Variable | Effect |
 |---|---|
 | `CLOUDPIN_SKIP=1` | Run one command without the check (terminal only; ignored for agents) |
+| `CLOUDPIN_ENV=<name>` | Use this environment (see Environments) |
+| `CLOUDPIN_CONFIRM=<name>` | Confirm changing commands on this protected environment without a prompt (terminal and CI only; ignored for agents) |
 | `CLOUDPIN_NO_CACHE=1` | Always ask the CLI instead of using the identity cache |
 | `CLOUDPIN_CACHE_DIR` | Where the identity cache lives |
 
@@ -164,7 +221,7 @@ environment variables, or the CLI's own account files (which `az account set`, `
 |---|---|
 | `0` | OK |
 | `1` | Usage error, or `check` found a problem |
-| `3` | Command blocked |
+| `3` | Command blocked, or not confirmed on a protected environment |
 
 ## Security and privacy
 

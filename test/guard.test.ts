@@ -130,3 +130,73 @@ describe("guard", () => {
     expect(v).toEqual({ action: "allow", reason: "not-installed" });
   });
 });
+
+describe("guard with a protected environment", () => {
+  const production = { name: "production", protected: true, source: 'branch "main"' };
+  const prodConfig: FoundConfig = { ...pinned, environment: production };
+
+  it("asks for confirmation before a changing command on the right account", async () => {
+    expect(await guard(req("gh", ["pr", "merge", "12"]), deps(me, prodConfig))).toEqual({
+      action: "confirm",
+      provider: "github",
+      configPath: "/repo/.cloudpin.yml",
+      environment: production,
+    });
+  });
+
+  it("lets read-only commands through without asking", async () => {
+    expect(await guard(req("gh", ["pr", "list"]), deps(me, prodConfig))).toEqual({ action: "allow", reason: "match" });
+  });
+
+  it("uses the project's read_only rules", async () => {
+    const cfg = { ...prodConfig, readOnly: { github: [["pr", "checks"]] } };
+    expect(await guard(req("gh", ["pr", "checks", "12"]), deps(me, cfg))).toEqual({ action: "allow", reason: "match" });
+  });
+
+  it("does not ask on an unprotected environment", async () => {
+    const cfg = { ...pinned, environment: { name: "staging", protected: false, source: "first listed" } };
+    expect(await guard(req("gh", ["pr", "merge", "12"]), deps(me, cfg))).toEqual({ action: "allow", reason: "match" });
+  });
+
+  it("still blocks a wrong account, naming the environment", async () => {
+    expect(await guard(req("gh", ["pr", "merge", "12"]), deps(other, prodConfig))).toMatchObject({
+      action: "block",
+      environment: production,
+    });
+  });
+
+  it("accepts CLOUDPIN_CONFIRM=<env> from a human without a terminal", async () => {
+    const env = { CLOUDPIN_CONFIRM: "production" };
+    expect(await guard(req("gh", ["pr", "merge", "12"], { env }), deps(me, prodConfig))).toEqual({
+      action: "allow",
+      reason: "confirmed",
+    });
+  });
+
+  it("ignores CLOUDPIN_CONFIRM naming another environment", async () => {
+    const env = { CLOUDPIN_CONFIRM: "staging" };
+    expect((await guard(req("gh", ["pr", "merge", "12"], { env }), deps(me, prodConfig))).action).toBe("confirm");
+  });
+
+  it("ignores CLOUDPIN_CONFIRM in agent mode, so an agent cannot confirm for the user", async () => {
+    const env = { CLOUDPIN_CONFIRM: "production" };
+    const v = await guard(req("gh", ["pr", "merge", "12"], { env, mode: "agent" }), deps(me, prodConfig));
+    expect(v.action).toBe("confirm");
+  });
+
+  it("still allows exempt commands", async () => {
+    expect(await guard(req("gh", ["auth", "switch"]), deps(other, prodConfig))).toEqual({ action: "allow", reason: "exempt" });
+  });
+
+  it("passes the command's environment variables to the config lookup", async () => {
+    let seen: NodeJS.ProcessEnv | undefined;
+    await guard(req("gh", ["pr", "list"], { env: { CLOUDPIN_ENV: "staging" } }), {
+      ...deps(me),
+      findConfig: (_cwd, env) => {
+        seen = env;
+        return pinned;
+      },
+    });
+    expect(seen).toEqual({ CLOUDPIN_ENV: "staging" });
+  });
+});

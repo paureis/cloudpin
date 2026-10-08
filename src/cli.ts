@@ -9,7 +9,7 @@ import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
 import { realExec } from "./exec.js";
 import { formatBlock } from "./format.js";
 import { guard, type GuardDeps } from "./guard.js";
-import { claudeHook } from "./hooks/claude.js";
+import { AGENTS, runHook, type AgentName } from "./hooks/agents.js";
 import { discover, renderConfig } from "./init.js";
 import { cacheDir } from "./paths.js";
 import { shellInit } from "./shell-init.js";
@@ -25,7 +25,8 @@ Usage:
                               Pin the accounts you are logged into now, in ./.cloudpin.yml
   cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
   cloudpin exec -- <cmd...>   Run <cmd> only if it would act on the pinned account
-  cloudpin hook claude        Claude Code PreToolUse hook (reads the hook JSON on stdin)
+  cloudpin hook <agent>       Agent hook; reads the hook JSON on stdin
+                              (claude, codex, copilot, gemini, cursor)
   cloudpin shell-init <bash|zsh|pwsh>
                               Print shell functions that guard az, aws, gcloud, vercel and gh
   cloudpin --version
@@ -152,11 +153,11 @@ async function readStdin(): Promise<string> {
 }
 
 async function hook(agent: string | undefined): Promise<number> {
-  if (agent !== "claude") {
-    console.error(`cloudpin hook: unsupported agent "${agent ?? ""}" (supported: claude)`);
+  if (agent === undefined || !Object.hasOwn(AGENTS, agent)) {
+    console.error(`cloudpin hook: unsupported agent "${agent ?? ""}" (supported: ${Object.keys(AGENTS).join(", ")})`);
     return 1;
   }
-  const out = await claudeHook(await readStdin(), cachedDeps, process.env);
+  const out = await runHook(AGENTS[agent as AgentName], await readStdin(), cachedDeps, process.env);
   if (out) process.stdout.write(`${out}\n`);
   return 0;
 }

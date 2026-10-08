@@ -75,9 +75,12 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
   gitignored `HANDOFF.md`. A local pre-commit hook blocks staged personal strings; never bypass it (`--no-verify`).
 - Switching branches never changes the owner's installed cloudpin; only `node scripts/dogfood.mjs install` does.
 - Before any `gh` call that writes, confirm `gh auth status --active` shows `paureis`.
-- **Releasing needs the owner:** bump the version and CHANGELOG, tag, then run `npm publish --access public
-  --auth-type=web` in the Terminal panel (the Bash tool is non-interactive, so npm exits); the owner approves in the
-  browser, then approves again under npmjs.com > Staged Packages (staged publishing holds every version).
+- **Releasing needs the owner:** in one `release/x.y.z` PR, bump the version and update the docs (owner rule): the
+  CHANGELOG entry, README's `**Latest release: x.y.z**` line, ROADMAP's Shipped list, the bug-report form's example
+  version, and any README/DESIGN/AGENTS text the release changes; `test/release-docs.test.ts` fails until the
+  first four match `package.json`. Run Nightly on the branch, merge, tag, then start `npm publish --access public
+  --auth-type=web` in the Terminal panel (if npm says 404, run `npm login --auth-type=web` first); the owner approves
+  in the browser, waits for "Validating" to end, then approves under npmjs.com > Staged Packages.
 
 ## Editing
 

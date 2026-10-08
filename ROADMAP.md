@@ -5,20 +5,11 @@ What's planned, in the order it's likely to ship. Each item links to its issue; 
 
 ## 1.0
 
-The `.cloudpin.yml` format is stable from 1.0 on, so everything that changes it lands first.
+The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shipped in 0.2.0; what is left:
 
-- **Environments** ([#12](https://github.com/paureis/cloudpin/issues/12)): `staging` and `production` pins in one
-  file, chosen with `cloudpin use <env>`, `CLOUDPIN_ENV` or a branch mapping. Environments marked `protected` ask
-  before any command that changes something: a one-line confirmation in your terminal, the agent's own approval
-  prompt for AI agents, and `CLOUDPIN_CONFIRM` in CI. Read-only commands (list, get, describe, logs) pass.
-- **Kubernetes** ([#13](https://github.com/paureis/cloudpin/issues/13)): pin the cluster (by API server URL) and
-  namespace for `kubectl`, `helm` and `kustomize`.
-- **Vercel monorepos and large teams** ([#4](https://github.com/paureis/cloudpin/issues/4),
-  [#5](https://github.com/paureis/cloudpin/issues/5)).
 - **Verifiable releases** ([#19](https://github.com/paureis/cloudpin/issues/19),
   [#20](https://github.com/paureis/cloudpin/issues/20)): npm provenance from GitHub Actions and an OpenSSF Scorecard.
-- **Command parser gaps** ([#7](https://github.com/paureis/cloudpin/issues/7)): heredocs and commands held in
-  variables.
+- **A week of real use** by the author, then 1.0.0.
 
 ## 1.x
 
@@ -41,6 +32,13 @@ The `.cloudpin.yml` format is stable from 1.0 on, so everything that changes it 
 - **Team policy:** a shared file that requires certain projects to be pinned.
 - **Fish and Nushell** wrappers.
 
-## Done
+## Shipped
 
-See [CHANGELOG.md](CHANGELOG.md).
+- **0.2.0** (2026-10-08): environments and protected environments ([#12](https://github.com/paureis/cloudpin/issues/12)),
+  Kubernetes for `kubectl` and `helm` ([#13](https://github.com/paureis/cloudpin/issues/13); standalone `kustomize`
+  never contacts a cluster, so it isn't guarded), Vercel monorepos and large teams
+  ([#4](https://github.com/paureis/cloudpin/issues/4), [#5](https://github.com/paureis/cloudpin/issues/5)), command
+  parser gaps ([#7](https://github.com/paureis/cloudpin/issues/7)), and safety-review fixes.
+- **0.1.0** (2026-10-08): first public beta.
+
+Details in [CHANGELOG.md](CHANGELOG.md).

@@ -14,6 +14,7 @@ const PIN_FIELDS: Record<Provider, { fields: string[]; comment?: string }> = {
   gcloud: { fields: ["account", "project"] },
   vercel: { fields: ["team"], comment: "label" },
   github: { fields: ["user", "host"] },
+  kubernetes: { fields: ["server", "namespace"], comment: "context" },
 };
 
 const DEFAULT_GITHUB_HOST = "github.com";
@@ -34,6 +35,8 @@ function providerLines(found: FoundIdentity[]): string[] {
       const value = identity[field];
       if (!value) continue;
       if (provider === "github" && field === "host" && value === DEFAULT_GITHUB_HOST) continue;
+      // Pinning "default" would block every -n; leave the namespace free unless the context sets one.
+      if (provider === "kubernetes" && field === "namespace" && value === "default") continue;
       const note = first && comment && identity[comment] ? ` # ${identity[comment]!.replace(/\s+/g, " ")}` : "";
       lines.push(`  ${field}: ${JSON.stringify(value)}${note}`);
       first = false;

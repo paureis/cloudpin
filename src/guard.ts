@@ -79,7 +79,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
 
   const pin = config.pins[provider.name];
   if (!pin) return { action: "allow", reason: "not-pinned" };
-  if (provider.isExempt(req.args)) return { action: "allow", reason: "exempt" };
+  if (provider.isExempt(req.args, name)) return { action: "allow", reason: "exempt" };
   if (req.mode === "shell" && req.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
 
   const base = {
@@ -97,7 +97,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
     if (result.notFound) cliMissing = true;
     return result;
   };
-  const res = await provider.resolve({ args: req.args, env: req.env, cwd: req.cwd }, exec);
+  const res = await provider.resolve({ args: req.args, env: req.env, cwd: req.cwd, bin: name }, exec);
   if (res.kind === "error" && cliMissing) return { action: "allow", reason: "not-installed" };
   switch (res.kind) {
     case "logged-out":
@@ -123,7 +123,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
  */
 function protectedEnvironment(req: GuardRequest, provider: Provider, config: FoundConfig): Verdict {
   const environment = config.environment;
-  if (!environment?.protected || isReadOnly(provider, req.args, req.env, config.readOnly ?? {})) {
+  if (!environment?.protected || isReadOnly(provider, req.args, req.env, config.readOnly ?? {}, commandName(req.bin))) {
     return { action: "allow", reason: "match" };
   }
   if (req.mode === "shell" && req.env.CLOUDPIN_CONFIRM === environment.name) {

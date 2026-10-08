@@ -42,7 +42,7 @@ Usage:
                               Add or remove the agent hook in this project's
                               settings (or your personal settings with --user)
   cloudpin shell-init <bash|zsh|pwsh>
-                              Print shell functions that guard az, aws, gcloud, vercel and gh
+                              Print shell functions that guard every supported CLI
   cloudpin --version
 
 Exit codes: 0 ok, 1 usage or check failure, ${EXIT_BLOCKED} command blocked.`;

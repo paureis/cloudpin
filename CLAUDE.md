@@ -1,6 +1,6 @@
 # cloudpin — project rules
 
-A CLI that pins cloud accounts (az, aws, gcloud, vercel, gh) to a repo via a .cloudpin.yml file and blocks
+A CLI that pins cloud accounts (az, aws, gcloud, vercel, gh, kubectl, helm) to a repo via a .cloudpin.yml file and blocks
 commands, from a human or an AI agent, that would run on a different account. **Read `DESIGN.md` first**
 (every product decision and why), then `HANDOFF.md` (where the last session stopped).
 

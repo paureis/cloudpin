@@ -3,7 +3,7 @@
  * cloudpin then starts the real executable directly (no shell), so the
  * functions never call themselves. If cloudpin is not installed (or was
  * uninstalled), each function runs the real CLI unchanged, so a missing
- * cloudpin can never stop az, aws, gcloud, vercel or gh from working.
+ * cloudpin can never stop a guarded CLI from working.
  */
 export function shellInit(shell: string, bins: string[]): string {
   switch (shell) {

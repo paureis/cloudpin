@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { hasAnyFlag, leadingWords } from "./args.js";
 import type { Provider, ReadOnlyRules } from "./config.js";
 import { home } from "./paths.js";
+import { commandWords } from "./providers/kubernetes.js";
 
 /*
  * Which commands only read, so they skip the confirmation on a protected
@@ -12,7 +13,25 @@ import { home } from "./paths.js";
  * the command (`aws --region x ec2 ...`) also ask.
  */
 
-const BUILT_IN: Record<Provider, (words: string[], args: string[], env: NodeJS.ProcessEnv) => boolean> = {
+const BUILT_IN: Record<
+  Provider,
+  (words: string[], args: string[], env: NodeJS.ProcessEnv, bin: string | undefined) => boolean
+> = {
+  // kubectl plugins cannot replace a built-in command (kubernetes.io, kubectl
+  // plugins), nor can kuberc aliases. Global flags may come first, so the words
+  // skip them (`kubectl -n web get pods`).
+  kubernetes: (_words, args, _env, bin) => {
+    const words = commandWords(args);
+    if (bin === "helm") {
+      return ["list", "ls", "status", "history"].includes(words[0] ?? "") || (words[0] === "get" && words.length >= 2);
+    }
+    const first = words[0] ?? "";
+    if (["get", "describe", "logs", "top", "explain", "api-resources", "api-versions", "cluster-info"].includes(first)) {
+      return true;
+    }
+    return first === "auth" && ["can-i", "whoami"].includes(words[1] ?? "");
+  },
+
   // Azure CLI command guidelines: list and show are "backed server-side by a GET
   // request" (github.com/Azure/azure-cli/blob/dev/doc/command_guidelines.md).
   // az takes names as flags, so the verb is the last leading word; the alias
@@ -84,9 +103,11 @@ export function isReadOnly(
   args: string[],
   env: NodeJS.ProcessEnv,
   rules: ReadOnlyRules,
+  /** The command name, for providers that guard several CLIs (kubectl, helm). */
+  bin?: string,
 ): boolean {
   const words = leadingWords(args);
   const extra = rules[provider] ?? [];
   if (extra.some((rule) => rule.length <= words.length && rule.every((w, i) => words[i] === w))) return true;
-  return BUILT_IN[provider](words, args, env);
+  return BUILT_IN[provider](words, args, env, bin);
 }

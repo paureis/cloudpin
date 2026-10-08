@@ -117,3 +117,21 @@ describe("addEnvironment", () => {
     expect(() => addEnvironment(null, "pro d", false, staging, false)).toThrow(/invalid environment name/);
   });
 });
+
+describe("renderConfig: kubernetes", () => {
+  it("pins the server and an explicit namespace, with the context as a comment", () => {
+    const found: FoundIdentity[] = [
+      { provider: "kubernetes", identity: { server: "https://1.2.3.4", namespace: "payments", context: "prod-admin" } },
+    ];
+    expect(renderConfig(found)).toContain(
+      ['kubernetes:', '  server: "https://1.2.3.4" # prod-admin', '  namespace: "payments"'].join("\n"),
+    );
+  });
+
+  it("leaves the namespace out when it is just the default", () => {
+    const found: FoundIdentity[] = [
+      { provider: "kubernetes", identity: { server: "https://1.2.3.4", namespace: "default", context: "dev" } },
+    ];
+    expect(parseConfig(renderConfig(found)).pins).toEqual({ kubernetes: { server: "https://1.2.3.4" } });
+  });
+});

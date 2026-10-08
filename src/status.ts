@@ -76,7 +76,7 @@ export async function collectStatus(
 }
 
 // Identity fields shown in brackets after the main value, as context.
-const CONTEXT_FIELDS = new Set(["name", "arn", "label", "host"]);
+const CONTEXT_FIELDS = new Set(["name", "arn", "label", "host", "context"]);
 
 function describe(identity: Identity): string {
   const main = Object.entries(identity)

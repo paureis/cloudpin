@@ -17,6 +17,10 @@ All notable changes to cloudpin are listed here. The format follows
   agent's own "ask" in Claude Code, Copilot CLI and Cursor, a block in Codex and Gemini CLI, `CLOUDPIN_CONFIRM` in CI).
   Read-only commands are listed per CLI and can be extended with `read_only:`.
 
+- Kubernetes (#13): a `kubernetes:` section pins the cluster API server URL and, optionally, the namespace, for
+  `kubectl` and `helm`. The target is read from the kubeconfig the way kubectl does (flags, `KUBECONFIG` merging,
+  helm's `HELM_*` variables, kuberc), without contacting the cluster.
+
 ### Changed
 
 - The flat `.cloudpin.yml` format keeps working unchanged; it is now the single-environment case.

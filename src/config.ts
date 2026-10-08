@@ -11,6 +11,7 @@ export interface Pins {
   gcloud?: { account?: string; project?: string };
   vercel?: { team: string };
   github?: { user: string; host?: string };
+  kubernetes?: { server: string; namespace?: string };
 }
 
 export type Provider = keyof Pins;
@@ -44,6 +45,7 @@ const SCHEMA: Record<Provider, { keys: string[]; required: string[] }> = {
   gcloud: { keys: ["account", "project"], required: [] },
   vercel: { keys: ["team"], required: ["team"] },
   github: { keys: ["user", "host"], required: ["user"] },
+  kubernetes: { keys: ["server", "namespace"], required: ["server"] },
 };
 
 export const PROVIDERS = Object.keys(SCHEMA) as Provider[];

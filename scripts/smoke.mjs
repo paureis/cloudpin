@@ -9,6 +9,7 @@ import { realExec } from "../dist/exec.js";
 import { azure } from "../dist/providers/azure.js";
 import { aws } from "../dist/providers/aws.js";
 import { github } from "../dist/providers/github.js";
+import { kubernetes } from "../dist/providers/kubernetes.js";
 
 const ctx = { args: ["--cloudpin-smoke"], env: process.env, cwd: process.cwd() };
 const short = (v) => JSON.stringify(v).replace(/[0-9a-f]{8}-[0-9a-f-]{23}([0-9a-f]{4})/gi, "…$1");
@@ -53,8 +54,25 @@ async function smokeAzure() {
   rmSync(empty, { recursive: true, force: true });
 }
 
+// Reads the kubeconfig only (no cluster is contacted); prints the server and
+// namespace, never credentials.
+async function smokeKubernetes() {
+  const res = await kubernetes.resolve({ ...ctx, args: ["get", "pods"], bin: "kubectl" }, realExec);
+  show("kubernetes resolve", res);
+  if (res.kind === "identity") {
+    show("pin = active", kubernetes.compare({ server: res.identity.server, namespace: res.identity.namespace }, res.identity));
+    show("pin = other", kubernetes.compare({ server: "https://cloudpin-nobody:6443" }, res.identity));
+    show("-n other vs pinned ns", kubernetes.compare({ server: res.identity.server, namespace: res.identity.namespace },
+      (await kubernetes.resolve({ ...ctx, args: ["-ncloudpin-other", "get", "pods"], bin: "kubectl" }, realExec)).identity));
+  }
+  const empty = mkdtempSync(join(tmpdir(), "cloudpin-kube-"));
+  const env = { ...process.env, HOME: empty, USERPROFILE: empty, KUBECONFIG: "" };
+  show("no kubeconfig", await kubernetes.resolve({ ...ctx, env, bin: "kubectl" }, realExec));
+  rmSync(empty, { recursive: true, force: true });
+}
+
 const wanted = process.argv.slice(2);
-const all = { github: smokeGithub, azure: smokeAzure, aws: smokeAws };
+const all = { github: smokeGithub, azure: smokeAzure, aws: smokeAws, kubernetes: smokeKubernetes };
 for (const [name, run] of Object.entries(all)) {
   if (wanted.length === 0 || wanted.includes(name)) await run();
 }

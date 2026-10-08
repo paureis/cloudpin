@@ -19,6 +19,8 @@ export interface CommandContext {
   args: string[];
   env: NodeJS.ProcessEnv;
   cwd: string;
+  /** The command name, e.g. "kubectl" or "helm", for providers that guard several CLIs. */
+  bin?: string;
 }
 
 /** The identity a command will act as, keyed like the provider's pin section. */
@@ -34,7 +36,7 @@ export interface ProviderDef<P extends Provider = Provider> {
   /** Executable names this provider guards. */
   bins: string[];
   /** Commands always allowed: login, logout, switch, whoami, version, help. */
-  isExempt(args: string[]): boolean;
+  isExempt(args: string[], bin?: string): boolean;
   /** Resolves who the command in `ctx` will act as. */
   resolve(ctx: CommandContext, exec: Exec): Promise<Resolution>;
   /** Compares pinned fields to the identity; returns one line per mismatch. */

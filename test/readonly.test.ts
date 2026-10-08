@@ -90,3 +90,37 @@ describe("isReadOnly: project rules", () => {
     expect(ro("aws", "webapp log tail", { azure: [["webapp", "log", "tail"]] })).toBe(false);
   });
 });
+
+describe("isReadOnly: kubernetes", () => {
+  const k = (bin: string, cmd: string) => isReadOnly("kubernetes", split(cmd), env, {}, bin);
+
+  it.each([
+    ["kubectl", "get pods"],
+    ["kubectl", "-n web --context prod get pods -o yaml"],
+    ["kubectl", "describe deploy api"],
+    ["kubectl", "logs -f api-123"],
+    ["kubectl", "top nodes"],
+    ["kubectl", "explain pods"],
+    ["kubectl", "api-resources"],
+    ["kubectl", "auth can-i delete pods"],
+    ["helm", "list -A"],
+    ["helm", "status api"],
+    ["helm", "history api"],
+    ["helm", "get values api"],
+  ])("%s %s is read-only", (bin, cmd) => {
+    expect(k(bin, cmd)).toBe(true);
+  });
+
+  it.each([
+    ["kubectl", "delete pod x"],
+    ["kubectl", "apply -f x.yaml"],
+    ["kubectl", "exec -it api -- sh"],
+    ["kubectl", "auth reconcile -f x"],
+    ["kubectl", "getn pods"],
+    ["helm", "upgrade api ./chart"],
+    ["helm", "get"],
+    ["kubectl", ""],
+  ])("%s %s needs confirmation", (bin, cmd) => {
+    expect(k(bin, cmd)).toBe(false);
+  });
+});

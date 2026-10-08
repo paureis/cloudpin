@@ -69,7 +69,7 @@ cloudpin status
 # Run one command only if it would act on the pinned account; exit 3 if blocked
 cloudpin exec -- vercel deploy --prod
 
-# Shell functions that route az, aws, gcloud, vercel and gh through cloudpin
+# Shell functions that route az, aws, gcloud, vercel, gh, kubectl and helm through cloudpin
 cloudpin shell-init bash|zsh|pwsh
 
 # Add or remove the hook in an agent's settings (this project, or yours with --user)
@@ -95,10 +95,14 @@ vercel:
   team: "team_x9KqZr" # acme
 github:
   user: "acme-bot"
+kubernetes:
+  server: "https://acme-prod.hcp.westeurope.azmk8s.io:443" # acme-prod-admin
+  namespace: "payments"
 ```
 
-Before a guarded command runs, cloudpin asks the CLI which account **that command** would use, honouring the
-command's own flags and environment, and compares the answer with the file:
+Before a guarded command runs, cloudpin works out which account **that command** would use (asking the CLI, or for
+Kubernetes reading the kubeconfig), honouring the command's own flags and environment, and compares the answer with
+the file:
 
 | CLI | What is pinned | What cloudpin takes into account |
 |---|---|---|
@@ -107,6 +111,14 @@ command's own flags and environment, and compares the answer with the file:
 | `gcloud` | account, project | `--account`, `--project`, `--configuration`, `CLOUDSDK_*` |
 | `vercel` / `vc` | team ID | `--scope`, `--team`, `--token`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, linked project |
 | `gh` | user, host | `--hostname`, `GH_HOST`, `GH_TOKEN`, `GITHUB_TOKEN` |
+| `kubectl`, `helm` | API server URL, namespace (optional) | `--kubeconfig`, `KUBECONFIG`, `--context`, `--cluster`, `--server`, `-n`, `-A`, kuberc; helm's `--kube-context`, `--kube-apiserver`, `HELM_*` |
+
+For Kubernetes the server URL is pinned rather than the context name, because context names are personal: the same
+cluster is `prod` on one laptop and `acme-prod-admin` on another. `init` writes your context name as a comment, and
+pins the namespace only if your context sets one. With a namespace pinned, `-A` / `--all-namespaces` is a mismatch.
+Commands that never reach a cluster (`kubectl config`, `kubectl kustomize`, `helm template`, `helm repo`, ...) are
+never blocked, and standalone `kustomize` isn't guarded at all. cloudpin can't see a `namespace:` written inside a
+manifest you apply, so pin the namespace and keep manifests namespace-free if that matters to you.
 
 - **Match:** the command runs as if cloudpin wasn't there.
 - **Mismatch:** the command is stopped, and you're told which account is active and how to switch.
@@ -156,7 +168,8 @@ status` and every message say which environment applies and why.
   "ask" in their hooks, so the command is blocked and the agent is told to hand it to you.
 
 The built-in read-only list is short on purpose (`az ... list|show`, `aws <service> describe-*|list-*|get-*` and
-`s3 ls`, `gcloud ... list|describe`, `vercel ls|inspect|logs` and `<group> ls`, `gh <group> list|view|status`), so
+`s3 ls`, `gcloud ... list|describe`, `vercel ls|inspect|logs` and `<group> ls`, `gh <group> list|view|status`,
+`kubectl get|describe|logs|top|explain`, `helm list|status|history|get`), so
 anything it doesn't know asks. `read_only` can add commands, matched by their leading words, but never remove
 any. A wrong account is still blocked outright, protected or not.
 

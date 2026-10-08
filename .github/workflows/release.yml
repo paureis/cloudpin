@@ -43,6 +43,8 @@ jobs:
       - name: Stage on npm (approve on npmjs.com > Staged Packages)
         if: github.event_name == 'push'
         run: npm stage publish --access public
+      # `npm publish --dry-run` refuses a version that is already published, so
+      # the dry run runs the same checks and packs without asking the registry.
       - name: Dry run
         if: github.event_name == 'workflow_dispatch'
-        run: npm publish --dry-run --access public
+        run: npm run prepublishOnly && npm pack --dry-run

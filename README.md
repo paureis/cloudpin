@@ -1,6 +1,7 @@
 # <picture><img width="32" height="32" alt="" src="assets/logomark.svg"></picture> cloudpin
 
 [![Tests](https://github.com/paureis/cloudpin/actions/workflows/nightly.yml/badge.svg)](https://github.com/paureis/cloudpin/actions/workflows/nightly.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/paureis/cloudpin/badge)](https://scorecard.dev/viewer/?uri=github.com/paureis/cloudpin)
 [![npm](https://img.shields.io/npm/v/cloudpin?color=2f81f7)](https://www.npmjs.com/package/cloudpin)
 [![Node](https://img.shields.io/node/v/cloudpin?color=2f81f7)](package.json)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2f81f7)](LICENSE)

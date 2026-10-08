@@ -6,6 +6,10 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- An OpenSSF Scorecard workflow (weekly) and badge (#20).
+
 ## [0.2.0] - 2026-10-08
 
 Environments, Kubernetes, and fixes from a safety review. The `.cloudpin.yml` format is backwards compatible.

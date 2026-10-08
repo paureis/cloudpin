@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import spawn from "cross-spawn";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { cachedExec } from "./cache.js";
 import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
@@ -11,6 +11,7 @@ import { formatBlock } from "./format.js";
 import { guard, type GuardDeps } from "./guard.js";
 import { AGENTS, runHook, type AgentName } from "./hooks/agents.js";
 import { discover, renderConfig } from "./init.js";
+import { hookFile, planInstall, planUninstall } from "./install.js";
 import { cacheDir } from "./paths.js";
 import { shellInit } from "./shell-init.js";
 import { providers } from "./providers/index.js";
@@ -27,6 +28,10 @@ Usage:
   cloudpin exec -- <cmd...>   Run <cmd> only if it would act on the pinned account
   cloudpin hook <agent>       Agent hook; reads the hook JSON on stdin
                               (claude, codex, copilot, gemini, cursor)
+  cloudpin install-hook <agent> [--user] [--yes]
+  cloudpin uninstall-hook <agent> [--user] [--yes]
+                              Add or remove the agent hook in this project's
+                              settings (or your personal settings with --user)
   cloudpin shell-init <bash|zsh|pwsh>
                               Print shell functions that guard az, aws, gcloud, vercel and gh
   cloudpin --version
@@ -146,6 +151,63 @@ async function exec(argv: string[]): Promise<number> {
   });
 }
 
+async function confirm(flags: string[], question: string): Promise<boolean> {
+  if (flags.includes("--yes")) return true;
+  if (!process.stdin.isTTY) {
+    console.error("cloudpin: not a terminal; re-run with --yes to apply.");
+    return false;
+  }
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question(`${question} [y/N] `);
+  rl.close();
+  return /^y(es)?$/i.test(answer.trim());
+}
+
+async function hookSetup(action: "install" | "uninstall", agent: string | undefined, flags: string[]): Promise<number> {
+  if (agent === undefined || !Object.hasOwn(AGENTS, agent)) {
+    console.error(`cloudpin ${action}-hook: unsupported agent "${agent ?? ""}" (supported: ${Object.keys(AGENTS).join(", ")})`);
+    return 1;
+  }
+  const name = agent as AgentName;
+  const path = hookFile(name, flags.includes("--user") ? "user" : "project", process.cwd(), process.env);
+  const existing = existsSync(path) ? readFileSync(path, "utf8") : null;
+  try {
+    if (action === "install") {
+      const plan = planInstall(name, existing);
+      if (plan.alreadyInstalled) {
+        console.log(`cloudpin: the ${name} hook is already in ${path}`);
+        return 0;
+      }
+      console.log(`cloudpin: ${existing === null ? "create" : "update"} ${path} to:\n\n${plan.content}`);
+      if (!(await confirm(flags, "Write this file?"))) return 1;
+      if (existing !== null) writeFileSync(`${path}.cloudpin-backup`, existing);
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, plan.content);
+      console.log(`cloudpin: installed${existing !== null ? ` (previous file saved as ${path}.cloudpin-backup)` : ""}.`);
+    } else {
+      const plan = planUninstall(name, existing);
+      if (!plan.found) {
+        console.log(`cloudpin: no cloudpin hook in ${path}`);
+        return 0;
+      }
+      console.log(
+        plan.content === null
+          ? `cloudpin: delete ${path} (it holds only cloudpin's hook)`
+          : `cloudpin: update ${path} to:\n\n${plan.content}`,
+      );
+      if (!(await confirm(flags, "Apply this change?"))) return 1;
+      writeFileSync(`${path}.cloudpin-backup`, existing!);
+      if (plan.content === null) rmSync(path);
+      else writeFileSync(path, plan.content);
+      console.log(`cloudpin: removed (previous file saved as ${path}.cloudpin-backup).`);
+    }
+    return 0;
+  } catch (err) {
+    console.error(`cloudpin ${action}-hook: ${path}: ${(err as Error).message}`);
+    return 1;
+  }
+}
+
 async function readStdin(): Promise<string> {
   let data = "";
   for await (const chunk of process.stdin) data += String(chunk);
@@ -173,6 +235,10 @@ export async function main(argv: string[]): Promise<number> {
       return exec(rest[0] === "--" ? rest.slice(1) : rest);
     case "hook":
       return hook(rest[0]);
+    case "install-hook":
+      return hookSetup("install", rest[0], rest.slice(1));
+    case "uninstall-hook":
+      return hookSetup("uninstall", rest[0], rest.slice(1));
     case "shell-init":
       try {
         process.stdout.write(shellInit(rest[0] ?? "", providers.flatMap((p) => p.bins)));

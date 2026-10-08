@@ -1,0 +1,134 @@
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import { hookFile, planInstall, planUninstall } from "../src/install.js";
+
+const ROOT = "/repo";
+const HOME = "/home/me";
+
+describe("hookFile", () => {
+  it.each([
+    ["claude", "project", join(ROOT, ".claude", "settings.json")],
+    ["claude", "user", join(HOME, ".claude", "settings.json")],
+    ["codex", "project", join(ROOT, ".codex", "hooks.json")],
+    ["gemini", "user", join(HOME, ".gemini", "settings.json")],
+    ["cursor", "project", join(ROOT, ".cursor", "hooks.json")],
+    ["copilot", "project", join(ROOT, ".github", "hooks", "cloudpin.json")],
+    ["copilot", "user", join(HOME, ".copilot", "hooks", "cloudpin.json")],
+  ] as const)("%s %s -> %s", (agent, scope, path) => {
+    expect(hookFile(agent, scope, ROOT, { HOME })).toBe(path);
+  });
+
+  it("respects COPILOT_HOME", () => {
+    expect(hookFile("copilot", "user", ROOT, { HOME, COPILOT_HOME: "/c" })).toBe(join("/c", "hooks", "cloudpin.json"));
+  });
+});
+
+describe("planInstall", () => {
+  it("creates Claude Code settings with a Bash|PowerShell PreToolUse hook", () => {
+    const plan = planInstall("claude", null);
+    expect(plan.alreadyInstalled).toBe(false);
+    expect(JSON.parse(plan.content)).toEqual({
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: "Bash|PowerShell",
+            hooks: [{ type: "command", command: "cloudpin hook claude", timeout: 60 }],
+          },
+        ],
+      },
+    });
+  });
+
+  it("keeps existing settings and hooks", () => {
+    const existing = JSON.stringify({
+      model: "x",
+      hooks: { PreToolUse: [{ matcher: "Edit", hooks: [{ type: "command", command: "lint" }] }] },
+    });
+    const out = JSON.parse(planInstall("claude", existing).content);
+    expect(out.model).toBe("x");
+    expect(out.hooks.PreToolUse).toHaveLength(2);
+    expect(out.hooks.PreToolUse[0].hooks[0].command).toBe("lint");
+  });
+
+  it("is idempotent", () => {
+    const once = planInstall("codex", null).content;
+    const twice = planInstall("codex", once);
+    expect(twice.alreadyInstalled).toBe(true);
+    expect(twice.content).toBe(once);
+  });
+
+  it("writes Codex's Bash matcher", () => {
+    const out = JSON.parse(planInstall("codex", null).content);
+    expect(out.hooks.PreToolUse[0]).toEqual({
+      matcher: "Bash",
+      hooks: [{ type: "command", command: "cloudpin hook codex" }],
+    });
+  });
+
+  it("writes Gemini's BeforeTool hook for run_shell_command", () => {
+    const out = JSON.parse(planInstall("gemini", null).content);
+    expect(out.hooks.BeforeTool[0]).toEqual({
+      matcher: "run_shell_command",
+      hooks: [{ type: "command", name: "cloudpin", command: "cloudpin hook gemini", timeout: 60000 }],
+    });
+  });
+
+  it("writes Cursor's versioned file with a matcher limited to cloud CLIs", () => {
+    const out = JSON.parse(planInstall("cursor", null).content);
+    expect(out.version).toBe(1);
+    const entry = out.hooks.beforeShellExecution[0];
+    expect(entry.command).toBe("cloudpin hook cursor");
+    const matcher = new RegExp(entry.matcher);
+    expect(matcher.test("cd x && vercel deploy")).toBe(true);
+    expect(matcher.test("npm test")).toBe(false);
+    expect(matcher.test("ghost-cli run")).toBe(false);
+  });
+
+  it("writes Copilot's own hook file", () => {
+    expect(JSON.parse(planInstall("copilot", null).content)).toEqual({
+      version: 1,
+      hooks: {
+        preToolUse: [
+          {
+            type: "command",
+            matcher: "bash|powershell",
+            bash: "cloudpin hook copilot",
+            powershell: "cloudpin hook copilot",
+            timeoutSec: 60,
+          },
+        ],
+      },
+    });
+  });
+
+  it("refuses to touch a file it cannot parse", () => {
+    expect(() => planInstall("claude", "{ not json")).toThrow(/not valid JSON/);
+  });
+});
+
+describe("planUninstall", () => {
+  it("removes only cloudpin's entry and keeps everything else", () => {
+    const existing = JSON.stringify({
+      model: "x",
+      hooks: { PreToolUse: [{ matcher: "Edit", hooks: [{ type: "command", command: "lint" }] }] },
+    });
+    const installed = planInstall("claude", existing).content;
+    const removed = planUninstall("claude", installed);
+    expect(removed.found).toBe(true);
+    expect(JSON.parse(removed.content!)).toEqual(JSON.parse(existing));
+  });
+
+  it("drops empty hook sections it created", () => {
+    const removed = planUninstall("gemini", planInstall("gemini", JSON.stringify({ theme: "dark" })).content);
+    expect(JSON.parse(removed.content!)).toEqual({ theme: "dark" });
+  });
+
+  it("deletes Copilot's own file", () => {
+    expect(planUninstall("copilot", planInstall("copilot", null).content)).toEqual({ found: true, content: null });
+  });
+
+  it("reports when nothing is installed", () => {
+    expect(planUninstall("cursor", JSON.stringify({ version: 1, hooks: {} })).found).toBe(false);
+    expect(planUninstall("cursor", null).found).toBe(false);
+  });
+});

@@ -31,6 +31,8 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Fixed
 
+- Logins and account switches are recognised after global flags (#21), e.g. `aws --profile p sso login` or
+  `vercel --scope t switch`; before, a logged-out command like these could be blocked.
 - Agent hooks fail closed: an unexpected error or a check slower than 45 seconds now blocks the command instead of
   letting the agent run it (agents treat a failed or timed-out hook as no objection).
 - Messages no longer repeat the value of `--token`, `--password`, `--kube-token` or Vercel's `-t`.

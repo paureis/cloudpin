@@ -1,0 +1,46 @@
+name: Bug report
+description: Something was blocked that shouldn't be, or let through that should have been blocked.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Never paste tokens or keys. Redact account IDs if you prefer.
+        For security problems, please use private reporting instead (see SECURITY.md).
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      description: The command you ran, or the agent ran.
+      placeholder: vercel deploy --prod --scope acme
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what you expected
+      description: Include cloudpin's message if there was one.
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did it run?
+      options:
+        - Terminal (shell wrapper)
+        - cloudpin exec / check
+        - Claude Code hook
+        - Codex hook
+        - Cursor hook
+        - Gemini CLI hook
+        - Copilot CLI hook
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Output of `cloudpin --version`, the CLI's version, your OS and Node.js version.
+      placeholder: cloudpin 0.1.0, vercel 50.35, Windows 11, Node 22.17
+    validations:
+      required: true

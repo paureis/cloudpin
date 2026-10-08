@@ -1,120 +1,227 @@
-# cloudpin
+# <picture><img width="32" height="32" alt="" src="assets/logomark.svg"></picture> cloudpin
 
-**A seatbelt for your cloud CLIs.** cloudpin stops you, or your AI coding agent, from running a command on
-the wrong cloud account.
+[![CI](https://github.com/paureis/cloudpin/actions/workflows/ci.yml/badge.svg)](https://github.com/paureis/cloudpin/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/cloudpin?color=2f81f7)](https://www.npmjs.com/package/cloudpin)
+[![Node](https://img.shields.io/node/v/cloudpin?color=2f81f7)](package.json)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2f81f7)](LICENSE)
 
-> Status: pre-release, not on npm yet. Everything below works and is tested; see
-> [What works today](#what-works-today) for how each part was verified.
+Pin cloud accounts to a project, and stop any command (yours or your AI agent's) that would run on the wrong one.
 
-## The problem
+`az`, `aws`, `gcloud`, `vercel` and `gh` act on whichever account you logged into last. With a work account, a
+personal one and a client or two on the same machine, sooner or later something gets deployed to, or deleted
+from, the wrong place. Coding agents make it more likely: they run these commands for you and never stop to ask
+which account is active. cloudpin checks before the command runs.
 
-`az`, `aws`, `gcloud`, `vercel` and `gh` quietly act on whichever account you logged into last. With a work
-account and a personal one (or two clients) on the same machine, sooner or later you deploy to, or delete
-from, the wrong place. AI agents make this more likely: they run these commands for you and never stop to ask
-which account is active.
+<p align="center"><img src="assets/demo.svg" alt="cloudpin blocking a Vercel deploy on the wrong team, then blocking an AI agent's gh command on the wrong account" width="100%"></p>
+
+## Install
+
+```sh
+pnpm add --global cloudpin
+```
+
+<details>
+<summary>npm, Yarn, Bun, or no install</summary>
+
+```sh
+npm install --global cloudpin
+yarn global add cloudpin
+bun add --global cloudpin
+
+# try it without installing
+npx cloudpin --help
+```
+
+</details>
+
+Requires Node.js 22 or later. Works on Windows, macOS and Linux.
+
+## Quick start
+
+```sh
+cd your-project
+cloudpin init                        # pin the accounts you are logged into now
+cloudpin install-hook claude         # protect your AI agent (or codex, cursor, gemini, copilot)
+echo 'eval "$(cloudpin shell-init bash)"' >> ~/.bashrc   # protect your terminal
+```
+
+Commit `.cloudpin.yml` so everyone on the project gets the same protection.
+
+## Usage
+
+```sh
+# Write .cloudpin.yml from the accounts you are logged into now
+cloudpin init
+
+# Check every pinned account; exit 1 on a mismatch (handy in CI and scripts)
+cloudpin check
+
+# Run one command only if it would act on the pinned account; exit 3 if blocked
+cloudpin exec -- vercel deploy --prod
+
+# Shell functions that route az, aws, gcloud, vercel and gh through cloudpin
+cloudpin shell-init bash|zsh|pwsh
+
+# Add or remove the hook in an agent's settings (this project, or yours with --user)
+cloudpin install-hook <agent> [--user]
+cloudpin uninstall-hook <agent> [--user]
+```
 
 ## How it works
 
-Commit a small file to your project saying which accounts it uses. `cloudpin init` writes it for you from the
-accounts you are logged into now:
+A `.cloudpin.yml` in your project lists the accounts it uses. `cloudpin init` writes it for you, with readable
+names as comments:
 
 ```yaml
-# .cloudpin.yml
 azure:
   subscription: "3f2a0000-0000-0000-0000-000000000c91" # Acme Prod
   tenant: "8b1d0000-0000-0000-0000-00000000044e"
 aws:
   account: "123456789012"
+gcloud:
+  account: "deploy@acme.com"
+  project: "acme-prod"
 vercel:
   team: "team_x9KqZr" # acme
 github:
   user: "acme-bot"
 ```
 
-Before a cloud command runs, cloudpin asks the CLI which account *that command* would use, honouring its flags
-(`--subscription`, `--profile`, `--scope`, `--project`) and environment (`AWS_PROFILE`, `GH_TOKEN`,
-`CLOUDSDK_*`, a linked Vercel project), and compares the answer with the file:
+Before a guarded command runs, cloudpin asks the CLI which account **that command** would use, honouring the
+command's own flags and environment, and compares the answer with the file:
 
-- **Match:** the command runs, and you don't notice anything.
-- **Mismatch:** the command is stopped, with the fix:
+| CLI | What is pinned | What cloudpin takes into account |
+|---|---|---|
+| `az` | subscription ID, tenant ID | `--subscription`, `AZURE_CONFIG_DIR` |
+| `aws` | account ID | `--profile`, `AWS_PROFILE`, access key variables, SSO |
+| `gcloud` | account, project | `--account`, `--project`, `--configuration`, `CLOUDSDK_*` |
+| `vercel` / `vc` | team ID | `--scope`, `--team`, `--token`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, linked project |
+| `gh` | user, host | `--hostname`, `GH_HOST`, `GH_TOKEN`, `GITHUB_TOKEN` |
 
-```text
-cloudpin: blocked `gh pr merge 42`
-  github is pinned in /code/acme/.cloudpin.yml
-  - user: expected "acme-bot", active is "my-personal"
-  fix: gh auth switch --user acme-bot
-```
+- **Match:** the command runs as if cloudpin wasn't there.
+- **Mismatch:** the command is stopped, and you're told which account is active and how to switch.
+- **Can't tell** (an expired login, a broken token, no network): the command is stopped too, and cloudpin says so
+  plainly, with the CLI's own reason and the command that shows what's wrong.
 
-- **Can't tell** (a broken token, a network error): the command is stopped too, and cloudpin says so plainly,
-  with the CLI's own reason and the command that shows what is wrong.
-
-cloudpin only *reads* which account is active. It never logs in, never stores or prints credentials, and
-always lets you log in and switch accounts.
+Logging in, logging out, switching accounts, `--help` and `--version` are never blocked. A folder without a
+`.cloudpin.yml` is never affected. Monorepos work: the nearest `.cloudpin.yml` above the current folder wins.
 
 ## Protect your terminal
 
-Add one line to your shell profile; remove it to uninstall:
+Add one line to your shell profile. Removing it uninstalls.
 
-```bash
-eval "$(cloudpin shell-init bash)"      # ~/.bashrc  (zsh: shell-init zsh in ~/.zshrc)
+```sh
+eval "$(cloudpin shell-init bash)"                          # ~/.bashrc
+eval "$(cloudpin shell-init zsh)"                           # ~/.zshrc
 ```
 
 ```powershell
-cloudpin shell-init pwsh | Out-String | Invoke-Expression   # in $PROFILE
+cloudpin shell-init pwsh | Out-String | Invoke-Expression   # $PROFILE
 ```
 
-To run one command anyway, on purpose: `CLOUDPIN_SKIP=1 <command>`.
+If cloudpin is ever uninstalled, the functions fall back to the real CLI, so they never get in your way. To run one
+command anyway, on purpose: `CLOUDPIN_SKIP=1 <command>`.
 
 ## Protect your AI agent
 
-```bash
-cloudpin install-hook claude     # also: codex, cursor, gemini, copilot
+```sh
+cloudpin install-hook claude
 ```
 
-This adds cloudpin's hook to the project's agent settings (`--user` for your personal settings), shows you the
-file first, and keeps a backup. A blocked agent is told why and asked to check with you; agents cannot use
-`CLOUDPIN_SKIP`. `cloudpin uninstall-hook <agent>` removes it.
+The hook goes into the project's agent settings (`--user` for your personal settings). cloudpin shows the file before
+writing it, keeps a backup, and `uninstall-hook` removes only its own entry. When a command is blocked, the agent is
+told why and asked to check with you. Agents can't use `CLOUDPIN_SKIP`.
 
-## Scripts and CI
+| Agent | Settings file | Status |
+|---|---|---|
+| Claude Code | `.claude/settings.json` | Tested inside the agent |
+| Codex | `.codex/hooks.json` | Tested inside the agent |
+| Cursor | `.cursor/hooks.json` | Built to the documented hook format |
+| Gemini CLI | `.gemini/settings.json` | Built to the documented hook format |
+| GitHub Copilot CLI | `.github/hooks/cloudpin.json` | Built to the documented hook format |
 
-```bash
-cloudpin check                   # exit 1 if any pinned account does not match
-cloudpin exec -- vercel deploy   # run one command only if the account matches (exit 3 if blocked)
-```
+cloudpin reads the whole command line the agent is about to run, so it also catches
+`cd ../other && npx vercel deploy`, `bash -c "..."`, pipelines, `$( )`, `xargs` and `find -exec`.
 
-## What works today
+## Configuration
 
-| Part | Status |
+| Variable | Effect |
 |---|---|
-| Azure (`az`), AWS (`aws`), GitHub (`gh`), Vercel (`vercel`, `vc`) | Working; tested on real accounts |
-| Google Cloud (`gcloud`) | Working; tested against the real CLI with test configurations |
-| `init`, `check`, `exec` | Working |
-| Shell wrappers | Working; tested in bash and Windows PowerShell |
-| Claude Code and Codex hooks | Working; tested inside the real agents (a wrong pin is blocked and the agent is told to ask the user; in Claude Code the right pin was also confirmed to run) |
-| Copilot CLI, Gemini CLI and Cursor hooks | Built to each agent's documented hook format; not yet tested inside the agent |
-| Identity cache | Lookups are reused for up to 5 minutes and dropped the moment an account file or variable changes; `CLOUDPIN_NO_CACHE=1` turns it off |
+| `CLOUDPIN_SKIP=1` | Run one command without the check (terminal only; ignored for agents) |
+| `CLOUDPIN_NO_CACHE=1` | Always ask the CLI instead of using the identity cache |
+| `CLOUDPIN_CACHE_DIR` | Where the identity cache lives |
 
-CI runs every test on Windows, macOS and Linux.
+Asking a CLI who it is takes 0.5 to 2 seconds, so cloudpin remembers a successful answer for up to five minutes.
+The cache is dropped the moment anything that decides the account changes: the command's flags, the relevant
+environment variables, or the CLI's own account files (which `az account set`, `gh auth switch` and
+`vercel switch` rewrite). `cloudpin check` always asks the CLI.
 
-## Try it (from source)
+| Exit code | Meaning |
+|---|---|
+| `0` | OK |
+| `1` | Usage error, or `check` found a problem |
+| `3` | Command blocked |
 
-```bash
+## Security and privacy
+
+cloudpin only reads which account is active, using each CLI's own identity command (`az account show`,
+`aws sts get-caller-identity`, `gcloud config list`, `vercel teams ls`, `gh api user`). It never logs in or
+switches accounts, never reads credential files, and never prints or stores a token: error messages name a variable
+such as `GH_TOKEN` but never its value, and the cache stores salted hashes of anything sensitive. It runs CLIs
+directly, never through a shell. cloudpin has no telemetry and sends nothing of its own; the identity commands
+above talk only to their own provider, as they would if you ran them. See [SECURITY.md](SECURITY.md) to report a
+problem.
+
+<details>
+<summary>FAQ</summary>
+
+**Does it slow my commands down?** Outside a pinned project, by the time it takes Node to start (about 0.1 s).
+Inside one, the first check costs one identity call, and later checks come from the cache.
+
+**What if a CLI isn't installed?** A pinned CLI that isn't installed is skipped; the command would fail on its own.
+
+**Can I use it in CI?** Yes. Run `cloudpin check` before deploying; it exits 1 if any pinned account doesn't match.
+
+**Why block when it can't tell?** Because "probably the right account" is the situation cloudpin exists to prevent.
+The message tells you exactly why it couldn't tell.
+
+</details>
+
+## Roadmap
+
+Ideas and what's next are in [ROADMAP.md](ROADMAP.md). Suggestions are welcome in
+[issues](https://github.com/paureis/cloudpin/issues).
+
+## Development
+
+<details>
+<summary>Contributor commands</summary>
+
+```sh
+git clone https://github.com/paureis/cloudpin.git
+cd cloudpin
 npm ci
 npm run build
-node dist/cli.js init
-node dist/cli.js check
+npm test
 ```
 
-## Design
+| Command | Description |
+|---|---|
+| `npm run build` | Compile to `dist/` |
+| `npm test` | Run the test suite |
+| `npm run typecheck` | Type-check without emitting |
+| `node scripts/smoke.mjs` | Check providers against the CLIs logged in on your machine (after a build) |
+| `node scripts/demo.mjs` | Regenerate `assets/demo.svg` (after a build) |
 
-The decisions behind cloudpin, and why, are in [DESIGN.md](DESIGN.md).
+The design decisions, and why they were made, are in [DESIGN.md](DESIGN.md). See [CONTRIBUTING.md](CONTRIBUTING.md)
+before opening a pull request.
 
-## Built with AI, openly
+</details>
 
-cloudpin is built by [Alvaro Reis](https://github.com/paureis) with Claude Code as a pair programmer.
-Every behaviour is covered by tests, and every CLI integration is checked against the tool's own
-documentation and the real CLI before it ships.
+## About
 
-## License
+Made by [Alvaro Reis](https://github.com/paureis) ([LinkedIn](https://www.linkedin.com/in/alpaureis)), with Claude
+Code as a pair programmer. Every behaviour is covered by tests, and every CLI integration is checked against the
+tool's own documentation and the real CLI.
 
-MIT
+[MIT](LICENSE)

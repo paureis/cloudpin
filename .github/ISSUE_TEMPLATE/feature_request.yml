@@ -1,0 +1,22 @@
+name: Feature or new CLI
+description: Suggest a CLI to support, an agent, or anything else.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: A real situation helps most, e.g. "I keep running kubectl against the wrong cluster".
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like cloudpin to do?
+    validations:
+      required: true
+  - type: textarea
+    id: identity
+    attributes:
+      label: For a new CLI, how does it report the active account?
+      description: The command that prints it, and the flags or environment variables that change it, if you know them.

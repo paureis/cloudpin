@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="526" viewBox="0 0 920 526" role="img" aria-label="cloudpin blocking a Vercel deploy on the wrong team, and blocking an AI agent's gh command on the wrong account">
+<style>
+text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;font-size:14px}
+.f,.p{opacity:0;animation:show 1ms forwards}
+.p{fill:#7ee787}
+@keyframes show{to{opacity:1}}
+@keyframes type0{to{width:144px}}
+@keyframes type6{to{width:169px}}
+svg *{animation-iteration-count:1}
+</style>
+<rect width="920" height="526" rx="10" fill="#0d1117"/>
+<rect width="920" height="30" rx="10" fill="#161b22"/>
+<rect y="20" width="920" height="10" fill="#161b22"/>
+<circle cx="20" cy="15" r="6" fill="#ff5f57"/><circle cx="40" cy="15" r="6" fill="#febc2e"/><circle cx="60" cy="15" r="6" fill="#28c840"/>
+<text x="460" y="20" fill="#7d8590" text-anchor="middle" style="font-size:12px">cloudpin demo</text>
+<text x="24" y="48" class="p" style="animation-delay:300ms" id="l0p">~/code/acme $</text>
+<clipPath id="l0c"><rect x="140" y="32" height="22" width="0" style="animation:type0 765ms steps(17) 300ms forwards"/></clipPath>
+<text x="140" y="48" fill="#e6edf3" clip-path="url(#l0c)">cat .cloudpin.yml</text>
+<text x="24" y="69" fill="#9da7b3" class="f" style="animation-delay:1715ms" xml:space="preserve">vercel:</text>
+<text x="24" y="90" fill="#9da7b3" class="f" style="animation-delay:1805ms" xml:space="preserve">  team: "team_acme7Kq2" # acme</text>
+<text x="24" y="111" fill="#9da7b3" class="f" style="animation-delay:1895ms" xml:space="preserve">github:</text>
+<text x="24" y="132" fill="#9da7b3" class="f" style="animation-delay:1985ms" xml:space="preserve">  user: "acme-bot"</text>
+<text x="24" y="174" class="p" style="animation-delay:2725ms" id="l6p">~/code/acme $</text>
+<clipPath id="l6c"><rect x="140" y="158" height="22" width="0" style="animation:type6 900ms steps(20) 2725ms forwards"/></clipPath>
+<text x="140" y="174" fill="#e6edf3" clip-path="url(#l6c)">vercel deploy --prod</text>
+<text x="24" y="195" fill="#ff7b72" font-weight="700" class="f" style="animation-delay:4275ms" xml:space="preserve">cloudpin: blocked `vercel deploy --prod`</text>
+<text x="24" y="216" fill="#ff7b72" class="f" style="animation-delay:4365ms" xml:space="preserve">  vercel is pinned in ~/code/acme/.cloudpin.yml</text>
+<text x="24" y="237" fill="#ff7b72" class="f" style="animation-delay:4455ms" xml:space="preserve">  - team: expected "team_acme7Kq2", active is "team_side9Xw1" (my-side-project)</text>
+<text x="24" y="258" fill="#ff7b72" class="f" style="animation-delay:4545ms" xml:space="preserve">  fix: vercel switch (choose the team with ID team_acme7Kq2)</text>
+<text x="24" y="279" fill="#ff7b72" class="f" style="animation-delay:4635ms" xml:space="preserve">  (to run it anyway, once: CLOUDPIN_SKIP=1 vercel deploy --prod)</text>
+<text x="24" y="321" fill="#7d8590" class="f" style="animation-delay:5375ms" xml:space="preserve"># the same check runs inside your AI agent (Claude Code shown)</text>
+<text x="24" y="342" fill="#d2a8ff" class="f" style="animation-delay:5465ms" xml:space="preserve">● Bash(gh pr merge 42)</text>
+<text x="24" y="363" fill="#ffa198" font-weight="700" class="f" style="animation-delay:5555ms" xml:space="preserve">  ⎿ cloudpin: blocked `gh pr merge 42`</text>
+<text x="24" y="384" fill="#ffa198" class="f" style="animation-delay:5645ms" xml:space="preserve">     github is pinned in ~/code/acme/.cloudpin.yml</text>
+<text x="24" y="405" fill="#ffa198" class="f" style="animation-delay:5735ms" xml:space="preserve">     - user: expected "acme-bot", active is "my-personal"</text>
+<text x="24" y="426" fill="#ffa198" class="f" style="animation-delay:5825ms" xml:space="preserve">     fix: gh auth switch --user acme-bot</text>
+<text x="24" y="447" fill="#ffa198" class="f" style="animation-delay:5915ms" xml:space="preserve">     Do not work around this; ask the user to switch accounts or confirm.</text>
+<text x="24" y="468" fill="#d2a8ff" class="f" style="animation-delay:6005ms" xml:space="preserve">● Blocked by cloudpin: this repo is pinned to acme-bot. I won't work around it;</text>
+<text x="24" y="489" fill="#d2a8ff" class="f" style="animation-delay:6095ms" xml:space="preserve">  switch with `gh auth switch --user acme-bot`, or tell me to continue.</text>
+<!-- total 10185ms -->
+</svg>

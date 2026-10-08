@@ -99,6 +99,38 @@ function linkedTeams(dir: string, project: string | undefined, homeDir: string):
   return [];
 }
 
+// Each page is one more CLI call; past this, something is wrong.
+const MAX_TEAM_PAGES = 25;
+
+/**
+ * Every team the user belongs to. `vercel teams ls --format json` returns one
+ * page, `{ teams, pagination: { next } }`, and `--next <ms>` asks for the
+ * following one (`vercel teams ls --help`). All pages are read: the team
+ * marked current may be on any of them, and missing it would wrongly mean the
+ * Hobby team. Pages that never end, or repeat, fail closed.
+ */
+async function listTeams(exec: Exec, common: string[], env: NodeJS.ProcessEnv): Promise<Team[] | Resolution> {
+  const teams: Team[] = [];
+  let next: number | undefined;
+  for (let page = 0; page < MAX_TEAM_PAGES; page++) {
+    const args = ["teams", "ls", "--format", "json", ...(next === undefined ? [] : ["--next", String(next)]), ...common];
+    const listed = await exec("vercel", args, env);
+    if (listed.code !== 0) return failure(listed.stderr, listed.code, "vercel teams ls");
+    let body: { teams?: Team[]; pagination?: { next?: unknown } };
+    try {
+      body = JSON.parse(listed.stdout) as typeof body;
+    } catch {
+      return { kind: "error", message: "could not read vercel teams ls output" };
+    }
+    teams.push(...(body.teams ?? []));
+    const following = body.pagination?.next;
+    if (typeof following !== "number" || !following) return teams;
+    if (following === next) return { kind: "error", message: "vercel teams ls pages did not advance" };
+    next = following;
+  }
+  return { kind: "error", message: `vercel teams ls returned more than ${MAX_TEAM_PAGES} pages` };
+}
+
 function failure(stderr: string, code: number, what: string): Resolution {
   const reason = /^Error: (.+)$/m.exec(stderr)?.[1]?.trim().slice(0, 300);
   return { kind: "error", message: reason ? `vercel: ${reason}` : `${what} failed (exit ${code})` };
@@ -142,14 +174,9 @@ export const vercel: ProviderDef<"vercel"> = {
     if (token) common.push("--token", token);
     if (globalConfig) common.push("--global-config", globalConfig);
 
-    const listed = await exec("vercel", ["teams", "ls", "--format", "json", ...common], env);
-    if (listed.code !== 0) return failure(listed.stderr, listed.code, "vercel teams ls");
-    let teams: Team[];
-    try {
-      teams = (JSON.parse(listed.stdout) as { teams: Team[] }).teams;
-    } catch {
-      return { kind: "error", message: "could not read vercel teams ls output" };
-    }
+    const listed = await listTeams(exec, common, env);
+    if (!Array.isArray(listed)) return listed;
+    const teams = listed;
     const toId = (value: string) => teams.find((t) => t.id === value || t.slug === value)?.id ?? value;
     const slugOf = (id: string) => teams.find((t) => t.id === id)?.slug ?? "";
 

@@ -31,6 +31,8 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Fixed
 
+- Vercel: every page of `vercel teams ls` is read (#5). With the current team on a later page, cloudpin assumed
+  the Hobby team, so a command on another team could pass if the Hobby team was pinned.
 - An agent could skip the check by wrapping a command in `cloudpin exec` (shell mode, where `CLOUDPIN_SKIP` works);
   the agent hook now checks the wrapped command as the agent's.
 

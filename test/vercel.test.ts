@@ -247,3 +247,72 @@ describe("vercel.resolve: repository links (.vercel/repo.json, vercel link --rep
     ]);
   });
 });
+
+describe("vercel.resolve: teams ls pages", () => {
+  // `vercel teams ls --format json` returns { teams, pagination: { next } } and
+  // takes `--next <ms>` for the following page (vercel teams ls --help, 50.35).
+  function paged(pages: { teams: object[]; next?: number }[], user = USER) {
+    const calls: string[][] = [];
+    const exec: Exec = async (_bin, args) => {
+      calls.push(args);
+      if (args[0] === "api") return { code: 0, stdout: user, stderr: "" };
+      const at = args.indexOf("--next");
+      const index = at === -1 ? 0 : pages.findIndex((_, i) => String(pages[i - 1]?.next) === args[at + 1]);
+      const page = pages[index];
+      if (!page) return { code: 1, stdout: "", stderr: "Error: unexpected page" };
+      return { code: 0, stdout: JSON.stringify({ teams: page.teams, pagination: page.next ? { next: page.next } : {} }), stderr: "" };
+    };
+    return { exec, calls };
+  }
+  const t = (id: string, slug: string, current = false) => ({ id, slug, name: slug, current });
+
+  it("finds the current team on a later page instead of assuming the Hobby team", async () => {
+    const { exec, calls } = paged([
+      { teams: [t("team_a", "a"), t("team_b", "b")], next: 1700000000000 },
+      { teams: [t("team_main", "acme", true)] },
+    ]);
+    expect(await vercel.resolve(ctx(["ls"]), exec)).toMatchObject({ identity: { team: "team_main", label: "acme" } });
+    expect(calls.filter((c) => c[0] === "teams").map((c) => c.slice(c.indexOf("--next"), c.indexOf("--next") + 2))).toEqual([
+      [],
+      ["--next", "1700000000000"],
+    ]);
+    expect(calls.some((c) => c[0] === "api")).toBe(false);
+  });
+
+  it("maps a --scope slug found on a later page", async () => {
+    const { exec } = paged([{ teams: [t("team_main", "acme", true)], next: 5 }, { teams: [t("team_late", "late")] }]);
+    expect(await vercel.resolve(ctx(["ls", "--scope", "late"]), exec)).toMatchObject({ identity: { team: "team_late" } });
+  });
+
+  it("falls back to the Hobby team only after every page", async () => {
+    const { exec } = paged([{ teams: [t("team_a", "a")], next: 5 }, { teams: [t("team_b", "b")] }]);
+    expect(await vercel.resolve(ctx(["ls"]), exec)).toMatchObject({ identity: { team: "team_hobby" } });
+  });
+
+  it("fails closed when the pages do not end", async () => {
+    const endless: Exec = async (_bin, args) => {
+      const at = args.indexOf("--next");
+      const next = at === -1 ? 1 : Number(args[at + 1]) + 1;
+      return { code: 0, stdout: JSON.stringify({ teams: [t(`team_${next}`, `s${next}`)], pagination: { next } }), stderr: "" };
+    };
+    expect(await vercel.resolve(ctx(["ls"]), endless)).toMatchObject({ kind: "error", message: expect.stringMatching(/pages/) });
+  });
+
+  it("fails closed when a page repeats its cursor", async () => {
+    const stuck: Exec = async () => ({ code: 0, stdout: JSON.stringify({ teams: [t("team_a", "a")], pagination: { next: 7 } }), stderr: "" });
+    expect(await vercel.resolve(ctx(["ls"]), stuck)).toMatchObject({ kind: "error", message: "vercel teams ls pages did not advance" });
+  });
+});
+
+describe("vercel.resolve: last page as vercel 50.35 prints it", () => {
+  it("stops at pagination.next: null", async () => {
+    const calls: string[][] = [];
+    const exec: Exec = async (_bin, args) => {
+      calls.push(args);
+      const teams = [{ id: "team_main", slug: "acme", name: "Acme", current: true }];
+      return { code: 0, stdout: JSON.stringify({ teams, pagination: { count: 1, next: null, prev: 1700000000000 } }), stderr: "" };
+    };
+    expect(await vercel.resolve(ctx(["ls"]), exec)).toMatchObject({ identity: { team: "team_main" } });
+    expect(calls).toHaveLength(1);
+  });
+});

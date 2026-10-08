@@ -3,8 +3,8 @@
 **A seatbelt for your cloud CLIs.** cloudpin stops you, or your AI coding agent, from running a command on
 the wrong cloud account.
 
-> Status: early development, not released yet. Azure, AWS and GitHub work and are tested against real
-> accounts; Vercel and Google Cloud are next. See [What works today](#what-works-today).
+> Status: early development, not released yet. All five CLIs (Azure, AWS, Google Cloud, Vercel, GitHub)
+> work and are tested against the real tools. See [What works today](#what-works-today).
 
 ## The problem
 
@@ -52,7 +52,8 @@ always lets you run login and account-switching commands.
 | Azure (`az`) | Working, tested on a real account |
 | AWS (`aws`) | Working, tested on a real account |
 | GitHub (`gh`) | Working, tested on a real account |
-| Vercel, Google Cloud | Next |
+| Vercel (`vercel`, `vc`) | Working, tested on a real account |
+| Google Cloud (`gcloud`) | Working, tested against the real CLI with test configs |
 | `cloudpin check` (scripts, CI) | Working |
 | `cloudpin exec -- <command>` | Working |
 | Claude Code hook | Working, not yet installable with one command |

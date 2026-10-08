@@ -11,7 +11,7 @@ const PIN_FIELDS: Record<Provider, { fields: string[]; comment?: string }> = {
   azure: { fields: ["subscription", "tenant"], comment: "name" },
   aws: { fields: ["account"], comment: "arn" },
   gcloud: { fields: ["account", "project"] },
-  vercel: { fields: ["team"] },
+  vercel: { fields: ["team"], comment: "label" },
   github: { fields: ["user", "host"] },
 };
 

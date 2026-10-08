@@ -90,7 +90,8 @@ cloudpin exec -- vercel deploy   # run one command only if the account matches (
 | Google Cloud (`gcloud`) | Working; tested against the real CLI with test configurations |
 | `init`, `check`, `exec` | Working |
 | Shell wrappers | Working; tested in bash and Windows PowerShell |
-| Claude Code, Codex, Copilot CLI, Gemini CLI, Cursor hooks | Working against each agent's documented hook format; end-to-end testing inside each agent in progress |
+| Claude Code and Codex hooks | Working; tested inside the real agents (a wrong pin is blocked and the agent is told to ask the user; in Claude Code the right pin was also confirmed to run) |
+| Copilot CLI, Gemini CLI and Cursor hooks | Built to each agent's documented hook format; not yet tested inside the agent |
 | Identity cache | Lookups are reused for up to 5 minutes and dropped the moment an account file or variable changes; `CLOUDPIN_NO_CACHE=1` turns it off |
 
 CI runs every test on Windows, macOS and Linux.

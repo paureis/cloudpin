@@ -8,7 +8,8 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Added
 
-- `cloudpin status`: each CLI's active account, the pins that apply here, and the installed agent hooks.
+- `cloudpin status`: each CLI's active account, the pins that apply here, and the installed agent hooks;
+  `--json` for tools (the MCP server and editor extension build on it).
 
 ## [0.1.0] - 2026-10-08
 

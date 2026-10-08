@@ -57,7 +57,7 @@ cloudpin init
 # Check every pinned account; exit 1 on a mismatch (handy in CI and scripts)
 cloudpin check
 
-# See each CLI's active account, what this folder pins, and which agent hooks are installed
+# See each CLI's active account, what this folder pins, and which agent hooks are installed (--json for tools)
 cloudpin status
 
 # Run one command only if it would act on the pinned account; exit 3 if blocked

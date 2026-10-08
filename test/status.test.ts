@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FoundConfig } from "../src/config.js";
 import type { GuardDeps } from "../src/guard.js";
-import { buildStatus } from "../src/status.js";
+import { buildStatus, collectStatus } from "../src/status.js";
 import type { ProviderDef, Resolution } from "../src/types.js";
 
 function provider(name: "github" | "aws", res: Resolution): ProviderDef {
@@ -24,6 +24,36 @@ const deps = (config: FoundConfig | null, providers: ProviderDef[]): GuardDeps =
   providers,
   exec: async () => ({ code: 0, stdout: "", stderr: "" }),
   findConfig: () => config,
+});
+
+describe("collectStatus", () => {
+  it("returns the same facts as structured data, for --json", async () => {
+    const config = { path: "/repo/.cloudpin.yml", pins: { github: { user: "acme-bot" } } };
+    const status = await collectStatus(
+      deps(config, [
+        provider("github", { kind: "identity", identity: { user: "me", host: "github.com" }, source: "t" }),
+        provider("aws", { kind: "logged-out", hint: "aws login" }),
+      ]),
+      "/repo",
+      {},
+      () => ["claude (personal)"],
+    );
+    expect(status).toEqual({
+      pinFile: "/repo/.cloudpin.yml",
+      providers: [
+        {
+          name: "github",
+          state: "active",
+          identity: { user: "me", host: "github.com" },
+          pin: { user: "acme-bot" },
+          match: false,
+          problems: ['user: expected "acme-bot", active is "me"'],
+        },
+        { name: "aws", state: "logged-out", hint: "aws login" },
+      ],
+      hooks: ["claude (personal)"],
+    });
+  });
 });
 
 describe("buildStatus", () => {

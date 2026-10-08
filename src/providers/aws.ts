@@ -1,9 +1,14 @@
 import { join } from "node:path";
-import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { commandWords, flagValue, hasAnyFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
 const EXEMPT_COMMANDS = new Set(["configure", "login", "logout", "help"]);
+// Global options that take a value (`aws help`: each listed as "(string)").
+const GLOBAL_VALUE_FLAGS = new Set([
+  "--ca-bundle", "--cli-binary-format", "--cli-connect-timeout", "--cli-error-format", "--cli-read-timeout",
+  "--color", "--endpoint-url", "--output", "--profile", "--query", "--region",
+]);
 // aws exits 253 when no credentials can be found (observed with empty
 // config files: "NoCredentials: Unable to locate credentials").
 const EXIT_NO_CREDENTIALS = 253;
@@ -26,7 +31,7 @@ export const aws: ProviderDef<"aws"> = {
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version"])) return true;
-    const words = leadingWords(args);
+    const words = commandWords(args, GLOBAL_VALUE_FLAGS);
     const [first, second] = words;
     if (first === undefined) return false;
     if (EXEMPT_COMMANDS.has(first) || words.at(-1) === "help") return true;

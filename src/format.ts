@@ -2,8 +2,20 @@ import type { Verdict } from "./guard.js";
 
 type Block = Extract<Verdict, { action: "block" }>;
 
+// Flags whose value is a credential (vercel --token/-t, kubectl --token/--password,
+// helm --kube-token); their values are never repeated in a message.
+const SECRET_FLAGS = ["--token", "--password", "--kube-token"];
+const SECRET_SHORT: Record<string, string[]> = { vercel: ["-t"], vc: ["-t"] };
+
 function displayCommand(argv: string[]): string {
-  return argv.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ");
+  const bin = argv[0]?.replace(/\\/g, "/").split("/").pop()?.toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, "") ?? "";
+  const secret = [...SECRET_FLAGS, ...(SECRET_SHORT[bin] ?? [])];
+  const shown = argv.map((a, i) => {
+    if (i > 0 && secret.includes(argv[i - 1]!)) return "***";
+    const inline = SECRET_FLAGS.find((f) => a.startsWith(`${f}=`));
+    return inline ? `${inline}=***` : a;
+  });
+  return shown.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ");
 }
 
 /** The message shown when a command is blocked, for a human or an agent. */

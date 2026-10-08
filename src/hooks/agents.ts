@@ -150,6 +150,46 @@ export async function runHook(
   stdin: string,
   deps: GuardDeps,
   env: NodeJS.ProcessEnv,
+  deadlineMs = HOOK_DEADLINE_MS,
+): Promise<string> {
+  // An agent runs the command when its hook fails or times out (Claude Code
+  // and Codex treat a non-zero exit other than 2 as non-blocking), so every
+  // failure here must become an explicit deny.
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<string>((resolve) => {
+    timer = setTimeout(
+      () =>
+        resolve(
+          agent.deny(
+            `cloudpin: checking the accounts took longer than ${Math.round(deadlineMs / 1000)}s, so the command is blocked.\n` +
+              "  Do not work around this; ask the user to run it or to check `cloudpin status`.",
+          ),
+        ),
+      deadlineMs,
+    );
+  });
+  try {
+    return await Promise.race([checkCommand(agent, stdin, deps, env), deadline]);
+  } catch (err) {
+    const reason = (err as Error)?.message?.split("\n")[0]?.slice(0, 200) ?? String(err);
+    return agent.deny(
+      `cloudpin could not check this command (${reason}), so it is blocked.\n` +
+        "  Do not work around this; ask the user to run it or to check `cloudpin status`.",
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Below the 60-second timeout `install-hook` writes for every agent, so cloudpin
+// answers before the agent gives up on it.
+const HOOK_DEADLINE_MS = 45_000;
+
+async function checkCommand(
+  agent: AgentHook,
+  stdin: string,
+  deps: GuardDeps,
+  env: NodeJS.ProcessEnv,
 ): Promise<string> {
   let call: { command: string; cwd: string } | null;
   try {

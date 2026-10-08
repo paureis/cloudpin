@@ -31,6 +31,9 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Fixed
 
+- Agent hooks fail closed: an unexpected error or a check slower than 45 seconds now blocks the command instead of
+  letting the agent run it (agents treat a failed or timed-out hook as no objection).
+- Messages no longer repeat the value of `--token`, `--password`, `--kube-token` or Vercel's `-t`.
 - Command parsing (#7): an apostrophe in heredoc data no longer hides the commands after it; heredocs and
   here-strings fed to a shell are checked; a `cd` inside `( )`, `$( )` or `bash -c` no longer applies to later
   commands; commands held in variables and PowerShell `$x = <command>` assignments are checked.

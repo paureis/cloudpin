@@ -5,7 +5,13 @@ export type Exec = (
   bin: string,
   args: string[],
   env: NodeJS.ProcessEnv,
-) => Promise<{ code: number; stdout: string; stderr: string }>;
+) => Promise<{
+  code: number;
+  stdout: string;
+  stderr: string;
+  /** The executable itself could not be found (not installed or not on PATH). */
+  notFound?: boolean;
+}>;
 
 export interface CommandContext {
   /** Arguments after the CLI binary, e.g. ["deploy", "--prod"]. */

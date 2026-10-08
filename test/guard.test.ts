@@ -111,4 +111,21 @@ describe("guard", () => {
     const v = await guard(req("gh", ["pr", "list"], { env: { CLOUDPIN_SKIP: "1" }, mode: "agent" }), deps(other));
     expect(v.action).toBe("block");
   });
+
+  it("lets the command through when the pinned CLI is not installed (it fails on its own)", async () => {
+    // A provider that asks the CLI, which the runner reports as missing (exit 127).
+    const asksCli: ProviderDef<"github"> = {
+      ...fakeGithub(me),
+      resolve: async (_ctx, exec) => {
+        const r = await exec("gh", ["api", "user"], {});
+        return { kind: "error", message: `gh api user failed (exit ${r.code})` };
+      },
+    };
+    const v = await guard(req("gh", ["pr", "list"]), {
+      ...deps(me),
+      providers: [asksCli as ProviderDef],
+      exec: async () => ({ code: 127, stdout: "", stderr: "spawn gh ENOENT", notFound: true }),
+    });
+    expect(v).toEqual({ action: "allow", reason: "not-installed" });
+  });
 });

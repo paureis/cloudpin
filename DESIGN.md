@@ -53,4 +53,7 @@ We found no popular standalone tool for per-project cloud account pinning.
   3. Safety review: read-only, no token output, switching never blocked.
   4. README with a short animated demo, one-line install, clean uninstall, and the origin story.
   5. `cloudpin` 1.0.0 published to npm.
+  6. **Disk cleanup (owner request, 2026-10-08):** delete the test tools folder `~\.cloudpin-testbed`
+     (gcloud and agent CLIs installed only for testing), `dist/`, any `cloudpin-*`/`tmp.*` folders left in the
+     temp directory, and stale git worktrees; report the space freed to the owner.
 - Then: make it public, pin it on the profile, post a launch (r/devops, r/ClaudeAI, Show HN).

@@ -92,7 +92,9 @@ async function check(): Promise<number> {
       { bin: provider.bins[0]!, args: [], env: process.env, cwd: process.cwd(), mode: "agent" },
       deps,
     );
-    if (verdict.action === "allow") {
+    if (verdict.action === "allow" && verdict.reason === "not-installed") {
+      console.log(`  -  ${name}: ${provider.bins[0]} is not installed here, nothing to check`);
+    } else if (verdict.action === "allow") {
       console.log(`  ok ${name}: active account matches the pin`);
     } else {
       ok = false;

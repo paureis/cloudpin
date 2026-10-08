@@ -34,7 +34,9 @@ Run typecheck and tests as separate calls, and read each exit code; a pipe (`| g
 
 - `src/config.ts`: parses and finds `.cloudpin.yml` (YAML failsafe schema, so every value is a string).
 - `src/types.ts`: `ProviderDef` is the interface every CLI implements: `isExempt`, `resolve`, `compare`, `switchHint`.
-- `src/providers/<name>.ts`: one file per CLI. Done: `github`. To do: `azure`, `aws`, `gcloud`, `vercel`.
+- `src/providers/<name>.ts`: one file per CLI. Done: `github`, `azure`, `aws`, `gcloud`. To do: `vercel`.
+- `src/guard.ts`: allow/block decision; `src/format.ts`: messages; `src/shellwords.ts`: finds CLI calls in a
+  command line; `src/hooks/<agent>.ts`: agent hooks; `src/init.ts`: writes `.cloudpin.yml`; `src/cli.ts`: entry.
 - `src/exec.ts`: the only place that spawns processes (`realExec`).
 - `src/args.ts`: flag parsing shared by providers.
 
@@ -65,6 +67,10 @@ Run typecheck and tests as separate calls, and read each exit code; a pipe (`| g
 
 ## Machine notes (owner's Windows 11 PC)
 
-- Installed: az 2.86, aws 2.34, vercel 50.35, gh 2.88, codex. Not installed: gcloud, Cursor, Gemini CLI,
-  Copilot CLI. Those providers/hooks are tested with fixtures until real testing is arranged.
+- Installed normally: az 2.86, aws 2.34, vercel 50.35, gh 2.88, codex, Cursor (editor).
+- **Test-only tools live in `~\.cloudpin-testbed` and must never go on the owner's PATH or touch
+  their real configs** (owner rule): gcloud is at `.cloudpin-testbed/google-cloud-sdk/bin`. Use them by
+  prepending to PATH inside the test command only (in Git Bash write `/c/Users/...`, since a `C:` entry splits
+  PATH) together with a throwaway config dir (`CLOUDSDK_CONFIG="$(mktemp -d)"`). Install further test CLIs
+  there with `npm install --prefix`, never globally; no PowerShell 7, no Cursor CLI.
 - `.gitattributes` forces LF; edit files with the Edit tool rather than CRLF-sensitive sed.

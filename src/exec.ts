@@ -22,7 +22,8 @@ export const realExec: Exec = (bin, args, env) =>
     child.stderr?.on("data", (d: Buffer) => (stderr += d.toString()));
     child.on("error", (err: NodeJS.ErrnoException) => {
       clearTimeout(timer);
-      resolve({ code: err.code === "ENOENT" ? 127 : 1, stdout, stderr: err.message });
+      const notFound = err.code === "ENOENT";
+      resolve({ code: notFound ? 127 : 1, stdout, stderr: err.message, notFound });
     });
     child.on("close", (code) => {
       clearTimeout(timer);

@@ -21,7 +21,7 @@ export interface GuardDeps {
 export type Verdict =
   | {
       action: "allow";
-      reason: "not-guarded" | "no-config" | "not-pinned" | "exempt" | "match" | "skipped";
+      reason: "not-guarded" | "no-config" | "not-pinned" | "exempt" | "match" | "skipped" | "not-installed";
     }
   | {
       action: "block";
@@ -63,7 +63,16 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
   if (req.mode === "shell" && req.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
 
   const base = { action: "block" as const, provider: provider.name, configPath: config.path };
-  const res = await provider.resolve({ args: req.args, env: req.env, cwd: req.cwd }, deps.exec);
+  // Track whether the CLI itself is missing: then the command would fail on
+  // its own, so there is no account to protect (DESIGN.md, edge cases).
+  let cliMissing = false;
+  const exec: Exec = async (bin, args, env) => {
+    const result = await deps.exec(bin, args, env);
+    if (result.notFound) cliMissing = true;
+    return result;
+  };
+  const res = await provider.resolve({ args: req.args, env: req.env, cwd: req.cwd }, exec);
+  if (res.kind === "error" && cliMissing) return { action: "allow", reason: "not-installed" };
   switch (res.kind) {
     case "logged-out":
       return { ...base, problems: ["not logged in"], fix: res.hint };

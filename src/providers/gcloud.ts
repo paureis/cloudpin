@@ -1,10 +1,15 @@
 import { join } from "node:path";
-import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { commandWords, flagValue, hasAnyFlag } from "../args.js";
 import { appData, home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
 // Setup and housekeeping groups: logins, local config, SDK components, docs.
 const EXEMPT_COMMANDS = new Set(["auth", "config", "init", "version", "info", "help", "topic", "components"]);
+// Global flags that take a value (`gcloud --help`, GLOBAL FLAGS; SDK 588).
+const GLOBAL_VALUE_FLAGS = new Set([
+  "--account", "--billing-project", "--configuration", "--flags-file", "--flatten", "--format", "--project",
+  "--verbosity", "--access-token-file", "--impersonate-service-account", "--trace-token",
+]);
 // Global flags that change which account/project a command uses
 // (`gcloud topic configurations`). The env (CLOUDSDK_CORE_ACCOUNT,
 // CLOUDSDK_CORE_PROJECT, CLOUDSDK_ACTIVE_CONFIG_NAME, CLOUDSDK_CONFIG)
@@ -29,7 +34,7 @@ export const gcloud: ProviderDef<"gcloud"> = {
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;
-    const [first] = leadingWords(args);
+    const [first] = commandWords(args, GLOBAL_VALUE_FLAGS);
     return first !== undefined && EXEMPT_COMMANDS.has(first);
   },
 

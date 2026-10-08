@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { parse, YAMLParseError } from "yaml";
-import { hasAnyFlag } from "../args.js";
+import { commandWords as wordsAfterFlags, hasAnyFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef, Resolution } from "../types.js";
 
@@ -280,15 +280,5 @@ const VALUE_FLAGS = new Set([
  * unknown ones, so the first word is the command.
  */
 export function commandWords(args: string[]): string[] {
-  const words: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i]!;
-    if (arg === "--") break;
-    if (arg.startsWith("-")) {
-      if (VALUE_FLAGS.has(arg)) i++;
-      continue;
-    }
-    words.push(arg);
-  }
-  return words;
+  return wordsAfterFlags(args, VALUE_FLAGS);
 }

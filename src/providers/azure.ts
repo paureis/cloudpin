@@ -1,11 +1,13 @@
 import { join } from "node:path";
-import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { commandWords, flagValue, hasAnyFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
 const EXEMPT_COMMANDS = new Set(["login", "logout", "version", "upgrade"]);
 // Account housekeeping only; `account get-access-token` stays guarded.
 const EXEMPT_ACCOUNT_SUBCOMMANDS = new Set(["set", "show", "list", "clear"]);
+// Global arguments that take a value (`az <command> --help`, "Global Arguments"), plus --subscription.
+const GLOBAL_VALUE_FLAGS = new Set(["--output", "-o", "--query", "--subscription"]);
 
 export const azure: ProviderDef<"azure"> = {
   name: "azure",
@@ -26,7 +28,7 @@ export const azure: ProviderDef<"azure"> = {
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;
-    const [first, second] = leadingWords(args);
+    const [first, second] = commandWords(args, GLOBAL_VALUE_FLAGS);
     if (first === undefined) return false;
     if (EXEMPT_COMMANDS.has(first)) return true;
     return first === "account" && second !== undefined && EXEMPT_ACCOUNT_SUBCOMMANDS.has(second);

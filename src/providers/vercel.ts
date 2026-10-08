@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
-import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { commandWords, flagValue, hasAnyFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { Exec, ProviderDef, Resolution } from "../types.js";
 
@@ -14,6 +14,10 @@ import type { Exec, ProviderDef, Resolution } from "../types.js";
 
 const EXEMPT_COMMANDS = new Set(["login", "logout", "switch", "whoami", "help", "telemetry"]);
 const EXEMPT_TEAMS_SUBCOMMANDS = new Set(["ls", "list", "switch"]);
+// Global options that take a value (`vercel <command> --help`, Global Options; 50.35).
+const GLOBAL_VALUE_FLAGS = new Set([
+  "--cwd", "--global-config", "-Q", "--local-config", "-A", "--scope", "-S", "--team", "-T", "--token", "-t",
+]);
 
 interface Team {
   id: string;
@@ -153,7 +157,7 @@ export const vercel: ProviderDef<"vercel"> = {
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "-v", "--help", "-h"])) return true;
-    const [first, second] = leadingWords(args);
+    const [first, second] = commandWords(args, GLOBAL_VALUE_FLAGS);
     if (first === undefined) return false;
     if (EXEMPT_COMMANDS.has(first)) return true;
     return first === "teams" && second !== undefined && EXEMPT_TEAMS_SUBCOMMANDS.has(second);

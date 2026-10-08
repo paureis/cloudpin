@@ -29,6 +29,25 @@ export function leadingWords(args: string[]): string[] {
   return words;
 }
 
+/**
+ * The command's words with flags left out, and with the values of `valueFlags`
+ * (global flags that take a separate value) skipped, e.g. ["sso", "login"] for
+ * `aws --profile prod sso login`. `--flag=value` needs no entry. Stops at "--".
+ */
+export function commandWords(args: string[], valueFlags: ReadonlySet<string>): string[] {
+  const words: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--") break;
+    if (arg.startsWith("-")) {
+      if (valueFlags.has(arg)) i++;
+      continue;
+    }
+    words.push(arg);
+  }
+  return words;
+}
+
 export function hasAnyFlag(args: string[], names: string[]): boolean {
   return args.some((a) => names.includes(a) || names.some((n) => a.startsWith(`${n}=`)));
 }

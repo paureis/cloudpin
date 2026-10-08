@@ -1,27 +1,41 @@
 # Roadmap
 
-What's planned and what's being considered. Nothing here is promised; open an
+What's planned, in the order it's likely to ship. Each item links to its issue; open an
 [issue](https://github.com/paureis/cloudpin/issues) to vote for an idea or suggest one.
 
-## Next
+## 1.0
 
-- **Tested inside every agent.** Cursor, Gemini CLI and Copilot CLI hooks are built to each agent's documented
-  format; they still need to be exercised inside the real agent, the way Claude Code and Codex were.
-- **Vercel monorepo links.** Read repo-level links (`.vercel/repo.json`) as well as project links.
+The `.cloudpin.yml` format is stable from 1.0 on, so everything that changes it lands first.
+
+- **Environments** ([#12](https://github.com/paureis/cloudpin/issues/12)): `staging` and `production` pins in one
+  file, chosen with `cloudpin use <env>`, `CLOUDPIN_ENV` or a branch mapping. Environments marked `protected` ask
+  before any command that changes something: a one-line confirmation in your terminal, the agent's own approval
+  prompt for AI agents, and `CLOUDPIN_CONFIRM` in CI. Read-only commands (list, get, describe, logs) pass.
+- **Kubernetes** ([#13](https://github.com/paureis/cloudpin/issues/13)): pin the cluster (by API server URL) and
+  namespace for `kubectl`, `helm` and `kustomize`.
+- **Vercel monorepos and large teams** ([#4](https://github.com/paureis/cloudpin/issues/4),
+  [#5](https://github.com/paureis/cloudpin/issues/5)).
+- **Command parser gaps** ([#7](https://github.com/paureis/cloudpin/issues/7)): heredocs and commands held in
+  variables.
+
+## 1.x
+
+- **`cloudpin switch`** ([#14](https://github.com/paureis/cloudpin/issues/14)): move every CLI to the pinned
+  accounts in one go, after one confirmation.
+- **Claude Code plugin and MCP server** ([#15](https://github.com/paureis/cloudpin/issues/15)): one-click install,
+  and read-only tools agents can call to check the account before acting.
+- **GitHub Action** ([#10](https://github.com/paureis/cloudpin/issues/10)): `cloudpin check` before deploy jobs.
+- **Installers:** Homebrew ([#16](https://github.com/paureis/cloudpin/issues/16)), Scoop and winget
+  ([#17](https://github.com/paureis/cloudpin/issues/17)).
+- **VS Code / Cursor status bar** ([#18](https://github.com/paureis/cloudpin/issues/18)): a green or red pin
+  showing whether the active accounts match the project.
+- **Tested inside every agent** ([#2](https://github.com/paureis/cloudpin/issues/2),
+  [#3](https://github.com/paureis/cloudpin/issues/3)): Cursor, Gemini CLI and Copilot CLI.
 
 ## Ideas
 
-- **More CLIs:** `kubectl` contexts, `terraform` workspaces, `doctl`, `flyctl`, `wrangler` (Cloudflare),
-  `supabase`, `firebase`, `heroku`, `stripe`, `netlify`. The provider interface makes each one a small, separate
-  addition with its own tests.
-- **A GitHub Action** that runs `cloudpin check` before a deploy job.
-- **Pinning environments, not just projects:** different accounts for `staging` and `production` in one file,
-  chosen by a flag or a branch.
-- **Allow lists for safe commands:** let read-only commands (`list`, `show`) through on a mismatch, per CLI, for
-  people who prefer fewer stops over stricter checks.
-- **Editor integration:** a status bar item in VS Code and Cursor showing whether the active accounts match the
-  project.
-- **`cloudpin switch`:** switch every CLI to the pinned accounts in one go, using each CLI's own switch command.
+- **More CLIs** ([#11](https://github.com/paureis/cloudpin/issues/11)): `terraform` workspaces, `doctl`, `flyctl`,
+  `wrangler` (Cloudflare), `supabase`, `firebase`, `heroku`, `stripe`, `netlify`.
 - **Team policy:** a shared file that requires certain projects to be pinned.
 - **Fish and Nushell** wrappers.
 

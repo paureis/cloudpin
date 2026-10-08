@@ -15,6 +15,8 @@ The `.cloudpin.yml` format is stable from 1.0 on, so everything that changes it 
   namespace for `kubectl`, `helm` and `kustomize`.
 - **Vercel monorepos and large teams** ([#4](https://github.com/paureis/cloudpin/issues/4),
   [#5](https://github.com/paureis/cloudpin/issues/5)).
+- **Verifiable releases** ([#19](https://github.com/paureis/cloudpin/issues/19),
+  [#20](https://github.com/paureis/cloudpin/issues/20)): npm provenance from GitHub Actions and an OpenSSF Scorecard.
 - **Command parser gaps** ([#7](https://github.com/paureis/cloudpin/issues/7)): heredocs and commands held in
   variables.
 

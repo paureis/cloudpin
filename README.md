@@ -34,7 +34,8 @@ npx cloudpin --help
 
 </details>
 
-Requires Node.js 22 or later. Works on Windows, macOS and Linux.
+Requires Node.js 22 or later. Works on Windows, macOS and Linux. cloudpin is in public beta (0.x): it works and
+is tested, and feedback before 1.0 is very welcome.
 
 ## Quick start
 

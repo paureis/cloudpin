@@ -5,11 +5,10 @@ What's planned, in the order it's likely to ship. Each item links to its issue; 
 
 ## 1.0
 
-The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shipped in 0.2.0; what is left:
+The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shipped in 0.2.0, and verifiable
+releases in 0.2.1; what is left:
 
-- **Verifiable releases** ([#19](https://github.com/paureis/cloudpin/issues/19),
-  [#20](https://github.com/paureis/cloudpin/issues/20)): npm provenance from GitHub Actions and an OpenSSF Scorecard.
-- **A week of real use** by the author, then 1.0.0.
+- **A week of real use** by the author and early testers, then 1.0.0.
 
 ## 1.x
 
@@ -34,6 +33,9 @@ The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shi
 
 ## Shipped
 
+- **0.2.1** (2026-10-08): releases published from GitHub Actions with provenance
+  ([#19](https://github.com/paureis/cloudpin/issues/19)), OpenSSF Scorecard
+  ([#20](https://github.com/paureis/cloudpin/issues/20)) and CodeQL.
 - **0.2.0** (2026-10-08): environments and protected environments ([#12](https://github.com/paureis/cloudpin/issues/12)),
   Kubernetes for `kubectl` and `helm` ([#13](https://github.com/paureis/cloudpin/issues/13); standalone `kustomize`
   never contacts a cluster, so it isn't guarded), Vercel monorepos and large teams

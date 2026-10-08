@@ -1,7 +1,7 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { tempDir } from "./tmp.js";
 import { ConfigError, findConfig, parseConfig } from "../src/config.js";
 
 describe("parseConfig", () => {
@@ -73,7 +73,7 @@ github:
 
 describe("findConfig", () => {
   function tree() {
-    const root = mkdtempSync(join(tmpdir(), "cloudpin-"));
+    const root = tempDir("cloudpin-");
     const nested = join(root, "apps", "web");
     mkdirSync(nested, { recursive: true });
     return { root, nested };

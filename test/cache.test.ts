@@ -1,12 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { tempDir } from "./tmp.js";
 import { cachedExec, type CacheInputs } from "../src/cache.js";
 import type { Exec } from "../src/types.js";
 
 function setup(inputs: Partial<CacheInputs> = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "cloudpin-cache-"));
+  const dir = tempDir("cloudpin-cache-");
   const watched = join(dir, "profile.json");
   writeFileSync(watched, "{}");
   const watchedDir = join(dir, "sso");

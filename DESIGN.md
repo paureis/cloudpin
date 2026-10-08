@@ -56,4 +56,8 @@ We found no popular standalone tool for per-project cloud account pinning.
   6. **Disk cleanup (owner request, 2026-10-08):** delete the test tools folder `~\.cloudpin-testbed`
      (gcloud and agent CLIs installed only for testing), `dist/`, any `cloudpin-*`/`tmp.*` folders left in the
      temp directory, and stale git worktrees; report the space freed to the owner.
+  7. **Before flipping to public:** remove personal machine details from `CLAUDE.md` and `HANDOFF.md` (paths,
+     account names, the owner's subscription layout) or move those files out of the repo; enable private
+     vulnerability reporting (`SECURITY.md` links to it); after the first npm publish, check that the README
+     images and badges render on npmjs.com.
 - Then: make it public, pin it on the profile, post a launch (r/devops, r/ClaudeAI, Show HN).

@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { tempDir } from "./tmp.js";
 import { vercel } from "../src/providers/vercel.js";
 import type { Exec } from "../src/types.js";
 
@@ -33,7 +33,7 @@ function fakeVercel(opts: { teams?: string; user?: string; fail?: { code: number
 
 /** A temp folder with a Vercel login marker, optionally linked to a team. */
 function folder(link?: string) {
-  const dir = mkdtempSync(join(tmpdir(), "cloudpin-vercel-"));
+  const dir = tempDir("cloudpin-vercel-");
   if (link) {
     mkdirSync(join(dir, ".vercel"));
     writeFileSync(join(dir, ".vercel", "project.json"), JSON.stringify({ orgId: link, projectId: "prj_1" }));
@@ -140,7 +140,7 @@ describe("vercel.resolve", () => {
 
   it("reports logged-out without calling vercel when there is no login and no token", async () => {
     const { exec, calls } = fakeVercel();
-    const empty = mkdtempSync(join(tmpdir(), "cloudpin-vercel-home-"));
+    const empty = tempDir("cloudpin-vercel-home-");
     const res = await vercel.resolve(ctx(["ls"], { HOME: empty, APPDATA: empty, XDG_DATA_HOME: empty }), exec);
     expect(res).toEqual({ kind: "logged-out", hint: "vercel login" });
     expect(calls).toEqual([]);

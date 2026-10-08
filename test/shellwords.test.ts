@@ -74,6 +74,17 @@ describe("findInvocations", () => {
   it("does not mistake an argument for a command", () => {
     expect(find("echo gh is great")).toEqual([]);
     expect(find("git commit -m 'use az later'")).toEqual([]);
+    expect(find("find . -name gh")).toEqual([]);
+  });
+
+  it.each([
+    ['eval "gh pr list"', ["pr", "list"]],
+    ["eval gh pr list", ["pr", "list"]],
+    ["watch -n 5 gh run list", ["run", "list"]],
+    ["find . -name '*.md' -exec gh gist create {} \\;", ["gist", "create", "{}"]],
+    ["find . -execdir gh repo view {} +", ["repo", "view", "{}"]],
+  ])("sees calls inside %j", (cmd, args) => {
+    expect(find(cmd)).toEqual([{ bin: "gh", args, env: {} }]);
   });
 
   it.each([

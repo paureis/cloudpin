@@ -126,7 +126,10 @@ const RUNNER_SUBCOMMANDS: Record<string, string[]> = {
 const VALUE_WRAPPERS: Record<string, { valueFlags: string[]; positionals: number }> = {
   timeout: { valueFlags: ["-s", "-k", "--signal", "--kill-after"], positionals: 1 },
   xargs: { valueFlags: ["-n", "-I", "-i", "-P", "-L", "-l", "-d", "-a", "-E", "-e", "-s"], positionals: 0 },
+  watch: { valueFlags: ["-n", "--interval"], positionals: 0 },
 };
+// find options whose arguments, up to ";" or "+", are a command it runs.
+const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
 const SHELLS = new Set(["bash", "sh", "zsh", "dash"]);
 const POWERSHELLS = new Set(["pwsh", "powershell"]);
 
@@ -179,6 +182,15 @@ function analyse(words: string[], guarded: Set<string>, out: Invocation[], state
   const args = words.slice(i + 1);
   if (guarded.has(name)) {
     out.push(state.cwd === undefined ? { bin, args, env } : { bin, args, env, cwd: state.cwd });
+  } else if (name === "eval") {
+    // eval joins its arguments and runs them as a command line.
+    collect(args.join(" "), guarded, out, state);
+  } else if (name === "find") {
+    for (let k = 0; k < args.length; k++) {
+      if (!FIND_EXEC.has(args[k]!)) continue;
+      const end = args.findIndex((a, j) => j > k && (a === ";" || a === "+"));
+      analyse(args.slice(k + 1, end === -1 ? undefined : end), guarded, out, state);
+    }
   } else if (SHELLS.has(name) || POWERSHELLS.has(name)) {
     const flag = args.findIndex((a) =>
       SHELLS.has(name) ? /^-[a-z]*c$/.test(a) : /^-(c|command)$/i.test(a),

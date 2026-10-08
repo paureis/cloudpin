@@ -1,6 +1,6 @@
 # cloudpin — project rules
 
-A CLI that pins cloud accounts (az, aws, gcloud, vercel, gh) to a repo via `.cloudpin.yml` and blocks
+A CLI that pins cloud accounts (az, aws, gcloud, vercel, gh) to a repo via a .cloudpin.yml file and blocks
 commands, from a human or an AI agent, that would run on a different account. **Read `DESIGN.md` first**
 (every product decision and why), then `HANDOFF.md` (where the last session stopped).
 
@@ -21,7 +21,6 @@ Run typecheck and tests as separate calls, and read each exit code; a pipe (`| g
 
 ## Dependencies (bitten twice on day one)
 
-- Add packages with `socket npm install <pkg>`, never bare `npm install`.
 - Incremental installs on Windows drop the platform-specific optional packages from the lockfile
   (rolldown, lightningcss), which breaks `npm ci` and CI on macOS/Linux. After adding or removing any dependency:
   delete `./node_modules` and `./package-lock.json`, run `socket npm install`, then confirm
@@ -32,19 +31,12 @@ Run typecheck and tests as separate calls, and read each exit code; a pipe (`| g
 
 ## Architecture
 
-- `src/config.ts`: parses and finds `.cloudpin.yml` (YAML failsafe schema, so every value is a string).
-- `src/types.ts`: `ProviderDef` is the interface every CLI implements: `isExempt`, `resolve`, `compare`, `switchHint`.
-- `src/providers/<name>.ts`: one file per CLI: `github`, `azure`, `aws`, `gcloud`, `vercel`.
-- `src/guard.ts`: allow/block decision; `src/format.ts`: messages; `src/shellwords.ts`: finds CLI calls in a
-  command line; `src/hooks/agents.ts`: one adapter per agent; `src/install.ts`: install-hook;
-  `src/cache.ts`: identity cache; `src/shell-init.ts`: wrappers; `src/init.ts`: writes `.cloudpin.yml`;
-  `src/cli.ts`: entry point.
-- `src/exec.ts`: the only place that spawns processes (`realExec`).
-- `src/args.ts`: flag parsing shared by providers.
+The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place that spawns processes.
 
 ## Rules for provider code
 
-1. **Test first, using a fake `Exec`** (see `test/github.test.ts`). No test spawns a real CLI.
+1. **Test first, using a fake `Exec`** (see `test/github.test.ts`). No test spawns a real CLI. Temporary
+   folders come from `tempDir()` in `test/tmp.ts`, which deletes them; a bare `mkdtempSync` leaks one per run.
 2. **Check every CLI behaviour against the official docs or `<cli> --help` before coding it** (flags,
    env vars, precedence, exit codes, output fields) and cite the source in a comment where it isn't obvious.
    Recorded findings go in HANDOFF.md under "Provider research".
@@ -69,13 +61,17 @@ Run typecheck and tests as separate calls, and read each exit code; a pipe (`| g
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - Push to `origin main` after each green commit, so the next session starts from GitHub.
 - Before any `gh` call that writes, confirm `gh auth status --active` shows `paureis`.
+- **Releasing needs the owner:** bump the version and CHANGELOG, tag, then run `npm publish --access public
+  --auth-type=web` in the Terminal panel (the Bash tool is non-interactive, so npm exits); the owner approves in the
+  browser, then approves again under npmjs.com > Staged Packages (staged publishing holds every version).
 
 ## Machine notes (owner's Windows 11 PC)
 
 - Installed normally: az 2.86, aws 2.34, vercel 50.35, gh 2.88, codex, Cursor (editor).
 - **Test-only tools live in `~\.cloudpin-testbed` and must never go on the owner's PATH or touch
-  their real configs** (owner rule): gcloud is at `.cloudpin-testbed/google-cloud-sdk/bin`. Use them by
-  prepending to PATH inside the test command only (in Git Bash write `/c/Users/...`, since a `C:` entry splits
-  PATH) together with a throwaway config dir (`CLOUDSDK_CONFIG="$(mktemp -d)"`). Install further test CLIs
-  there with `npm install --prefix`, never globally; no PowerShell 7, no Cursor CLI.
+  their real configs** (owner rule): gcloud is at `.cloudpin-testbed/google-cloud-sdk/bin`. Prepend it to PATH
+  inside the test command only, with a throwaway config dir (`CLOUDSDK_CONFIG="$(mktemp -d)"`). Install further
+  test CLIs there with `npm install --prefix`, never globally; no PowerShell 7, no Cursor CLI.
+- Before running a real agent or CLI in a test, copy its user config and diff it afterwards: `codex exec -c`
+  saved a one-run trust override into `~/.codex/config.toml`.
 - `.gitattributes` forces LF; edit files with the Edit tool rather than CRLF-sensitive sed.

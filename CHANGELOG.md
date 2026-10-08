@@ -6,6 +6,10 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-08
+
+Environments, Kubernetes, and fixes from a safety review. The `.cloudpin.yml` format is backwards compatible.
+
 ### Added
 
 - `cloudpin status`: each CLI's active account, the pins that apply here, and the installed agent hooks;

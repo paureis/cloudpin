@@ -7,7 +7,7 @@
 
 Pin cloud accounts to a project, and stop any command (yours or your AI agent's) that would run on the wrong one.
 
-`az`, `aws`, `gcloud`, `vercel` and `gh` act on whichever account you logged into last. With a work account, a
+`az`, `aws`, `gcloud`, `vercel`, `gh`, `kubectl` and `helm` act on whichever account or cluster you used last. With a work account, a
 personal one and a client or two on the same machine, sooner or later something gets deployed to, or deleted
 from, the wrong place. Coding agents make it more likely: they run these commands for you and never stop to ask
 which account is active. cloudpin checks before the command runs.
@@ -35,7 +35,7 @@ npx cloudpin --help
 </details>
 
 Requires Node.js 22 or later. Works on Windows, macOS and Linux. cloudpin is in public beta (0.x): it works and
-is tested, and feedback before 1.0 is very welcome.
+is tested, and [feedback before 1.0](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
 
 ## Quick start
 
@@ -46,7 +46,13 @@ cloudpin install-hook claude         # protect your AI agent (or codex, cursor, 
 echo 'eval "$(cloudpin shell-init bash)"' >> ~/.bashrc   # protect your terminal
 ```
 
-Commit `.cloudpin.yml` so everyone on the project gets the same protection.
+Commit `.cloudpin.yml` so everyone on the project gets the same protection. `cloudpin status` shows each CLI's
+active account next to what is pinned. To see a block without risking anything, pin a wrong account in a scratch
+folder (edit an ID in `.cloudpin.yml`) and run a read-only command such as `gh repo list`.
+
+To undo it all: `cloudpin uninstall-hook claude`, remove the `shell-init` line from your profile, and delete
+`.cloudpin.yml`. The only other things cloudpin writes are a short-lived identity cache in your user cache folder,
+`.git/cloudpin-env` if you ran `cloudpin use`, and `*.cloudpin-backup` copies next to agent settings it edited.
 
 ## Usage
 

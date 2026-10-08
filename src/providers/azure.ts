@@ -8,6 +8,7 @@ const EXEMPT_ACCOUNT_SUBCOMMANDS = new Set(["set", "show", "list", "clear"]);
 export const azure: ProviderDef<"azure"> = {
   name: "azure",
   bins: ["az"],
+  statusCommand: "az account show",
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;

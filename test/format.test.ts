@@ -40,4 +40,25 @@ describe("formatBlock", () => {
       ["cloudpin: blocked `gh`", "  - invalid config: x", "  (to run it anyway, once: CLOUDPIN_SKIP=1 gh)"].join("\n"),
     );
   });
+
+  it("says plainly when it stopped because it could not tell the account", () => {
+    const uncertain = {
+      action: "block" as const,
+      uncertain: true,
+      provider: "github" as const,
+      configPath: "/repo/.cloudpin.yml",
+      problems: ["gh api user failed (exit 1)"],
+      fix: "gh auth status",
+    };
+    expect(formatBlock(uncertain, ["gh", "pr", "list"], "shell")).toBe(
+      [
+        "cloudpin: stopped `gh pr list` because it could not tell which github account it would use",
+        "  github is pinned in /repo/.cloudpin.yml",
+        "  - reason: gh api user failed (exit 1)",
+        "  This is a safety stop: cloudpin blocks whenever it cannot confirm the account.",
+        "  to see what is wrong: gh auth status",
+        "  (to run it anyway, once: CLOUDPIN_SKIP=1 gh pr list)",
+      ].join("\n"),
+    );
+  });
 });

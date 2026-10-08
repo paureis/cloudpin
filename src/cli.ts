@@ -96,9 +96,15 @@ async function check(): Promise<number> {
       console.log(`  ok ${name}: active account matches the pin`);
     } else {
       ok = false;
-      console.log(`  x  ${name}`);
-      for (const problem of verdict.problems) console.log(`     - ${problem}`);
-      if (verdict.fix) console.log(`     fix: ${verdict.fix}`);
+      if (verdict.uncertain) {
+        console.log(`  x  ${name}: could not tell which account is active, so commands will be stopped`);
+        for (const problem of verdict.problems) console.log(`     - reason: ${problem}`);
+        if (verdict.fix) console.log(`     to see what is wrong: ${verdict.fix}`);
+      } else {
+        console.log(`  x  ${name}`);
+        for (const problem of verdict.problems) console.log(`     - ${problem}`);
+        if (verdict.fix) console.log(`     fix: ${verdict.fix}`);
+      }
     }
   }
   return ok ? 0 : 1;

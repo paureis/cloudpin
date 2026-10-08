@@ -11,6 +11,7 @@ function fakeGithub(resolution: Resolution): ProviderDef<"github"> {
     resolve: async () => resolution,
     compare: (pin, id) => (pin.user === id.user ? [] : [`user: expected "${pin.user}", active is "${id.user}"`]),
     switchHint: (pin) => `gh auth switch --user ${pin.user}`,
+    statusCommand: "gh auth status",
   };
 }
 
@@ -88,7 +89,12 @@ describe("guard", () => {
 
   it("fails closed when the identity cannot be determined", async () => {
     const v = await guard(req("gh", ["pr", "list"]), deps({ kind: "error", message: "network down" }));
-    expect(v).toMatchObject({ action: "block", problems: ["could not determine the active account: network down"] });
+    expect(v).toMatchObject({
+      action: "block",
+      uncertain: true,
+      problems: ["network down"],
+      fix: "gh auth status",
+    });
   });
 
   it("fails closed on an invalid config file", async () => {

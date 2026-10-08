@@ -5,10 +5,12 @@ const DEFAULT_HOST = "github.com";
 const EXEMPT_COMMANDS = new Set(["auth", "version", "help", "completion"]);
 // gh exits 4 when a command needs authentication (`gh help exit-codes`).
 const EXIT_AUTH_REQUIRED = 4;
+const TOKEN_VARS = ["GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"];
 
 export const github: ProviderDef<"github"> = {
   name: "github",
   bins: ["gh"],
+  statusCommand: "gh auth status",
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;
@@ -26,7 +28,13 @@ export const github: ProviderDef<"github"> = {
     }
     const login = res.stdout.trim();
     if (res.code !== 0 || login === "") {
-      return { kind: "error", message: `gh api user failed (exit ${res.code})` };
+      // gh prints its reason as "gh: <message>" on stderr (e.g. "gh: Bad credentials (HTTP 401)").
+      const reason = /^gh: .+$/m.exec(res.stderr)?.[0].trim().slice(0, 300);
+      // Token variables silently replace the stored login (`gh help environment`);
+      // name the one in effect, never its value.
+      const tokenVar = TOKEN_VARS.find((name) => env[name]);
+      const note = tokenVar ? `; note: ${tokenVar} is set and is used instead of your gh login` : "";
+      return { kind: "error", message: `${reason ?? `gh api user failed (exit ${res.code})`}${note}` };
     }
     return { kind: "identity", identity: { user: login, host }, source: "gh api user" };
   },

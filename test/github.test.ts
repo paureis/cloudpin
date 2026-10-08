@@ -77,6 +77,19 @@ describe("github.resolve", () => {
     expect(res.kind).toBe("error");
     expect(JSON.stringify(res)).not.toContain("secret-value");
   });
+
+  it("passes gh's reason on and names a token variable that overrides the login", async () => {
+    const { exec } = fakeExec({
+      code: 1,
+      // Observed with GH_TOKEN=invalid on gh 2.88.
+      stderr: "gh: Bad credentials (HTTP 401)\n",
+    });
+    const res = await github.resolve(ctx(["pr", "list"], { GH_TOKEN: "secret-value" }), exec);
+    expect(res).toEqual({
+      kind: "error",
+      message: "gh: Bad credentials (HTTP 401); note: GH_TOKEN is set and is used instead of your gh login",
+    });
+  });
 });
 
 describe("github.compare", () => {

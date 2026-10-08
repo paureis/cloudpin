@@ -9,6 +9,7 @@ const EXIT_NO_CREDENTIALS = 253;
 export const aws: ProviderDef<"aws"> = {
   name: "aws",
   bins: ["aws"],
+  statusCommand: "aws sts get-caller-identity",
 
   isExempt(args) {
     if (hasAnyFlag(args, ["--version"])) return true;

@@ -34,4 +34,6 @@ export interface ProviderDef<P extends Provider = Provider> {
   compare(pin: NonNullable<Pins[P]>, identity: Identity): string[];
   /** Command a human would run to switch to the pinned identity. */
   switchHint(pin: NonNullable<Pins[P]>): string;
+  /** Command that shows the CLI's login state, suggested when resolving fails. */
+  statusCommand: string;
 }

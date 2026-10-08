@@ -25,6 +25,8 @@ export type Verdict =
     }
   | {
       action: "block";
+      /** True when the account could not be determined at all (a safety stop). */
+      uncertain?: boolean;
       provider?: Provider;
       configPath?: string;
       problems: string[];
@@ -68,7 +70,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
     case "error":
       // Fail closed: if we cannot tell who the command will act as, we cannot
       // promise it is the right account.
-      return { ...base, problems: [`could not determine the active account: ${res.message}`] };
+      return { ...base, uncertain: true, problems: [res.message], fix: provider.statusCommand };
     case "identity": {
       // The provider and its pin come from the same key, so the cast is safe.
       const p = provider as ProviderDef<typeof provider.name>;

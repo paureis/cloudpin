@@ -46,14 +46,14 @@ We found no popular standalone tool for per-project cloud account pinning.
 
 ## Repo and release
 
-- Private `paureis/cloudpin`, local at `<repo>`.
+- `paureis/cloudpin` (private until the checklist below is done).
 - Go public only when all of these are done:
   1. Every CLI and every supported agent tested on real accounts (Windows), with CI green on Windows, macOS and Linux.
   2. About a week of the owner using it on real projects.
   3. Safety review: read-only, no token output, switching never blocked.
   4. README with a short animated demo, one-line install, clean uninstall, and the origin story.
   5. `cloudpin` 1.0.0 published to npm.
-  6. **Disk cleanup (owner request, 2026-10-08):** delete the test tools folder `~\.cloudpin-testbed`
+  6. **Disk cleanup (owner request, 2026-10-08):** delete the test tools folder `~/.cloudpin-testbed`
      (gcloud and agent CLIs installed only for testing), `dist/`, any `cloudpin-*`/`tmp.*` folders left in the
      temp directory, and stale git worktrees; report the space freed to the owner.
   7. **Before flipping to public:** remove personal machine details from `CLAUDE.md` and `HANDOFF.md` (paths,

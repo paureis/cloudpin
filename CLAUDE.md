@@ -70,10 +70,10 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
   --auth-type=web` in the Terminal panel (the Bash tool is non-interactive, so npm exits); the owner approves in the
   browser, then approves again under npmjs.com > Staged Packages (staged publishing holds every version).
 
-## Machine notes (owner's Windows 11 PC)
+## Machine notes (owner's Windows PC)
 
 - Installed normally: az 2.86, aws 2.34, vercel 50.35, gh 2.88, codex, Cursor (editor).
-- **Test-only tools live in `~\.cloudpin-testbed` and must never go on the owner's PATH or touch
+- **Test-only tools live in `~/.cloudpin-testbed` and must never go on the owner's PATH or touch
   their real configs** (owner rule): gcloud is at `.cloudpin-testbed/google-cloud-sdk/bin`. Prepend it to PATH
   inside the test command only, with a throwaway config dir (`CLOUDSDK_CONFIG="$(mktemp -d)"`). Install further
   test CLIs there with `npm install --prefix`, never globally; no PowerShell 7, no Cursor CLI.

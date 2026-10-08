@@ -109,7 +109,7 @@ the file:
 | `az` | subscription ID, tenant ID | `--subscription`, `AZURE_CONFIG_DIR` |
 | `aws` | account ID | `--profile`, `AWS_PROFILE`, access key variables, SSO |
 | `gcloud` | account, project | `--account`, `--project`, `--configuration`, `CLOUDSDK_*` |
-| `vercel` / `vc` | team ID | `--scope`, `--team`, `--token`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, linked project |
+| `vercel` / `vc` | team ID | `--scope`, `--team`, `--token`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, linked project (`.vercel/project.json` or a repository's `.vercel/repo.json`) |
 | `gh` | user, host | `--hostname`, `GH_HOST`, `GH_TOKEN`, `GITHUB_TOKEN` |
 | `kubectl`, `helm` | API server URL, namespace (optional) | `--kubeconfig`, `KUBECONFIG`, `--context`, `--cluster`, `--server`, `-n`, `-A`, kuberc; helm's `--kube-context`, `--kube-apiserver`, `HELM_*` |
 

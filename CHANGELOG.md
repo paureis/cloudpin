@@ -21,6 +21,10 @@ All notable changes to cloudpin are listed here. The format follows
   `kubectl` and `helm`. The target is read from the kubeconfig the way kubectl does (flags, `KUBECONFIG` merging,
   helm's `HELM_*` variables, kuberc), without contacting the cluster.
 
+- Vercel monorepos linked with `vercel link --repo` (#4): the team of the project a command acts on is read from
+  `.vercel/repo.json` the way the CLI picks it; if the folder matches no project, every linked project's team must
+  match the pin.
+
 ### Changed
 
 - The flat `.cloudpin.yml` format keeps working unchanged; it is now the single-environment case.

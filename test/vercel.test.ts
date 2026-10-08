@@ -177,3 +177,73 @@ describe("vercel.compare", () => {
     expect(vercel.switchHint({ team: "team_main" })).toBe("vercel switch (choose the team with ID team_main)");
   });
 });
+
+describe("vercel.resolve: repository links (.vercel/repo.json, vercel link --repo)", () => {
+  // Format and lookup from the CLI source (vercel/vercel packages/cli/src/util/link/repo.ts
+  // and util/projects/link.ts): projects[].{id, name, directory, orgId}, a deprecated
+  // top-level orgId, and the deepest project whose directory holds the folder.
+  function monorepo(repo: object, cwdPath = "apps/web") {
+    const root = tempDir("cloudpin-vercel-repo-");
+    mkdirSync(join(root, ".vercel"));
+    writeFileSync(join(root, ".vercel", "repo.json"), JSON.stringify(repo));
+    const cwd = join(root, ...cwdPath.split("/"));
+    mkdirSync(cwd, { recursive: true });
+    return { root, cwd };
+  }
+  const projects = [
+    { id: "prj_root", name: "site", directory: ".", orgId: "team_main" },
+    { id: "prj_web", name: "web", directory: "apps/web", orgId: "team_side" },
+    { id: "prj_api", name: "api", directory: "apps/api", orgId: "team_main" },
+  ];
+  const resolveIn = async (cwd: string, args = ["deploy"]) => (await vercel.resolve(ctx(args, loggedIn, cwd), fakeVercel().exec));
+
+  it("uses the deepest project whose directory holds the folder", async () => {
+    const { cwd } = monorepo({ remoteName: "origin", projects }, "apps/web/src");
+    expect(await resolveIn(cwd)).toMatchObject({ identity: { projectTeam: "team_side" } });
+  });
+
+  it("falls back to the root project elsewhere in the repository", async () => {
+    const { cwd } = monorepo({ remoteName: "origin", projects }, "docs");
+    expect(await resolveIn(cwd)).toMatchObject({ identity: { projectTeam: "team_main" } });
+  });
+
+  it("checks every project the CLI could pick when none matches the folder", async () => {
+    const { cwd } = monorepo({ projects: projects.filter((p) => p.directory !== ".") }, "docs");
+    expect(await resolveIn(cwd)).toMatchObject({ identity: { projectTeam: "team_main,team_side" } });
+  });
+
+  it("narrows to --project when it names a linked project", async () => {
+    const { cwd } = monorepo({ projects: projects.filter((p) => p.directory !== ".") }, "docs");
+    expect(await resolveIn(cwd, ["deploy", "--project", "api"])).toMatchObject({ identity: { projectTeam: "team_main" } });
+  });
+
+  it("uses the deprecated top-level orgId when a project has none", async () => {
+    const { cwd } = monorepo({ orgId: "team_side", projects: [{ id: "prj_web", name: "web", directory: "apps/web" }] });
+    expect(await resolveIn(cwd)).toMatchObject({ identity: { projectTeam: "team_side" } });
+  });
+
+  it("fails closed when a project has no orgId at all", async () => {
+    const { cwd } = monorepo({ projects: [{ id: "prj_web", name: "web", directory: "apps/web" }] });
+    expect(await resolveIn(cwd)).toMatchObject({ kind: "error", message: expect.stringMatching(/repo\.json.*orgId/) });
+  });
+
+  it("prefers a .vercel/project.json in the folder itself", async () => {
+    const { cwd } = monorepo({ remoteName: "origin", projects });
+    mkdirSync(join(cwd, ".vercel"));
+    writeFileSync(join(cwd, ".vercel", "project.json"), JSON.stringify({ orgId: "team_main", projectId: "prj_x" }));
+    expect(await resolveIn(cwd)).toMatchObject({ identity: { projectTeam: "team_main" } });
+  });
+
+  it("ignores a settings-only project.json without orgId (written by vercel pull)", async () => {
+    const { cwd } = monorepo({ remoteName: "origin", projects });
+    mkdirSync(join(cwd, ".vercel"));
+    writeFileSync(join(cwd, ".vercel", "project.json"), JSON.stringify({ settings: {} }));
+    expect(await resolveIn(cwd)).toMatchObject({ identity: { projectTeam: "team_side" } });
+  });
+
+  it("compares every candidate team with the pin", () => {
+    expect(vercel.compare({ team: "team_main" }, { team: "team_main", projectTeam: "team_main,team_side" })).toEqual([
+      'linked project: belongs to team "team_side", expected "team_main"',
+    ]);
+  });
+});

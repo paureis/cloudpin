@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve as resolvePath } from "node:path";
+import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { home } from "../paths.js";
 import type { Exec, ProviderDef, Resolution } from "../types.js";
 
 // Behaviour below was observed on vercel 50.35 through `--debug` request URLs
@@ -36,13 +37,66 @@ function loginDirs(env: NodeJS.ProcessEnv): string[] {
   return dirs;
 }
 
-function linkedOrg(dir: string): string | undefined {
+const readJson = (path: string): Record<string, unknown> | undefined => {
   try {
-    const link = JSON.parse(readFileSync(join(dir, ".vercel", "project.json"), "utf8")) as { orgId?: unknown };
-    return typeof link.orgId === "string" ? link.orgId : undefined;
+    const value: unknown = JSON.parse(readFileSync(path, "utf8"));
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
   } catch {
     return undefined;
   }
+};
+const nonEmpty = (v: unknown): v is string => typeof v === "string" && v !== "";
+
+interface RepoProject {
+  id?: unknown;
+  name?: unknown;
+  directory?: unknown;
+  orgId?: unknown;
+}
+
+/**
+ * The teams of the projects a command in `dir` can act on, as the Vercel CLI
+ * picks them (vercel/vercel packages/cli/src/util/projects/link.ts and
+ * util/link/repo.ts): a `.vercel/project.json` in the folder itself, else the
+ * nearest `.vercel/repo.json` above it (`vercel link --repo`, below the home
+ * folder), using the deepest project whose directory holds the folder, or every
+ * project when none does (the CLI would then ask). Empty when not linked.
+ */
+function linkedTeams(dir: string, project: string | undefined, homeDir: string): string[] | { error: string } {
+  const own = readJson(join(dir, ".vercel", "project.json"));
+  // A project.json without both IDs (e.g. settings only, from `vercel pull`) is not a link.
+  if (own && nonEmpty(own.orgId) && nonEmpty(own.projectId)) return [own.orgId];
+
+  for (let current = dir; current !== homeDir; ) {
+    const repoPath = join(current, ".vercel", "repo.json");
+    if (existsSync(repoPath)) {
+      const repo = readJson(repoPath);
+      const all = (Array.isArray(repo?.projects) ? repo.projects : []) as RepoProject[];
+      const rel = relative(current, dir).split(sep).join("/") || ".";
+      const holding = all
+        .filter((p) => typeof p.directory === "string")
+        .filter((p) => p.directory === "." || rel === p.directory || rel.startsWith(`${p.directory as string}/`));
+      const depthOf = (p: RepoProject) => (p.directory === "." ? 0 : (p.directory as string).split("/").length);
+      const deepest = Math.max(-1, ...holding.map(depthOf));
+      let candidates = holding.filter((p) => depthOf(p) === deepest);
+      if (candidates.length === 0) candidates = all;
+      if (project) {
+        const named = candidates.filter((p) => p.id === project || p.name === project);
+        if (named.length > 0) candidates = named;
+      }
+      const teams = new Set<string>();
+      for (const p of candidates) {
+        const org = nonEmpty(p.orgId) ? p.orgId : repo?.orgId;
+        if (!nonEmpty(org)) return { error: `${repoPath} has no orgId for project "${String(p.name ?? p.id)}"; re-link it with vercel link --repo` };
+        teams.add(org);
+      }
+      return [...teams].sort();
+    }
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return [];
 }
 
 function failure(stderr: string, code: number, what: string): Resolution {
@@ -123,8 +177,16 @@ export const vercel: ProviderDef<"vercel"> = {
     const identity: Record<string, string> = { team, label: slugOf(team) };
     // The team project-level requests use.
     const projectDir = resolvePath(cwd, flagValue(args, ["--cwd"]) ?? ".");
-    const projectTeam = env.VERCEL_ORG_ID ?? linkedOrg(projectDir);
-    if (projectTeam) identity.projectTeam = toId(projectTeam);
+    let projectTeams: string[];
+    if (env.VERCEL_ORG_ID) {
+      projectTeams = [env.VERCEL_ORG_ID];
+    } else {
+      const linked = linkedTeams(projectDir, flagValue(args, ["--project"]), home(env));
+      if ("error" in linked) return { kind: "error", message: linked.error };
+      projectTeams = linked;
+    }
+    // Several when a repository link leaves the project open; each must be the pinned team.
+    if (projectTeams.length > 0) identity.projectTeam = [...new Set(projectTeams.map(toId))].join(",");
     return { kind: "identity", identity, source: "vercel teams ls" };
   },
 
@@ -134,8 +196,10 @@ export const vercel: ProviderDef<"vercel"> = {
       const slug = identity.label ? ` (${identity.label})` : "";
       out.push(`team: expected "${pin.team}", active is "${identity.team}"${slug}`);
     }
-    if (identity.projectTeam !== undefined && identity.projectTeam !== pin.team) {
-      out.push(`linked project: belongs to team "${identity.projectTeam}", expected "${pin.team}"`);
+    for (const projectTeam of identity.projectTeam?.split(",") ?? []) {
+      if (projectTeam !== pin.team) {
+        out.push(`linked project: belongs to team "${projectTeam}", expected "${pin.team}"`);
+      }
     }
     return out;
   },

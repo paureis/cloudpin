@@ -3,3 +3,5 @@ dist/
 coverage/
 *.log
 .preview/
+# The owner's local session notes (see CLAUDE.md)
+HANDOFF.md

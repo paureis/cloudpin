@@ -2,10 +2,11 @@
 
 A CLI that pins cloud accounts (az, aws, gcloud, vercel, gh, kubectl, helm) to a repo via a .cloudpin.yml file and blocks
 commands, from a human or an AI agent, that would run on a different account. **Read `DESIGN.md` first**
-(every product decision and why), then `HANDOFF.md` (where the last session stopped).
+(every product decision and why), then `HANDOFF.md` if it exists: the owner's local session notes (where the
+last session stopped, machine notes, provider research), kept out of the repo by `.gitignore`.
 
-Owner: Alvaro Reis (`paureis`). The repo is private until the go-public checklist in DESIGN.md is complete.
-Do not make it public, publish to npm or post anywhere without the owner's explicit yes.
+Owner: Alvaro Reis (`paureis`). Do not publish to npm, change repository settings or post anywhere without the
+owner's explicit yes.
 
 ## Commands
 
@@ -74,13 +75,6 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
   --auth-type=web` in the Terminal panel (the Bash tool is non-interactive, so npm exits); the owner approves in the
   browser, then approves again under npmjs.com > Staged Packages (staged publishing holds every version).
 
-## Machine notes (owner's Windows PC)
+## Editing
 
-- Installed normally: az 2.86, aws 2.34, vercel 50.35, gh 2.88, codex, Cursor (editor).
-- **Test-only tools live in `~/.cloudpin-testbed` and must never go on the owner's PATH or touch
-  their real configs** (owner rule): gcloud is at `.cloudpin-testbed/google-cloud-sdk/bin`. Prepend it to PATH
-  inside the test command only, with a throwaway config dir (`CLOUDSDK_CONFIG="$(mktemp -d)"`). Install further
-  test CLIs there with `npm install --prefix`, never globally; no PowerShell 7, no Cursor CLI.
-- Before running a real agent or CLI in a test, copy its user config and diff it afterwards: `codex exec -c`
-  saved a one-run trust override into `~/.codex/config.toml`.
 - `.gitattributes` forces LF; edit files with the Edit tool rather than CRLF-sensitive sed.

@@ -46,9 +46,12 @@ We found no popular standalone tool for per-project cloud account pinning.
 
 ## Repo and release
 
-- `paureis/cloudpin` (private until the checklist below is done).
-- Go public only when all of these are done:
-  1. Every CLI and every supported agent tested on real accounts (Windows), with CI green on Windows, macOS and Linux.
+- `paureis/cloudpin`, public since 2026-10-08. The owner chose to go public before the checklist below was
+  complete, to stop private-repo Actions minutes; it is now the bar for **1.0.0** instead. Personal details were
+  removed first: a fresh repository with the history rewritten (author emails, paths), the session notes
+  (`HANDOFF.md`) kept local, and the original repository archived privately.
+- Before 1.0.0, all of these:
+  1. Every CLI and every supported agent tested on real accounts (Windows), with the nightly Windows run green.
   2. About a week of the owner using it on real projects.
   3. Safety review: read-only, no token output, switching never blocked.
   4. README with a short animated demo, one-line install, clean uninstall, and the origin story.
@@ -56,8 +59,6 @@ We found no popular standalone tool for per-project cloud account pinning.
   6. **Disk cleanup (owner request, 2026-10-08):** delete the test tools folder `~/.cloudpin-testbed`
      (gcloud and agent CLIs installed only for testing), `dist/`, any `cloudpin-*`/`tmp.*` folders left in the
      temp directory, and stale git worktrees; report the space freed to the owner.
-  7. **Before flipping to public:** remove personal machine details from `CLAUDE.md` and `HANDOFF.md` (paths,
-     account names, the owner's subscription layout) or move those files out of the repo; enable private
-     vulnerability reporting (`SECURITY.md` links to it); after the first npm publish, check that the README
-     images and badges render on npmjs.com.
+  7. Personal details out of the repo (done 2026-10-08); private vulnerability reporting on (`SECURITY.md` links
+     to it); the README images and badges render on GitHub and npmjs.com.
 - Then: make it public, pin it on the profile, post a launch (r/devops, r/ClaudeAI, Show HN).

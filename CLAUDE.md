@@ -59,7 +59,12 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
 - Small commits, one concern each. Write the message to a file and use `git commit -F <file>`
   (never inline `-m` with quotes or backticks). End with:
   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
-- Push to `origin main` after each green commit, so the next session starts from GitHub.
+- **One branch per issue** (owner decision, 2026-10-08), e.g. `feat/12-environments`, `fix/7-heredocs`,
+  `docs/...`, cut from an up-to-date `main` in this folder (no worktree). Push the branch after each green
+  commit, open a PR whose body says `Closes #N`, and squash-merge it only when CI is green on all three OSes
+  (`gh pr checks`). Free private repos can't enforce branch protection, so this is a habit until go-public (#8),
+  then turn protection on (it also helps #20). `main` stays releasable: half-done work waits on its branch.
+- Switching branches never changes the owner's installed cloudpin; only `node scripts/dogfood.mjs install` does.
 - Before any `gh` call that writes, confirm `gh auth status --active` shows `paureis`.
 - **Releasing needs the owner:** bump the version and CHANGELOG, tag, then run `npm publish --access public
   --auth-type=web` in the Terminal panel (the Bash tool is non-interactive, so npm exits); the owner approves in the

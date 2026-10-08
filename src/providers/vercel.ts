@@ -5,8 +5,8 @@ import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
 import { home } from "../paths.js";
 import type { Exec, ProviderDef, Resolution } from "../types.js";
 
-// Behaviour below was observed on vercel 50.35 through `--debug` request URLs
-// (HANDOFF.md, "Provider research"):
+// Behaviour below was observed on vercel 50.35 through `--debug` request URLs,
+// running read-only commands:
 // - account-level requests use --scope/--team, else the global current team;
 // - project-level requests use the linked project's orgId, overridden by
 //   VERCEL_ORG_ID; a --team flag does not change the project lookup.

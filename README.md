@@ -213,7 +213,9 @@ environment by setting `CLOUDPIN_ENV` in their own command, and need your OK to 
 | GitHub Copilot CLI | `.github/hooks/cloudpin.json` | Built to the documented hook format |
 
 cloudpin reads the whole command line the agent is about to run, so it also catches
-`cd ../other && npx vercel deploy`, `bash -c "..."`, pipelines, `$( )`, `xargs` and `find -exec`.
+`cd ../other && npx vercel deploy`, `bash -c "..."`, pipelines, `$( )`, `xargs`, `find -exec`, heredocs fed to a shell
+(`bash <<EOF`), commands held in a variable (`CLI=vercel; $CLI deploy`) and PowerShell assignments
+(`$prs = gh pr list`). It can't see inside a script file the agent writes and runs later (`bash deploy.sh`).
 
 ## Configuration
 

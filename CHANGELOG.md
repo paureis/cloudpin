@@ -31,6 +31,9 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Fixed
 
+- Command parsing (#7): an apostrophe in heredoc data no longer hides the commands after it; heredocs and
+  here-strings fed to a shell are checked; a `cd` inside `( )`, `$( )` or `bash -c` no longer applies to later
+  commands; commands held in variables and PowerShell `$x = <command>` assignments are checked.
 - Vercel: every page of `vercel teams ls` is read (#5). With the current team on a later page, cloudpin assumed
   the Hobby team, so a command on another team could pass if the Hobby team was pinned.
 - An agent could skip the check by wrapping a command in `cloudpin exec` (shell mode, where `CLOUDPIN_SKIP` works);

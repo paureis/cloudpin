@@ -1,0 +1,48 @@
+name: Release
+
+# Publishes to npm from GitHub Actions with trusted publishing (OIDC, no stored
+# token) and automatic provenance (docs.npmjs.com/trusted-publishers). It only
+# stages the version: a maintainer still approves it with 2FA on npmjs.com
+# (Staged Packages). Triggered by pushing a v* tag; run it by hand for a dry run.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: Tag matches package.json
+        if: github.event_name == 'push'
+        run: |
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then echo "tag $GITHUB_REF_NAME but package.json says $version"; exit 1; fi
+      - run: npm ci
+      # Trusted publishing needs npm 11.5.1+, `npm stage` 11.15+.
+      - run: npm install --global npm@11.21.0
+      # prepublishOnly runs typecheck, tests and build before either command.
+      - name: Stage on npm (approve on npmjs.com > Staged Packages)
+        if: github.event_name == 'push'
+        run: npm stage publish --access public
+      - name: Dry run
+        if: github.event_name == 'workflow_dispatch'
+        run: npm publish --dry-run --access public

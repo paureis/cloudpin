@@ -14,6 +14,7 @@ import { discover, renderConfig } from "./init.js";
 import { hookFile, planInstall, planUninstall } from "./install.js";
 import { cacheDir } from "./paths.js";
 import { shellInit } from "./shell-init.js";
+import { buildStatus } from "./status.js";
 import { providers } from "./providers/index.js";
 
 /** Exit code for a blocked command, distinct from the usual 1 and 2. */
@@ -25,6 +26,7 @@ Usage:
   cloudpin init [--yes] [--force]
                               Pin the accounts you are logged into now, in ./.cloudpin.yml
   cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
+  cloudpin status             Show each CLI's active account, the pins here, and installed hooks
   cloudpin exec -- <cmd...>   Run <cmd> only if it would act on the pinned account
   cloudpin hook <agent>       Agent hook; reads the hook JSON on stdin
                               (claude, codex, copilot, gemini, cursor)
@@ -235,6 +237,19 @@ export async function main(argv: string[]): Promise<number> {
       return exec(rest[0] === "--" ? rest.slice(1) : rest);
     case "hook":
       return hook(rest[0]);
+    case "status": {
+      const hooks = () =>
+        (Object.keys(AGENTS) as AgentName[]).flatMap((agent) =>
+          (["project", "user"] as const)
+            .filter((scope) => {
+              const file = hookFile(agent, scope, process.cwd(), process.env);
+              return existsSync(file) && readFileSync(file, "utf8").includes(`cloudpin hook ${agent}`);
+            })
+            .map((scope) => `${agent} (${scope === "user" ? "personal" : "project"})`),
+        );
+      for (const line of await buildStatus(cachedDeps, process.cwd(), process.env, hooks)) console.log(line);
+      return 0;
+    }
     case "install-hook":
       return hookSetup("install", rest[0], rest.slice(1));
     case "uninstall-hook":

@@ -12,6 +12,7 @@ export interface Pins {
   vercel?: { team: string };
   github?: { user: string; host?: string };
   kubernetes?: { server: string; namespace?: string };
+  supabase?: { project: string; org?: string };
 }
 
 export type Provider = keyof Pins;
@@ -46,6 +47,7 @@ const SCHEMA: Record<Provider, { keys: string[]; required: string[] }> = {
   vercel: { keys: ["team"], required: ["team"] },
   github: { keys: ["user", "host"], required: ["user"] },
   kubernetes: { keys: ["server", "namespace"], required: ["server"] },
+  supabase: { keys: ["project", "org"], required: ["project"] },
 };
 
 export const PROVIDERS = Object.keys(SCHEMA) as Provider[];

@@ -15,6 +15,7 @@ const PIN_FIELDS: Record<Provider, { fields: string[]; comment?: string }> = {
   vercel: { fields: ["team"], comment: "label" },
   github: { fields: ["user", "host"] },
   kubernetes: { fields: ["server", "namespace"], comment: "context" },
+  supabase: { fields: ["project", "org"], comment: "name" },
 };
 
 const DEFAULT_GITHUB_HOST = "github.com";

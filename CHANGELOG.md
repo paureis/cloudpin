@@ -8,6 +8,10 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Added
 
+- Supabase CLI (#37): pin the project ref, and optionally the organisation. The project a command targets is worked
+  out offline, in the CLI's own order (`--project-ref`, `SUPABASE_PROJECT_ID`, the ref `supabase link` saved, with
+  `--workdir` / `SUPABASE_WORKDIR`); a linked branch counts as its parent project; the organisation comes from
+  `supabase projects list`. Local-stack commands are never blocked; a remote `--db-url` is stopped.
 - `cloudpin explain` (#36): what cloudpin would decide for a command, and why, without running it: the pin file and
   environment, the pinned value, the account the command would use and what decided it (its own flags and env), whether
   it counts as read-only, and the verdict with its reason and fix. A quoted line shows every call in it and the folder

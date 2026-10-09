@@ -1,6 +1,6 @@
 {
   "name": "cloudpin",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "A seatbelt for your cloud CLIs: stops you, or your AI agent, from running commands on the wrong account.",
   "type": "module",
   "bin": {

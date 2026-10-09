@@ -6,6 +6,10 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-09
+
+Releases you can verify, and exempt commands that still run when the pin file is broken.
+
 ### Fixed
 
 - A broken `.cloudpin.yml` no longer blocks exempt commands such as `gh auth status`, `az login` or `--help` (#62):

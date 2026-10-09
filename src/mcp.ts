@@ -5,6 +5,8 @@
  * initialize, ping, tools/list and tools/call. Every tool is read-only.
  */
 
+import { StringDecoder } from "node:string_decoder";
+
 export interface McpTool {
   name: string;
   description: string;
@@ -80,10 +82,17 @@ export function createHandler(opts: { version: string; tools: McpTool[] }): (lin
     } catch {
       return reply(null, { error: { code: -32700, message: "parse error" } });
     }
-    const isRequest = msg !== null && typeof msg === "object" && "id" in msg;
-    const params = msg?.params && typeof msg.params === "object" ? msg.params : {};
+    // MCP dropped JSON-RPC batches (2025-06-18), so an array is as invalid as a bare value.
+    if (msg === null || typeof msg !== "object" || Array.isArray(msg)) {
+      return reply(null, { error: { code: -32600, message: "invalid request" } });
+    }
+    const isRequest = "id" in msg;
+    if (typeof msg.method !== "string") {
+      return isRequest ? reply(msg.id ?? null, { error: { code: -32600, message: "invalid request: no method" } }) : null;
+    }
+    const params = msg.params && typeof msg.params === "object" ? msg.params : {};
     try {
-      const result = await dispatch(msg?.method, params);
+      const result = await dispatch(msg.method, params);
       return isRequest ? reply(msg.id ?? null, { result }) : null;
     } catch (err) {
       if (!isRequest) return null;
@@ -100,13 +109,15 @@ export async function serve(
   output: { write(s: string): unknown },
 ): Promise<void> {
   let buffer = "";
+  // A multi-byte character can straddle two chunks; the decoder holds its first bytes until the rest arrive.
+  const decoder = new StringDecoder("utf8");
   const answer = async (line: string) => {
     if (line.trim() === "") return;
     const out = await handler(line);
     if (out !== null) output.write(`${out}\n`);
   };
   for await (const chunk of input) {
-    buffer += String(chunk);
+    buffer += typeof chunk === "string" ? chunk : decoder.write(chunk as Buffer);
     let nl: number;
     while ((nl = buffer.indexOf("\n")) !== -1) {
       const line = buffer.slice(0, nl);
@@ -114,5 +125,5 @@ export async function serve(
       await answer(line);
     }
   }
-  await answer(buffer);
+  await answer(buffer + decoder.end());
 }

@@ -84,6 +84,14 @@ describe("protocol", () => {
     expect(await ask({ jsonrpc: "2.0", method: "something/unknown" })).toBeNull();
   });
 
+  it("answers a request without a method, or a message that isn't an object, with -32600", async () => {
+    expect(await ask({ jsonrpc: "2.0", id: 10 })).toEqual({ jsonrpc: "2.0", id: 10, error: { code: -32600, message: "invalid request: no method" } });
+    expect(await ask({ jsonrpc: "2.0", id: 11, method: 5 })).toEqual({ jsonrpc: "2.0", id: 11, error: { code: -32600, message: "invalid request: no method" } });
+    for (const msg of ["5", "null", '"ping"', '[{"jsonrpc":"2.0","id":1,"method":"ping"}]']) {
+      expect(await ask(msg)).toEqual({ jsonrpc: "2.0", id: null, error: { code: -32600, message: "invalid request" } });
+    }
+  });
+
   it("accepts CRLF lines", async () => {
     expect((await ask(`${JSON.stringify(req(9, "ping"))}\r`))!.result).toEqual({});
   });
@@ -99,5 +107,19 @@ describe("serve", () => {
     input.end();
     await done;
     expect(lines).toEqual(['{"jsonrpc":"2.0","id":1,"result":{}}\n', '{"jsonrpc":"2.0","id":2,"result":{}}\n']);
+  });
+
+  it("keeps a UTF-8 character whole when a chunk boundary splits its bytes", async () => {
+    const input = new PassThrough();
+    const lines: string[] = [];
+    const done = serve(handle, input, { write: (s: string) => lines.push(s) });
+    const bytes = Buffer.from(`${JSON.stringify(req(1, "tools/call", { name: "echo_args", arguments: { x: "café ✓" } }))}\n`, "utf8");
+    const cut = bytes.indexOf(Buffer.from("✓", "utf8")) + 1; // inside the 3-byte check mark
+    input.write(bytes.subarray(0, cut));
+    await new Promise((r) => setImmediate(r)); // let serve read the first half on its own
+    input.write(bytes.subarray(cut));
+    input.end();
+    await done;
+    expect(JSON.parse(lines[0]!).result.structuredContent).toEqual({ got: { x: "café ✓" } });
   });
 });

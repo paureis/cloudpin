@@ -4,7 +4,7 @@
   "plugins": [
     {
       "name": "cloudpin",
-      "source": "./",
+      "source": "./plugin",
       "description": "Stops Claude Code from running cloud CLI commands on the wrong account, with read-only tools to check first."
     }
   ]

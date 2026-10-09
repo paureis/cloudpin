@@ -233,6 +233,14 @@ async function pinAndCliChecks(d: DoctorDeps): Promise<Check[]> {
         ...(pinned ? { detail: ["it is pinned here, so its commands are stopped until you log in"] } : {}),
         fix: p.hint,
       });
+    } else if (p.state === "no-target") {
+      const pinned = pinnedHere(d, p.name);
+      checks.push({
+        id,
+        level: pinned ? "fail" : "info",
+        title: `${p.name}: nothing in this folder says which project or account`,
+        detail: [p.message, ...(pinned ? ["it is pinned here, so its commands will be stopped"] : [])],
+      });
     } else if (p.state === "error") {
       const pinned = pinnedHere(d, p.name);
       checks.push({

@@ -247,6 +247,21 @@ describe("runDoctor: CLIs and pins", () => {
   });
 });
 
+describe("runDoctor: a CLI with nothing to target in this folder", () => {
+  const noProject = provider("github", { kind: "error", message: "no project for this command", noTarget: true });
+
+  it("is a plain note when the CLI is not pinned here", async () => {
+    const cli = one(await runDoctor(deps({ providers: [noProject] })), "cli:github");
+    expect(cli.level).toBe("info");
+    expect(cli.title).toMatch(/nothing in this folder/);
+  });
+
+  it("still fails when the CLI is pinned, since its commands are stopped", async () => {
+    const config: FoundConfig = { path: join(REPO, ".cloudpin.yml"), pins: { github: { user: "x" } } };
+    expect(one(await runDoctor(deps({ providers: [noProject], config })), "cli:github").level).toBe("fail");
+  });
+});
+
 describe("runDoctor: identity cache", () => {
   it("warns when the cache folder can't be written (checks still run, only slower)", async () => {
     const cache = one(await runDoctor(deps({ writable: false })), "cache");

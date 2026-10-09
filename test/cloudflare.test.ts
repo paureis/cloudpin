@@ -126,7 +126,7 @@ describe("cloudflare.resolve: which account a command uses", () => {
 
   it("stops when the credentials see several accounts and none is set: Wrangler would ask or fail", async () => {
     const res = await resolve(["deploy"], folder(), {}, fake({ stdout: whoami([{ id: A, name: "Acme" }, { id: B, name: "Side" }]) }).exec);
-    expect(res).toMatchObject({ kind: "error", message: expect.stringMatching(/2 accounts.*account_id.*CLOUDFLARE_ACCOUNT_ID/) });
+    expect(res).toMatchObject({ kind: "error", noTarget: true, message: expect.stringMatching(/2 accounts.*account_id.*CLOUDFLARE_ACCOUNT_ID/) });
   });
 
   it("reports logged out", async () => {

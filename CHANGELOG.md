@@ -6,6 +6,11 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `cloudpin doctor` and `cloudpin status` no longer warn about Supabase (or Wrangler) in a folder that has no
+  project for it (#48); they note it instead. A pinned CLI with nothing to target is still stopped.
+
 ## [0.3.0] - 2026-10-09
 
 Two more CLIs, two commands for when something looks off, and a fix for Cursor users. The `.cloudpin.yml`

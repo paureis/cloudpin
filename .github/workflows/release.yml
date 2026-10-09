@@ -37,6 +37,10 @@ jobs:
           version="v$(node -p "require('./package.json').version")"
           if [ "$version" != "$GITHUB_REF_NAME" ]; then echo "tag $GITHUB_REF_NAME but package.json says $version"; exit 1; fi
       - run: npm ci
+      # Build once up front: npm reads package.json before prepublishOnly runs and
+      # warns that the bin (dist/cli.js) is missing. It re-reads it after the
+      # build, so the published bin was fine (0.2.1), but the warning is noise.
+      - run: npm run build
       # Trusted publishing needs npm 11.5.1+, `npm stage` 11.15+.
       - run: npm install --global npm@11.21.0
       # prepublishOnly runs typecheck, tests and build before either command.

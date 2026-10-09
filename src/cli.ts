@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { cachedExec } from "./cache.js";
+import { doctorJson, formatDoctor, runDoctor } from "./doctor.js";
 import { confirmProtected } from "./confirm.js";
 import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
 import { realExec } from "./exec.js";
@@ -14,7 +15,7 @@ import { AGENTS, runHook, type AgentName } from "./hooks/agents.js";
 import { flagValue } from "./args.js";
 import { addEnvironment, discover, renderConfig, type FoundIdentity } from "./init.js";
 import { hookFile, planInstall, planUninstall } from "./install.js";
-import { cacheDir } from "./paths.js";
+import { cacheDir, findOnPath } from "./paths.js";
 import { shellInit } from "./shell-init.js";
 import { buildStatus, collectStatus } from "./status.js";
 import { useCommand } from "./use.js";
@@ -31,6 +32,8 @@ Usage:
                               (--env adds them as one environment of the file)
   cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
   cloudpin status [--json]    Show each CLI's active account, the pins here, and installed hooks
+  cloudpin doctor [--json]    Check the whole setup (PATH, shell, hooks, pins, CLIs) and say what to fix
+                              (--json is safe to paste in a bug report)
   cloudpin use [<env> | --clear]
                               Show the environments, or choose the one to use in this clone
   cloudpin exec -- <cmd...>   Run <cmd> only if it would act on the pinned account
@@ -158,6 +161,49 @@ async function check(): Promise<number> {
     }
   }
   return ok ? 0 : 1;
+}
+
+const version = () => (createRequire(import.meta.url)("../package.json") as { version: string }).version;
+
+/** True if cloudpin can create and remove a file in `dir` (its own cache folder). */
+function writable(dir: string): boolean {
+  const probe = join(dir, `.cloudpin-doctor-${process.pid}`);
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileSync(probe, "");
+    rmSync(probe);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function doctor(flags: string[]): Promise<number> {
+  const d = {
+    guard: deps,
+    env: process.env,
+    cwd: process.cwd(),
+    platform: process.platform,
+    version: version(),
+    self: process.argv[1] ?? "",
+    node: process.versions.node,
+    read: (path: string) => {
+      try {
+        return readFileSync(path, "utf8");
+      } catch {
+        return null;
+      }
+    },
+    writable,
+    onPath: (name: string) => findOnPath(name, process.env, process.platform, existsSync),
+  };
+  const checks = await runDoctor(d);
+  if (flags.includes("--json")) console.log(JSON.stringify(doctorJson(checks, d), null, 2));
+  else {
+    console.log("cloudpin doctor\n");
+    for (const line of formatDoctor(checks, process.env)) console.log(line);
+  }
+  return checks.some((c) => c.level === "fail") ? 1 : 0;
 }
 
 async function exec(argv: string[]): Promise<number> {
@@ -303,6 +349,8 @@ export async function main(argv: string[]): Promise<number> {
       for (const line of await buildStatus(cachedDeps, process.cwd(), process.env, hooks)) console.log(line);
       return 0;
     }
+    case "doctor":
+      return doctor(rest);
     case "install-hook":
       return hookSetup("install", rest[0], rest.slice(1));
     case "uninstall-hook":
@@ -317,8 +365,7 @@ export async function main(argv: string[]): Promise<number> {
       }
     case "--version":
     case "-v": {
-      const pkg = createRequire(import.meta.url)("../package.json") as { version: string };
-      console.log(pkg.version);
+      console.log(version());
       return 0;
     }
     case undefined:

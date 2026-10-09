@@ -36,6 +36,14 @@ body:
         - Copilot CLI hook
     validations:
       required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: cloudpin doctor --json
+      description: Run `cloudpin doctor --json` in the folder where it happened and paste the output. It shortens account IDs to their last four characters and writes your home folder as ~.
+      render: json
+    validations:
+      required: false
   - type: input
     id: versions
     attributes:

@@ -4,6 +4,7 @@ import { AGENTS, type AgentName } from "./hooks/agents.js";
 import { hookFile, planInstall, type Scope } from "./install.js";
 import { cacheDir, home } from "./paths.js";
 import { collectStatus, describe } from "./status.js";
+import { isNewer, updateCheckAllowed } from "./update.js";
 
 export type Level = "ok" | "warn" | "fail" | "info";
 
@@ -31,6 +32,8 @@ export interface DoctorDeps {
   writable: (dir: string) => boolean;
   /** Where a bare command name resolves on PATH, or null. */
   onPath: (name: string) => string | null;
+  /** cloudpin's latest version on npm, or null if it can't be reached. */
+  latest: () => Promise<string | null>;
 }
 
 // package.json "engines".
@@ -70,6 +73,19 @@ async function selfChecks(d: DoctorDeps): Promise<Check[]> {
       ? { id: "node", level: "ok", title: `Node.js ${d.node}` }
       : { id: "node", level: "fail", title: `Node.js ${d.node} is too old`, fix: `install Node.js ${MIN_NODE} or later` },
   );
+  // You asked, so no terminal is needed; the switches that turn the daily notice off still count.
+  if (!updateCheckAllowed(d.env, true)) {
+    checks.push({ id: "update", level: "info", title: "newer version: not checked (update check off)" });
+  } else {
+    const latest = await d.latest();
+    checks.push(
+      latest === null
+        ? { id: "update", level: "info", title: "newer version: npm could not be reached" }
+        : isNewer(latest, d.version)
+          ? { id: "update", level: "warn", title: `cloudpin ${latest} is available (you have ${d.version})`, fix: "npm install --global cloudpin" }
+          : { id: "update", level: "ok", title: `latest version (${latest} on npm)` },
+    );
+  }
   const onPath = d.onPath("cloudpin");
   if (onPath === null) {
     checks.push({

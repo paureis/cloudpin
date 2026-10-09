@@ -1,13 +1,16 @@
 import { join } from "node:path";
 import type { AgentName } from "./hooks/agents.js";
 import { home } from "./paths.js";
+import { providers } from "./providers/index.js";
 
 export type Scope = "project" | "user";
 
 const MARKER = "cloudpin hook";
 const command = (agent: AgentName) => `${MARKER} ${agent}`;
-// Cursor runs the hook only for commands matching this regex: the guarded CLIs as words.
-const CURSOR_MATCHER = "\\b(az|aws|gcloud|vercel|vc|gh)\\b";
+// Cursor runs the hook only for commands matching this regex: as words, every
+// name the hook inspects (each guarded CLI, and cloudpin itself for `cloudpin
+// use`). Built from the providers so a new one can't be left out (#42).
+const CURSOR_MATCHER = `\\b(${[...providers.flatMap((p) => p.bins), "cloudpin"].join("|")})\\b`;
 
 /** The settings file each agent reads hooks from (each agent's hook docs). */
 export function hookFile(agent: AgentName, scope: Scope, root: string, env: NodeJS.ProcessEnv): string {
@@ -80,6 +83,7 @@ function layout(agent: AgentName): { event: string; entry: Json; version?: numbe
 export function planInstall(agent: AgentName, existing: string | null): { content: string; alreadyInstalled: boolean } {
   const settings = parse(existing);
   if (existing !== null && existing.includes(command(agent))) {
+    if (agent === "cursor" && updateCursorMatcher(settings)) return { content: render(settings), alreadyInstalled: false };
     return { content: existing, alreadyInstalled: true };
   }
   const { event, entry, version } = layout(agent);
@@ -98,6 +102,20 @@ export function planInstall(agent: AgentName, existing: string | null): { conten
 }
 
 const mentionsCloudpin = (value: unknown) => JSON.stringify(value).includes(MARKER);
+
+/** Sets the current matcher on cloudpin's Cursor entries; true if any changed. */
+function updateCursorMatcher(settings: Json): boolean {
+  const hooks = settings.hooks as Json | undefined;
+  const list = Array.isArray(hooks?.beforeShellExecution) ? (hooks.beforeShellExecution as Json[]) : [];
+  let changed = false;
+  for (const entry of list) {
+    if (mentionsCloudpin(entry) && entry.matcher !== CURSOR_MATCHER) {
+      entry.matcher = CURSOR_MATCHER;
+      changed = true;
+    }
+  }
+  return changed;
+}
 
 /**
  * The file content with cloudpin's hook removed. `content: null` means the

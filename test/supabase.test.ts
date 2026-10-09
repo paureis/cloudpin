@@ -177,7 +177,7 @@ describe("read-only supabase commands on a protected environment", () => {
     expect(isReadOnly("supabase", args, {}, {})).toBe(true);
   });
 
-  it.each([[["db", "push"]], [["db", "query", "select 1"]], [["db", "pull"]], [["functions", "deploy"]], [["secrets", "set", "A=1"]], [["functions", "list", "deploy"]]])(
+  it.each([[["db", "push"]], [["db", "query", "select 1"]], [["db", "query"]], [["db", "pull"]], [["functions", "deploy"]], [["secrets", "set", "A=1"]], [["functions", "list", "deploy"]]])(
     "asks for %j",
     (args) => {
       expect(isReadOnly("supabase", args, {}, {})).toBe(false);

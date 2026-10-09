@@ -6,6 +6,10 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-09
+
+An update notice, and a quieter `doctor` and `status` outside Supabase projects.
+
 ### Added
 
 - An update notice (#50): at most once a day, cloudpin's own commands run in a terminal ask registry.npmjs.org for

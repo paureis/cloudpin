@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { hookFile, planInstall, planUninstall } from "../src/install.js";
+import { providers } from "../src/providers/index.js";
 
 const ROOT = "/repo";
 const HOME = "/home/me";
@@ -82,6 +83,35 @@ describe("planInstall", () => {
     expect(matcher.test("cd x && vercel deploy")).toBe(true);
     expect(matcher.test("npm test")).toBe(false);
     expect(matcher.test("ghost-cli run")).toBe(false);
+  });
+
+  it("gives Cursor a matcher that covers every guarded CLI", () => {
+    const entry = JSON.parse(planInstall("cursor", null).content).hooks.beforeShellExecution[0];
+    const matcher = new RegExp(entry.matcher);
+    const bins = providers.flatMap((p) => p.bins);
+    expect(bins).toEqual(expect.arrayContaining(["kubectl", "helm"]));
+    for (const bin of bins) expect(matcher.test(`cd app && ${bin} version`), bin).toBe(true);
+    // The hook also asks before an agent runs `cloudpin use <env>`.
+    expect(matcher.test("cloudpin use production")).toBe(true);
+  });
+
+  it("updates an older Cursor matcher instead of calling it installed", () => {
+    const old = {
+      version: 1,
+      hooks: {
+        beforeShellExecution: [
+          { command: "other-tool check" },
+          { command: "cloudpin hook cursor", matcher: "\\b(az|aws|gcloud|vercel|vc|gh)\\b", timeout: 60 },
+        ],
+      },
+    };
+    const plan = planInstall("cursor", JSON.stringify(old, null, 2));
+    expect(plan.alreadyInstalled).toBe(false);
+    const list = JSON.parse(plan.content).hooks.beforeShellExecution;
+    expect(list).toHaveLength(2);
+    expect(list[0]).toEqual({ command: "other-tool check" });
+    expect(new RegExp(list[1].matcher).test("kubectl delete ns prod")).toBe(true);
+    expect(planInstall("cursor", plan.content).alreadyInstalled).toBe(true);
   });
 
   it("writes Copilot's own hook file", () => {

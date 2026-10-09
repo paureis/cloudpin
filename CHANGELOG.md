@@ -6,6 +6,13 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The Cursor hook now runs for `kubectl`, `helm` and `cloudpin use` commands (#42). Its command filter was written
+  before 0.2.0 added Kubernetes, so Cursor let those commands through without asking cloudpin. **Cursor users:
+  re-run `cloudpin install-hook cursor`** (add `--user` if you installed it for your user); it now updates the
+  filter instead of saying the hook is already installed.
+
 ### Changed
 
 - `cloudpin init` no longer writes a docs URL into the `.cloudpin.yml` header (#39).

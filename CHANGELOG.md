@@ -6,6 +6,11 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- GitHub Releases carry only the tarball, its signed bundle and `SHA256SUMS` (#65): v0.4.0 also got the repo's
+  logo and demo SVGs, since removed by hand. The verify commands in the release notes now line up.
+
 ## [0.4.0] - 2026-10-09
 
 Releases you can verify, and exempt commands that still run when the pin file is broken.

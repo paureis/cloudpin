@@ -277,6 +277,10 @@ The cache is dropped the moment anything that decides the account changes: the c
 environment variables, or the CLI's own account files (which `az account set`, `gh auth switch` and
 `vercel switch` rewrite). `cloudpin check` always asks the CLI.
 
+From 1.0 on, `.cloudpin.yml` only grows: a new version may add sections and keys, never change or remove them. A
+file that uses a name your cloudpin doesn't know is refused rather than half read, so a typo such as `azrue:` can't
+switch protection off. The message names your version and says to update in case the file was written for a newer one.
+
 | Exit code | Meaning |
 |---|---|
 | `0` | OK |

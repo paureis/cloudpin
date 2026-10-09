@@ -21,6 +21,8 @@ The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shi
 - **Tested inside every agent** ([#2](https://github.com/paureis/cloudpin/issues/2),
   [#3](https://github.com/paureis/cloudpin/issues/3)): Cursor, Gemini CLI and Copilot CLI.
 - **Go-public checklist closed** ([#8](https://github.com/paureis/cloudpin/issues/8)).
+- **Pin files from newer versions** ([#67](https://github.com/paureis/cloudpin/issues/67)): a section or key this
+  cloudpin doesn't know is still refused, with a message that says to update.
 
 ## 1.1.0: Claude Code plugin and MCP server (target 2026-10-23)
 

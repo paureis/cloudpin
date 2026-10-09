@@ -39,6 +39,8 @@ left:
 
 ## Shipped
 
+- **0.3.1** (2026-10-09): the update notice and `cloudpin version` ([#50](https://github.com/paureis/cloudpin/issues/50)),
+  and no false Supabase warning outside a project ([#48](https://github.com/paureis/cloudpin/issues/48)).
 - **0.3.0** (2026-10-09): Supabase and Cloudflare Wrangler ([#37](https://github.com/paureis/cloudpin/issues/37)),
   `cloudpin doctor` ([#35](https://github.com/paureis/cloudpin/issues/35)), `cloudpin explain`
   ([#36](https://github.com/paureis/cloudpin/issues/36)), and the Cursor hook fix

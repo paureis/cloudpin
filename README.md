@@ -39,8 +39,9 @@ npx cloudpin --help
 Requires Node.js 22 or later. Works on Windows, macOS and Linux. cloudpin is in public beta (0.x): it works and
 is tested, and [feedback before 1.0](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
 
-**Latest release: 0.3.0** (2026-10-09): Supabase and Cloudflare Wrangler, `cloudpin doctor` and `cloudpin explain`,
-and a fix that makes the Cursor hook check `kubectl`, `helm` and `cloudpin use`. See the [CHANGELOG](CHANGELOG.md).
+**Latest release: 0.3.1** (2026-10-09): tells you when a newer cloudpin is out (at most once a day, never from the
+guarded path), and `doctor` and `status` no longer warn about Supabase outside a Supabase project. 0.3.0 brought
+Supabase and Cloudflare Wrangler, `cloudpin doctor` and `cloudpin explain`. See the [CHANGELOG](CHANGELOG.md).
 
 ## Quick start
 

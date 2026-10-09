@@ -6,6 +6,7 @@ import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { cachedExec } from "./cache.js";
 import { doctorJson, formatDoctor, runDoctor } from "./doctor.js";
+import { explain, formatExplain } from "./explain.js";
 import { confirmProtected } from "./confirm.js";
 import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
 import { realExec } from "./exec.js";
@@ -32,6 +33,9 @@ Usage:
                               (--env adds them as one environment of the file)
   cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
   cloudpin status [--json]    Show each CLI's active account, the pins here, and installed hooks
+  cloudpin explain [--json] [--agent] -- <cmd...>
+                              What cloudpin would decide for a command, and why, without running it
+                              (one quoted argument is read as a full shell line; --agent: as an agent hook)
   cloudpin doctor [--json]    Check the whole setup (PATH, shell, hooks, pins, CLIs) and say what to fix
                               (--json is safe to paste in a bug report)
   cloudpin use [<env> | --clear]
@@ -176,6 +180,29 @@ function writable(dir: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * `explain [--json] [--agent] [--] <cmd...>`: one argument is a full shell line,
+ * several are one command's argv. Read-only; exit 0 whatever the verdict.
+ */
+async function explainCommand(argv: string[]): Promise<number> {
+  // Only leading --json / --agent are cloudpin's; everything after is the command's.
+  const flags = new Set<string>();
+  let i = 0;
+  while (argv[i] === "--json" || argv[i] === "--agent") flags.add(argv[i++]!);
+  if (argv[i] === "--") i++;
+  const words = argv.slice(i);
+  if (words.length === 0) {
+    console.error('cloudpin explain: give a command, e.g. cloudpin explain -- vercel deploy --prod, or a line in quotes');
+    return 1;
+  }
+  const command = words.length === 1 ? words[0]! : words;
+  const mode = flags.has("--agent") ? "agent" : "shell";
+  const calls = await explain(command, { mode, cwd: process.cwd(), env: process.env }, deps);
+  if (flags.has("--json")) console.log(JSON.stringify({ mode, calls }, null, 2));
+  else for (const line of formatExplain(calls, process.env)) console.log(line);
+  return 0;
 }
 
 async function doctor(flags: string[]): Promise<number> {
@@ -349,6 +376,8 @@ export async function main(argv: string[]): Promise<number> {
       for (const line of await buildStatus(cachedDeps, process.cwd(), process.env, hooks)) console.log(line);
       return 0;
     }
+    case "explain":
+      return explainCommand(rest);
     case "doctor":
       return doctor(rest);
     case "install-hook":

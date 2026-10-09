@@ -118,7 +118,7 @@ export const AGENTS = {
 // for the user or skip the check, so they are dropped.
 const USER_ONLY_VARS = ["CLOUDPIN_ENV", "CLOUDPIN_CONFIRM", "CLOUDPIN_SKIP"];
 
-function withoutUserOnlyVars(vars: Record<string, string>): Record<string, string> {
+export function withoutUserOnlyVars(vars: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(vars).filter(([k]) => !USER_ONLY_VARS.includes(k)));
 }
 

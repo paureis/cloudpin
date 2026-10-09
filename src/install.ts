@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { AgentName } from "./hooks/agents.js";
+import { AGENTS, type AgentName } from "./hooks/agents.js";
 import { home } from "./paths.js";
 import { providers } from "./providers/index.js";
 
@@ -28,6 +28,15 @@ export function hookFile(agent: AgentName, scope: Scope, root: string, env: Node
       if (scope === "project") return join(root, ".github", "hooks", "cloudpin.json");
       return join(env.COPILOT_HOME ?? join(home(env), ".copilot"), "hooks", "cloudpin.json");
   }
+}
+
+/** The installed agent hooks, as `cloudpin status` names them: "claude (project)", "codex (personal)", ... */
+export function installedHooks(read: (path: string) => string | null, cwd: string, env: NodeJS.ProcessEnv): string[] {
+  return (Object.keys(AGENTS) as AgentName[]).flatMap((agent) =>
+    (["project", "user"] as const)
+      .filter((scope) => read(hookFile(agent, scope, cwd, env))?.includes(command(agent)))
+      .map((scope) => `${agent} (${scope === "user" ? "personal" : "project"})`),
+  );
 }
 
 type Json = Record<string, unknown>;

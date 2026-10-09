@@ -15,7 +15,7 @@ import { guard, type GuardDeps } from "./guard.js";
 import { AGENTS, runHook, type AgentName } from "./hooks/agents.js";
 import { flagValue } from "./args.js";
 import { addEnvironment, discover, renderConfig, type FoundIdentity } from "./init.js";
-import { hookFile, planInstall, planUninstall } from "./install.js";
+import { hookFile, installedHooks, planInstall, planUninstall } from "./install.js";
 import { cacheDir, findOnPath } from "./paths.js";
 import { shellInit } from "./shell-init.js";
 import { buildStatus, collectStatus } from "./status.js";
@@ -168,6 +168,15 @@ async function check(): Promise<number> {
   return ok ? 0 : 1;
 }
 
+/** A file's text, or null if it can't be read. */
+const readOrNull = (path: string): string | null => {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+};
+
 const version = () => (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 /** True if cloudpin can create and remove a file in `dir` (its own cache folder). */
@@ -215,13 +224,7 @@ async function doctor(flags: string[]): Promise<number> {
     version: version(),
     self: process.argv[1] ?? "",
     node: process.versions.node,
-    read: (path: string) => {
-      try {
-        return readFileSync(path, "utf8");
-      } catch {
-        return null;
-      }
-    },
+    read: readOrNull,
     writable,
     onPath: (name: string) => findOnPath(name, process.env, process.platform, existsSync),
     latest: () => fetchLatest(fetch, 3000),
@@ -362,15 +365,7 @@ export async function main(argv: string[]): Promise<number> {
     case "hook":
       return hook(rest[0]);
     case "status": {
-      const hooks = () =>
-        (Object.keys(AGENTS) as AgentName[]).flatMap((agent) =>
-          (["project", "user"] as const)
-            .filter((scope) => {
-              const file = hookFile(agent, scope, process.cwd(), process.env);
-              return existsSync(file) && readFileSync(file, "utf8").includes(`cloudpin hook ${agent}`);
-            })
-            .map((scope) => `${agent} (${scope === "user" ? "personal" : "project"})`),
-        );
+      const hooks = () => installedHooks(readOrNull, process.cwd(), process.env);
       if (rest.includes("--json")) {
         console.log(JSON.stringify(await collectStatus(cachedDeps, process.cwd(), process.env, hooks), null, 2));
         return 0;

@@ -3,7 +3,9 @@ name: Release
 # Publishes to npm from GitHub Actions with trusted publishing (OIDC, no stored
 # token) and automatic provenance (docs.npmjs.com/trusted-publishers). It only
 # stages the version: a maintainer still approves it with 2FA on npmjs.com
-# (Staged Packages). Triggered by pushing a v* tag; run it by hand for a dry run.
+# (Staged Packages). Each tag also gets a GitHub Release with the tarball, its
+# SHA-256 checksum and a signed build-provenance attestation (Scorecard
+# Signed-Releases, #53). Triggered by pushing a v* tag; run it by hand for a dry run.
 on:
   push:
     tags: ["v*"]
@@ -23,6 +25,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      # actions/attest-build-provenance (README, permissions).
+      attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,6 +52,33 @@ jobs:
         run: |
           npm --version
           node -e 'const [a,b]=process.argv[1].split(".").map(Number); if (a < 11 || (a === 11 && b < 15)) { console.error("npm " + process.argv[1] + " is older than 11.15"); process.exit(1) }' "$(npm --version)"
+      # npm packs reproducibly: this is byte for byte the file npm will serve
+      # (checked against 0.3.1's dist.integrity), so it is the release asset.
+      - name: Pack the release tarball
+        id: pack
+        run: |
+          tarball="$(npm pack --silent)"
+          sha256sum "$tarball" > SHA256SUMS
+          cat SHA256SUMS
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+      - name: Sign build provenance
+        id: attest
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.pack.outputs.tarball }}
+      - name: Keep the signed bundle next to the tarball
+        if: github.event_name == 'push'
+        run: cp "${{ steps.attest.outputs.bundle-path }}" "${{ steps.pack.outputs.tarball }}.sigstore.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push'
+        with:
+          name: release-assets
+          path: |
+            ${{ steps.pack.outputs.tarball }}
+            ${{ steps.pack.outputs.tarball }}.sigstore.json
+            SHA256SUMS
+          if-no-files-found: error
       # prepublishOnly runs typecheck, tests and build before either command.
       - name: Stage on npm (approve on npmjs.com > Staged Packages)
         if: github.event_name == 'push'
@@ -56,4 +87,27 @@ jobs:
       # the dry run runs the same checks and packs without asking the registry.
       - name: Dry run
         if: github.event_name == 'workflow_dispatch'
-        run: npm run prepublishOnly && npm pack --dry-run
+        run: npm run prepublishOnly && npm pack --dry-run && node scripts/release-notes.mjs "$(node -p "require('./package.json').version")"
+
+  # Only this job can write to the repository, and only to create the release.
+  github-release:
+    needs: publish
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-assets
+          path: assets
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" > notes.md
+          gh release create "$GITHUB_REF_NAME" assets/* --verify-tag --title "$GITHUB_REF_NAME" --notes-file notes.md

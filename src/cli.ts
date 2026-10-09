@@ -17,7 +17,7 @@ import { guard, type GuardDeps } from "./guard.js";
 import { AGENTS, runHook, type AgentName } from "./hooks/agents.js";
 import { flagValue } from "./args.js";
 import { addEnvironment, discover, renderConfig, type FoundIdentity } from "./init.js";
-import { hookFile, installedHooks, planInstall, planUninstall } from "./install.js";
+import { claudePluginEnabled, hookFile, installedHooks, planInstall, planUninstall } from "./install.js";
 import { cacheDir, findOnPath } from "./paths.js";
 import { shellInit } from "./shell-init.js";
 import { buildStatus, collectStatus } from "./status.js";
@@ -300,6 +300,11 @@ async function hookSetup(action: "install" | "uninstall", agent: string | undefi
   const existing = existsSync(path) ? readFileSync(path, "utf8") : null;
   try {
     if (action === "install") {
+      // The plugin's hook and a settings copy would both run (code.claude.com/docs/en/hooks).
+      if (name === "claude" && claudePluginEnabled(readOrNull, process.cwd(), process.env)) {
+        console.log("cloudpin: the cloudpin plugin already guards Claude Code here; uninstall the plugin first if you want the settings hook instead.");
+        return 0;
+      }
       const plan = planInstall(name, existing);
       if (plan.alreadyInstalled) {
         console.log(`cloudpin: the ${name} hook is already in ${path}`);

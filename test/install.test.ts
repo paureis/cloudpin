@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { hookFile, planInstall, planUninstall } from "../src/install.js";
+import { claudePluginEnabled, hookFile, installedHooks, planInstall, planUninstall } from "../src/install.js";
 import { providers } from "../src/providers/index.js";
 
 const ROOT = "/repo";
@@ -160,5 +160,25 @@ describe("planUninstall", () => {
   it("reports when nothing is installed", () => {
     expect(planUninstall("cursor", JSON.stringify({ version: 1, hooks: {} })).found).toBe(false);
     expect(planUninstall("cursor", null).found).toBe(false);
+  });
+});
+
+describe("the Claude Code plugin and the settings hook", () => {
+  const env = { HOME };
+  const user = join(HOME, ".claude", "settings.json");
+  const local = join(ROOT, ".claude", "settings.local.json");
+  const enabled = JSON.stringify({ enabledPlugins: { "cloudpin@cloudpin": true } });
+
+  it("sees the plugin enabled in user, project or local settings, and nothing else", () => {
+    expect(claudePluginEnabled((p) => (p === user ? enabled : null), ROOT, env)).toBe(true);
+    expect(claudePluginEnabled((p) => (p === local ? enabled : null), ROOT, env)).toBe(true);
+    expect(claudePluginEnabled(() => null, ROOT, env)).toBe(false);
+    expect(claudePluginEnabled(() => "{ broken", ROOT, env)).toBe(false);
+    expect(claudePluginEnabled(() => JSON.stringify({ enabledPlugins: { "cloudpin@cloudpin": false } }), ROOT, env)).toBe(false);
+    expect(claudePluginEnabled(() => JSON.stringify({ enabledPlugins: { "other@cloudpin": true } }), ROOT, env)).toBe(false);
+  });
+
+  it("lists the plugin among the installed hooks", () => {
+    expect(installedHooks((p) => (p === user ? enabled : null), ROOT, env)).toEqual(["claude (plugin)"]);
   });
 });

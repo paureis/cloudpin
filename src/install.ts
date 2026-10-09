@@ -30,13 +30,34 @@ export function hookFile(agent: AgentName, scope: Scope, root: string, env: Node
   }
 }
 
+// The plugin's id in `enabledPlugins`: plugin@marketplace (.claude-plugin/*.json in this repository).
+const CLAUDE_PLUGIN = "cloudpin@cloudpin";
+
+/**
+ * True when the cloudpin Claude Code plugin is enabled in the user, project or
+ * local settings. Its hook then guards Claude Code, and Claude Code would run a
+ * settings copy of the same hook as well (code.claude.com/docs/en/hooks).
+ */
+export function claudePluginEnabled(read: (path: string) => string | null, cwd: string, env: NodeJS.ProcessEnv): boolean {
+  const files = [hookFile("claude", "user", cwd, env), hookFile("claude", "project", cwd, env), join(cwd, ".claude", "settings.local.json")];
+  return files.some((file) => {
+    try {
+      const settings = JSON.parse(read(file) ?? "{}") as { enabledPlugins?: Record<string, unknown> };
+      return settings.enabledPlugins?.[CLAUDE_PLUGIN] === true;
+    } catch {
+      return false;
+    }
+  });
+}
+
 /** The installed agent hooks, as `cloudpin status` names them: "claude (project)", "codex (personal)", ... */
 export function installedHooks(read: (path: string) => string | null, cwd: string, env: NodeJS.ProcessEnv): string[] {
-  return (Object.keys(AGENTS) as AgentName[]).flatMap((agent) =>
+  const hooks = (Object.keys(AGENTS) as AgentName[]).flatMap((agent) =>
     (["project", "user"] as const)
       .filter((scope) => read(hookFile(agent, scope, cwd, env))?.includes(command(agent)))
       .map((scope) => `${agent} (${scope === "user" ? "personal" : "project"})`),
   );
+  return claudePluginEnabled(read, cwd, env) ? ["claude (plugin)", ...hooks] : hooks;
 }
 
 type Json = Record<string, unknown>;

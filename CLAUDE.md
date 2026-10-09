@@ -26,7 +26,6 @@ Run typecheck and tests as separate calls, and read each exit code; a pipe (`| g
   (rolldown, lightningcss), which breaks `npm ci` and CI on macOS/Linux. After adding or removing any dependency:
   delete `./node_modules` and `./package-lock.json`, run `socket npm install`, then confirm
   `grep -c '"node_modules/@rolldown/binding-' package-lock.json` is about 15 and `npm ci` succeeds.
-- TypeScript 7 does not load `@types/node` by default; `tsconfig.json` lists `"types": ["node"]`.
 - Keep runtime dependencies minimal (currently `yaml`, `cross-spawn`). Every dependency runs inside
   people's shell wrappers and agent hooks.
 

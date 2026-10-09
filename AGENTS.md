@@ -32,6 +32,7 @@ Run the type-check and the tests as separate commands and read each exit code.
 | `src/providers/` | One file per CLI, implementing `ProviderDef` from `src/types.ts` |
 | `src/guard.ts` | The allow-or-block decision |
 | `src/status.ts`, `src/doctor.ts` | `cloudpin status` and `cloudpin doctor` (read-only overviews) |
+| `src/explain.ts` | `cloudpin explain`: a verdict and its reasons, from guard's `Trace` |
 | `src/shellwords.ts` | Finds CLI calls inside a full shell command line |
 | `src/hooks/agents.ts` | One adapter per AI agent's hook format |
 | `src/cache.ts` | The identity cache |

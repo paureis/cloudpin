@@ -8,6 +8,11 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Added
 
+- `cloudpin explain` (#36): what cloudpin would decide for a command, and why, without running it: the pin file and
+  environment, the pinned value, the account the command would use and what decided it (its own flags and env), whether
+  it counts as read-only, and the verdict with its reason and fix. A quoted line shows every call in it and the folder
+  each runs in; `--agent` explains what an agent hook decides; `--json` for tools. Env vars set in the line are named,
+  never shown.
 - `cloudpin doctor` (#35): checks the whole setup, read-only, and gives the fix for each problem: the `cloudpin`
   on PATH (the one hooks and shell lines run) and its version, Node.js, the shell profiles that run `shell-init`
   (PowerShell's own `$PROFILE` included), each agent hook and whether it is out of date, the pin file and its

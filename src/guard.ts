@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { isReadOnly } from "./readonly.js";
-import type { Exec, ProviderDef } from "./types.js";
+import type { Exec, ProviderDef, Resolution } from "./types.js";
 
 export interface GuardRequest {
   /** The executable as typed or resolved, e.g. "az" or "C:\\...\\gh.exe". */
@@ -60,10 +60,24 @@ export function commandName(bin: string): string {
     .replace(/\.(exe|cmd|bat|ps1)$/, "");
 }
 
-export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict> {
+/**
+ * What guard found on the way to its verdict, for `cloudpin explain`. guard
+ * fills in what it gets to; the verdict never depends on it.
+ */
+export interface Trace {
+  provider?: Provider;
+  config?: FoundConfig;
+  pin?: Record<string, string>;
+  resolution?: Resolution;
+  /** Set on a protected environment: whether the command counts as read-only. */
+  readOnly?: boolean;
+}
+
+export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {}): Promise<Verdict> {
   const name = commandName(req.bin);
   const provider = deps.providers.find((p) => p.bins.includes(name));
   if (!provider) return { action: "allow", reason: "not-guarded" };
+  trace.provider = provider.name;
 
   let config: FoundConfig | null;
   try {
@@ -76,9 +90,11 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
     throw err;
   }
   if (!config) return { action: "allow", reason: "no-config" };
+  trace.config = config;
 
   const pin = config.pins[provider.name];
   if (!pin) return { action: "allow", reason: "not-pinned" };
+  trace.pin = pin as Record<string, string>;
   if (provider.isExempt(req.args, name)) return { action: "allow", reason: "exempt" };
   if (req.mode === "shell" && req.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
 
@@ -98,6 +114,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
     return result;
   };
   const res = await provider.resolve({ args: req.args, env: req.env, cwd: req.cwd, bin: name }, exec);
+  trace.resolution = res;
   if (res.kind === "error" && cliMissing) return { action: "allow", reason: "not-installed" };
   switch (res.kind) {
     case "logged-out":
@@ -111,7 +128,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
       const p = provider as ProviderDef<typeof provider.name>;
       const problems = p.compare(pin as never, res.identity);
       if (problems.length > 0) return { ...base, problems, fix: p.switchHint(pin as never) };
-      return protectedEnvironment(req, provider.name, config);
+      return protectedEnvironment(req, provider.name, config, trace);
     }
   }
 }
@@ -121,11 +138,11 @@ export async function guard(req: GuardRequest, deps: GuardDeps): Promise<Verdict
  * something still needs the user's yes (issue #12). Only a human can give it
  * ahead of time, with CLOUDPIN_CONFIRM=<environment>.
  */
-function protectedEnvironment(req: GuardRequest, provider: Provider, config: FoundConfig): Verdict {
+function protectedEnvironment(req: GuardRequest, provider: Provider, config: FoundConfig, trace: Trace): Verdict {
   const environment = config.environment;
-  if (!environment?.protected || isReadOnly(provider, req.args, req.env, config.readOnly ?? {}, commandName(req.bin))) {
-    return { action: "allow", reason: "match" };
-  }
+  if (!environment?.protected) return { action: "allow", reason: "match" };
+  trace.readOnly = isReadOnly(provider, req.args, req.env, config.readOnly ?? {}, commandName(req.bin));
+  if (trace.readOnly) return { action: "allow", reason: "match" };
   if (req.mode === "shell" && req.env.CLOUDPIN_CONFIRM === environment.name) {
     return { action: "allow", reason: "confirmed" };
   }

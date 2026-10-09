@@ -6,6 +6,14 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A Claude Code plugin (#15): `claude plugin install cloudpin --marketplace paureis/cloudpin` installs the hook, a
+  read-only MCP server and a skill that tells the agent to check first and stop on a block. With the plugin enabled,
+  `install-hook claude` declines and `doctor` warns if a settings hook would also run.
+- `cloudpin mcp` (#15): a read-only MCP server (stdio) with `cloudpin_status` and `cloudpin_check`, for any agent that
+  supports MCP. No new dependency.
+
 ### Fixed
 
 - GitHub Releases carry only the tarball, its signed bundle and `SHA256SUMS` (#65): v0.4.0 also got the repo's
@@ -21,12 +29,6 @@ Releases you can verify, and exempt commands that still run when the pin file is
   they never act on an account and are what you need to investigate. Every other guarded command is still stopped.
 
 ### Added
-
-- A Claude Code plugin (#15): `claude plugin install cloudpin --marketplace paureis/cloudpin` installs the hook, a
-  read-only MCP server and a skill that tells the agent to check first and stop on a block. With the plugin enabled,
-  `install-hook claude` declines and `doctor` warns if a settings hook would also run.
-- `cloudpin mcp` (#15): a read-only MCP server (stdio) with `cloudpin_status` and `cloudpin_check`, for any agent that
-  supports MCP. No new dependency.
 
 - A GitHub Release for every tag (#53): the package tarball (the same file npm serves), its SHA-256 checksum and a
   signed build-provenance attestation, with the CHANGELOG section and how to verify a download as notes. See

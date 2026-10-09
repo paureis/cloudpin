@@ -30,6 +30,19 @@ Examples of what counts as a security problem here:
   agent hooks, and never in CI. `cloudpin doctor` also checks when you run it. Turn it off with
   `CLOUDPIN_NO_UPDATE_CHECK=1` or `NO_UPDATE_NOTIFIER=1`.
 
+## Verifying a release
+
+Every version is built and published by this repository's release workflow, never from a laptop: npm shows its
+provenance, and from 0.4.0 each tag also has a [GitHub Release](https://github.com/paureis/cloudpin/releases) with the
+package tarball, a SHA-256 checksum file and a signed build-provenance attestation. npm packs reproducibly, so the
+tarball is the same file npm serves. To check one:
+
+```sh
+gh attestation verify cloudpin-<version>.tgz --repo paureis/cloudpin
+sha256sum -c SHA256SUMS
+npm view cloudpin@<version> dist.integrity   # npm's sha512 for the same file
+```
+
 ## Supported versions
 
 Security fixes go into the latest release.

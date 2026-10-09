@@ -6,6 +6,12 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A GitHub Release for every tag (#53): the package tarball (the same file npm serves), its SHA-256 checksum and a
+  signed build-provenance attestation, with the CHANGELOG section and how to verify a download as notes. See
+  SECURITY.md, Verifying a release.
+
 ## [0.3.1] - 2026-10-09
 
 An update notice, and a quieter `doctor` and `status` outside Supabase projects.

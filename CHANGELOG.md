@@ -6,6 +6,14 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `cloudpin doctor` (#35): checks the whole setup, read-only, and gives the fix for each problem: the `cloudpin`
+  on PATH (the one hooks and shell lines run) and its version, Node.js, the shell profiles that run `shell-init`
+  (PowerShell's own `$PROFILE` included), each agent hook and whether it is out of date, the pin file and its
+  environment, each CLI's account against its pin, and the identity cache folder. Exit 1 if anything fails.
+  `--json` shortens account IDs and writes the home folder as `~`, for bug reports; the bug report form asks for it.
+
 ### Fixed
 
 - The Cursor hook now runs for `kubectl`, `helm` and `cloudpin use` commands (#42). Its command filter was written

@@ -78,6 +78,10 @@ cloudpin check
 # See each CLI's active account, what this folder pins, and which agent hooks are installed (--json for tools)
 cloudpin status
 
+# Something looks off? Check the whole setup and get the fix for each problem; exit 1 if anything fails.
+# --json shortens account IDs and hides your home folder, so it is safe to paste in a bug report.
+cloudpin doctor [--json]
+
 # Run one command only if it would act on the pinned account; exit 3 if blocked
 cloudpin exec -- vercel deploy --prod
 

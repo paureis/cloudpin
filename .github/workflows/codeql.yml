@@ -1,10 +1,9 @@
 name: CodeQL
 
-# Static analysis (SAST) of the TypeScript source: on pull requests that touch
-# src/, and weekly. Free on public repositories; actions pinned by commit.
+# Static analysis (SAST) of the TypeScript source: on every pull request, and
+# weekly. Free on public repositories; actions pinned by commit.
 on:
   pull_request:
-    paths: ["src/**"]
   schedule:
     - cron: "23 7 * * 3"
   workflow_dispatch:

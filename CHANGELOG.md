@@ -6,6 +6,10 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- `cloudpin init` no longer writes a docs URL into the `.cloudpin.yml` header (#39).
+
 ## [0.2.1] - 2026-10-08
 
 The first release published from GitHub Actions. No change to how cloudpin behaves.

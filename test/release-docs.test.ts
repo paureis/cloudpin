@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 // them makes this fail, so the release PR can't go green with stale docs.
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const { version } = JSON.parse(read("package.json")) as { version: string };
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 describe(`docs for release ${version}`, () => {
   it("README names it as the latest release", () => {
@@ -12,7 +13,7 @@ describe(`docs for release ${version}`, () => {
   });
 
   it("CHANGELOG has its entry", () => {
-    expect(read("CHANGELOG.md")).toMatch(new RegExp(`^## \\[${version.replace(/\./g, "\\.")}\\] - \\d{4}-\\d{2}-\\d{2}$`, "m"));
+    expect(read("CHANGELOG.md")).toMatch(new RegExp(`^## \\[${escapeRegExp(version)}\\] - \\d{4}-\\d{2}-\\d{2}$`, "m"));
   });
 
   it("ROADMAP lists it as shipped", () => {

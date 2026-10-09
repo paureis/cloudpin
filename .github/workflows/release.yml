@@ -29,7 +29,9 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          # Exact version: its bundled npm (11.19.0, nodejs.org/dist/index.json) is
+          # new enough, so no unpinned `npm install --global npm` is needed.
+          node-version: 24.21.0
           registry-url: https://registry.npmjs.org
       - name: Tag matches package.json
         if: github.event_name == 'push'
@@ -42,7 +44,10 @@ jobs:
       # build, so the published bin was fine (0.2.1), but the warning is noise.
       - run: npm run build
       # Trusted publishing needs npm 11.5.1+, `npm stage` 11.15+.
-      - run: npm install --global npm@11.21.0
+      - name: Bundled npm is new enough
+        run: |
+          npm --version
+          node -e 'const [a,b]=process.argv[1].split(".").map(Number); if (a < 11 || (a === 11 && b < 15)) { console.error("npm " + process.argv[1] + " is older than 11.15"); process.exit(1) }' "$(npm --version)"
       # prepublishOnly runs typecheck, tests and build before either command.
       - name: Stage on npm (approve on npmjs.com > Staged Packages)
         if: github.event_name == 'push'

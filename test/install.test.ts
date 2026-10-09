@@ -178,6 +178,18 @@ describe("the Claude Code plugin and the settings hook", () => {
     expect(claudePluginEnabled(() => JSON.stringify({ enabledPlugins: { "other@cloudpin": true } }), ROOT, env)).toBe(false);
   });
 
+  it("follows Claude Code's scope order: a narrower scope's setting wins, even false", () => {
+    const project = join(ROOT, ".claude", "settings.json");
+    const off = JSON.stringify({ enabledPlugins: { "cloudpin@cloudpin": false } });
+    const files = (map: Record<string, string>) => (p: string) => map[p] ?? null;
+    expect(claudePluginEnabled(files({ [user]: enabled, [project]: off }), ROOT, env)).toBe(false);
+    expect(claudePluginEnabled(files({ [user]: enabled, [local]: off }), ROOT, env)).toBe(false);
+    expect(claudePluginEnabled(files({ [user]: off, [project]: enabled }), ROOT, env)).toBe(true);
+    expect(claudePluginEnabled(files({ [project]: off, [local]: enabled }), ROOT, env)).toBe(true);
+    // A scope that doesn't mention the plugin leaves the decision to the wider one.
+    expect(claudePluginEnabled(files({ [user]: enabled, [project]: JSON.stringify({ enabledPlugins: {} }) }), ROOT, env)).toBe(true);
+  });
+
   it("lists the plugin among the installed hooks", () => {
     expect(installedHooks((p) => (p === user ? enabled : null), ROOT, env)).toEqual(["claude (plugin)"]);
   });

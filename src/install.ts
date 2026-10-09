@@ -39,15 +39,20 @@ const CLAUDE_PLUGIN = "cloudpin@cloudpin";
  * settings copy of the same hook as well (code.claude.com/docs/en/hooks).
  */
 export function claudePluginEnabled(read: (path: string) => string | null, cwd: string, env: NodeJS.ProcessEnv): boolean {
-  const files = [hookFile("claude", "user", cwd, env), hookFile("claude", "project", cwd, env), join(cwd, ".claude", "settings.local.json")];
-  return files.some((file) => {
+  // Narrowest scope first, as Claude Code applies them: the first file that
+  // mentions the plugin decides, so a project's `false` beats the user's `true`.
+  // Managed settings and --plugin-dir are out of reach and not considered.
+  const files = [join(cwd, ".claude", "settings.local.json"), hookFile("claude", "project", cwd, env), hookFile("claude", "user", cwd, env)];
+  for (const file of files) {
+    let plugins: Record<string, unknown> | undefined;
     try {
-      const settings = JSON.parse(read(file) ?? "{}") as { enabledPlugins?: Record<string, unknown> };
-      return settings.enabledPlugins?.[CLAUDE_PLUGIN] === true;
+      plugins = (JSON.parse(read(file) ?? "{}") as { enabledPlugins?: Record<string, unknown> }).enabledPlugins;
     } catch {
-      return false;
+      continue; // A settings file Claude Code can't read either.
     }
-  });
+    if (plugins && Object.hasOwn(plugins, CLAUDE_PLUGIN)) return plugins[CLAUDE_PLUGIN] === true;
+  }
+  return false;
 }
 
 /** The installed agent hooks, as `cloudpin status` names them: "claude (project)", "codex (personal)", ... */

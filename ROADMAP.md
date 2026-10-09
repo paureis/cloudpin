@@ -37,6 +37,10 @@ releases in 0.2.1; what is left:
   `wrangler` (Cloudflare), `supabase`, `firebase`, `heroku`, `stripe`, `netlify`.
 - **Team policy:** a shared file that requires certain projects to be pinned.
 - **Fish and Nushell** wrappers.
+- **OpenSSF Best Practices silver, then gold** (passing since 2026-10-08,
+  [project 15321](https://www.bestpractices.dev/projects/15321)). Silver is mostly writing: governance, a code of
+  conduct, a threat model, signed releases and 80% test coverage, plus a second person who could keep the project
+  going. Gold needs other contributors: two-person review of most changes and a bus factor of two.
 
 ## Shipped
 

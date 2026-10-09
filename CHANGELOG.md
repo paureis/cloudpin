@@ -8,6 +8,10 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Fixed
 
+- The bash and zsh wrappers no longer break on an existing alias of a guarded CLI (#69). Before, such an alias left
+  that CLI unguarded without a word, and in zsh every CLI after it too. An alias that calls the CLI itself is now
+  guarded; one that runs another program (`kubectl=kubecolor`) can't be, so each new shell warns about it, in
+  PowerShell as well.
 - GitHub Releases carry only the tarball, its signed bundle and `SHA256SUMS` (#65): v0.4.0 also got the repo's
   logo and demo SVGs, since removed by hand. The verify commands in the release notes now line up.
 - A `.cloudpin.yml` section or key that this cloudpin doesn't know is still refused, but the message now says the

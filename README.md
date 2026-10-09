@@ -237,6 +237,11 @@ cloudpin shell-init pwsh | Out-String | Invoke-Expression   # $PROFILE
 If cloudpin is ever uninstalled, the functions fall back to the real CLI, so they never get in your way. To run one
 command anyway, on purpose: `CLOUDPIN_SKIP=1 <command>`.
 
+**Aliases.** An alias that calls the CLI itself, such as `alias kubectl='kubectl --context dev'`, is still guarded.
+An alias that runs another program, such as `alias kubectl=kubecolor` or `alias gh='command gh'`, bypasses cloudpin,
+so each new shell prints a warning naming it (bash 4+, zsh and PowerShell; PowerShell runs any alias before the
+wrapper). Put the `cloudpin shell-init` line after your aliases so it can see them.
+
 ## Protect your AI agent
 
 ```sh

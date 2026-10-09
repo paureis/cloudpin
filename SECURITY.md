@@ -16,7 +16,9 @@ Examples of what counts as a security problem here:
 ## What cloudpin does with your accounts
 
 - It runs each CLI's own identity command (`az account show`, `aws sts get-caller-identity`, `gcloud config list`,
-  `vercel teams ls`, `gh api user`) with the same flags and environment as your command, and reads the result.
+  `vercel teams ls`, `gh api user`, `supabase projects list`, `wrangler whoami --json`) with the same flags and
+  environment as your command, and reads the result. For Kubernetes, Supabase and Wrangler it also reads project
+  files that name the target (the kubeconfig, `supabase/.temp/`, the Wrangler config and its account cache).
 - It never logs in, logs out or switches accounts, and never reads credential files. For Vercel it checks whether a
   login file exists, without reading it.
 - It stores successful identity answers for up to five minutes in a cache file in your user cache folder. Keys are

@@ -6,6 +6,12 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-09
+
+Two more CLIs, two commands for when something looks off, and a fix for Cursor users. The `.cloudpin.yml`
+format is backwards compatible (new `supabase` and `cloudflare` sections). **Cursor users: re-run
+`cloudpin install-hook cursor`** (see Fixed).
+
 ### Added
 
 - Supabase CLI (#37): pin the project ref, and optionally the organisation. The project a command targets is worked

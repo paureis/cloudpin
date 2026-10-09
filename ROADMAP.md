@@ -5,15 +5,10 @@ What's planned, in the order it's likely to ship. Each item links to its issue; 
 
 ## 1.0
 
-The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shipped in 0.2.0, and verifiable
-releases in 0.2.1; what is left:
+The `.cloudpin.yml` format is stable from 1.0 on. Everything planned for 1.0 shipped in 0.2.0 to 0.3.0; what is
+left:
 
-- **`cloudpin doctor`** ([#35](https://github.com/paureis/cloudpin/issues/35)): checks the whole setup (hooks,
-  shell wrappers, CLIs, pins) and says exactly what to fix.
-- **`cloudpin explain`** ([#36](https://github.com/paureis/cloudpin/issues/36)): shows which account a command
-  would use and what cloudpin would decide, without running it.
-- **Supabase and Cloudflare Wrangler** ([#37](https://github.com/paureis/cloudpin/issues/37)): pin the project and
-  account.
+- **Wrangler against a real Cloudflare login:** the Cloudflare support is built to Wrangler's source and docs.
 - **A week of real use** by the author and early testers, then 1.0.0 and the launch
   ([#9](https://github.com/paureis/cloudpin/issues/9)).
 
@@ -34,7 +29,7 @@ releases in 0.2.1; what is left:
 ## Ideas
 
 - **More CLIs** ([#11](https://github.com/paureis/cloudpin/issues/11)): `terraform` workspaces, `doctl`, `flyctl`,
-  `wrangler` (Cloudflare), `supabase`, `firebase`, `heroku`, `stripe`, `netlify`.
+  `firebase`, `heroku`, `stripe`, `netlify`.
 - **Team policy:** a shared file that requires certain projects to be pinned.
 - **Fish and Nushell** wrappers.
 - **OpenSSF Best Practices silver, then gold** (passing since 2026-10-08,
@@ -44,6 +39,10 @@ releases in 0.2.1; what is left:
 
 ## Shipped
 
+- **0.3.0** (2026-10-09): Supabase and Cloudflare Wrangler ([#37](https://github.com/paureis/cloudpin/issues/37)),
+  `cloudpin doctor` ([#35](https://github.com/paureis/cloudpin/issues/35)), `cloudpin explain`
+  ([#36](https://github.com/paureis/cloudpin/issues/36)), and the Cursor hook fix
+  ([#42](https://github.com/paureis/cloudpin/issues/42)).
 - **0.2.1** (2026-10-08): releases published from GitHub Actions with provenance
   ([#19](https://github.com/paureis/cloudpin/issues/19)), OpenSSF Scorecard
   ([#20](https://github.com/paureis/cloudpin/issues/20)) and CodeQL.

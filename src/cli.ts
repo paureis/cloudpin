@@ -7,6 +7,8 @@ import { createInterface } from "node:readline/promises";
 import { cachedExec } from "./cache.js";
 import { doctorJson, formatDoctor, runDoctor } from "./doctor.js";
 import { explain, formatExplain } from "./explain.js";
+import { createHandler, serve } from "./mcp.js";
+import { cloudpinTools } from "./mcp-tools.js";
 import { confirmProtected } from "./confirm.js";
 import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
 import { realExec } from "./exec.js";
@@ -37,6 +39,7 @@ Usage:
   cloudpin explain [--json] [--agent] -- <cmd...>
                               What cloudpin would decide for a command, and why, without running it
                               (one quoted argument is read as a full shell line; --agent: as an agent hook)
+  cloudpin mcp                Read-only MCP server for agents (stdio): cloudpin_status, cloudpin_check
   cloudpin doctor [--json]    Check the whole setup (PATH, shell, hooks, pins, CLIs) and say what to fix
                               (--json is safe to paste in a bug report)
   cloudpin use [<env> | --clear]
@@ -375,6 +378,12 @@ export async function main(argv: string[]): Promise<number> {
     }
     case "explain":
       return explainCommand(rest);
+    case "mcp": {
+      // Fresh answers (no identity cache), like check and explain. stdout carries only JSON-RPC lines.
+      const tools = cloudpinTools(deps, { cwd: process.cwd(), env: process.env, read: readOrNull, exists: existsSync });
+      await serve(createHandler({ version: version(), tools }), process.stdin, process.stdout);
+      return 0;
+    }
     case "doctor":
       return doctor(rest);
     case "install-hook":

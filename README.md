@@ -266,7 +266,8 @@ cloudpin reads the whole command line the agent is about to run, so it also catc
 | `CLOUDPIN_ENV=<name>` | Use this environment (see Environments) |
 | `CLOUDPIN_CONFIRM=<name>` | Confirm changing commands on this protected environment without a prompt (terminal and CI only; ignored for agents) |
 | `CLOUDPIN_NO_CACHE=1` | Always ask the CLI instead of using the identity cache |
-| `CLOUDPIN_CACHE_DIR` | Where the identity cache lives |
+| `CLOUDPIN_CACHE_DIR` | Where the identity cache (and the time of the last update check) lives |
+| `CLOUDPIN_NO_UPDATE_CHECK=1` | Never ask npm whether a newer cloudpin exists (`NO_UPDATE_NOTIFIER` works too) |
 
 Asking a CLI who it is takes 0.5 to 2 seconds, so cloudpin remembers a successful answer for up to five minutes.
 The cache is dropped the moment anything that decides the account changes: the command's flags, the relevant
@@ -283,10 +284,14 @@ environment variables, or the CLI's own account files (which `az account set`, `
 
 cloudpin only reads which account is active, using each CLI's own identity command (`az account show`,
 `aws sts get-caller-identity`, `gcloud config list`, `vercel teams ls`, `gh api user`). It never logs in or
-switches accounts, never reads credential files, and never prints or stores a token: error messages name a variable
+switches accounts, never reads a credential file other than the kubeconfig (taking only the server and namespace from
+it), and never prints or stores a token: error messages name a variable
 such as `GH_TOKEN` but never its value, and the cache stores salted hashes of anything sensitive. It runs CLIs
-directly, never through a shell. cloudpin has no telemetry and sends nothing of its own; the identity commands
-above talk only to their own provider, as they would if you ran them. See [SECURITY.md](SECURITY.md) to report a
+directly, never through a shell. cloudpin has no telemetry and sends nothing about you or your accounts; the
+identity commands above talk only to their own provider, as they would if you ran them. Its one request of its own
+asks registry.npmjs.org for the latest cloudpin version, at most once a day and only when you run a cloudpin command
+in a terminal (never from the shell wrappers, `exec` or the agent hooks), to tell you when an update is out. Turn it
+off with `CLOUDPIN_NO_UPDATE_CHECK=1` or `NO_UPDATE_NOTIFIER=1`; it is off in CI. See [SECURITY.md](SECURITY.md) to report a
 problem.
 
 <details>

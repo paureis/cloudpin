@@ -43,6 +43,7 @@ interface Setup {
   pathVersion?: string;
   writable?: boolean;
   platform?: NodeJS.Platform;
+  latest?: string | null;
 }
 
 function deps(s: Setup = {}): DoctorDeps {
@@ -71,6 +72,7 @@ function deps(s: Setup = {}): DoctorDeps {
     read: (path) => files[path] ?? null,
     writable: () => s.writable ?? true,
     onPath: () => (s.onPath === undefined ? "/usr/bin/cloudpin" : s.onPath),
+    latest: async () => (s.latest === undefined ? "0.3.0" : s.latest),
   };
 }
 
@@ -106,6 +108,24 @@ describe("runDoctor: cloudpin itself", () => {
     const path = one(await runDoctor(deps({ pathVersion: "0.2.1" })), "path");
     expect(path.level).toBe("warn");
     expect(path.title).toContain("0.2.1");
+  });
+});
+
+describe("runDoctor: newer version", () => {
+  it("is ok on the latest version, and warns with the install command when a newer one exists", async () => {
+    expect(one(await runDoctor(deps()), "update").level).toBe("ok");
+    const update = one(await runDoctor(deps({ latest: "0.4.0" })), "update");
+    expect(update).toMatchObject({ level: "warn", fix: "npm install --global cloudpin" });
+    expect(update.title).toContain("0.4.0");
+  });
+
+  it("notes when npm can't be reached, and asks nothing when the check is turned off", async () => {
+    expect(one(await runDoctor(deps({ latest: null })), "update").level).toBe("info");
+    let asked = false;
+    const d = deps({ env: { CLOUDPIN_NO_UPDATE_CHECK: "1" } });
+    d.latest = async () => ((asked = true), "0.4.0");
+    expect(one(await runDoctor(d), "update")).toMatchObject({ level: "info", title: expect.stringMatching(/off/) });
+    expect(asked).toBe(false);
   });
 });
 

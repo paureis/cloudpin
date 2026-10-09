@@ -19,6 +19,7 @@ import { hookFile, planInstall, planUninstall } from "./install.js";
 import { cacheDir, findOnPath } from "./paths.js";
 import { shellInit } from "./shell-init.js";
 import { buildStatus, collectStatus } from "./status.js";
+import { checksForUpdates, fetchLatest, refreshIfStale, savedNotice, updateCheckAllowed } from "./update.js";
 import { useCommand } from "./use.js";
 import { providers } from "./providers/index.js";
 
@@ -50,7 +51,7 @@ Usage:
                               settings (or your personal settings with --user)
   cloudpin shell-init <bash|zsh|pwsh>
                               Print shell functions that guard every supported CLI
-  cloudpin --version
+  cloudpin version, --version
 
 Exit codes: 0 ok, 1 usage or check failure, ${EXIT_BLOCKED} command blocked.`;
 
@@ -223,6 +224,7 @@ async function doctor(flags: string[]): Promise<number> {
     },
     writable,
     onPath: (name: string) => findOnPath(name, process.env, process.platform, existsSync),
+    latest: () => fetchLatest(fetch, 3000),
   };
   const checks = await runDoctor(d);
   if (flags.includes("--json")) console.log(JSON.stringify(doctorJson(checks, d), null, 2));
@@ -392,6 +394,7 @@ export async function main(argv: string[]): Promise<number> {
         console.error(`cloudpin shell-init: ${(err as Error).message}`);
         return 1;
       }
+    case "version":
     case "--version":
     case "-v": {
       console.log(version());
@@ -409,4 +412,18 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-process.exitCode = await main(process.argv.slice(2));
+/**
+ * After the command: the saved update notice, then at most once a day a fresh
+ * look at npm (src/update.ts). Only for cloudpin's own interactive commands.
+ */
+async function updateNotice(command: string | undefined): Promise<void> {
+  if (!checksForUpdates(command) || !updateCheckAllowed(process.env, Boolean(process.stdout.isTTY && process.stderr.isTTY))) return;
+  const stateFile = join(cacheDir(), "update-check.json");
+  const notice = savedNotice(version(), stateFile);
+  if (notice) console.error(`\n${notice}`);
+  await refreshIfStale({ now: Date.now, stateFile, fetchLatest: () => fetchLatest() });
+}
+
+const argv = process.argv.slice(2);
+process.exitCode = await main(argv);
+await updateNotice(argv[0]);

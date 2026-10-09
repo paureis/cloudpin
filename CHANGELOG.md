@@ -6,6 +6,13 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- An update notice (#50): at most once a day, cloudpin's own commands run in a terminal ask registry.npmjs.org for
+  the latest version and say in one line when a newer one is out. Never from the shell wrappers, `exec` or the agent
+  hooks, never in CI; off with `CLOUDPIN_NO_UPDATE_CHECK=1` or `NO_UPDATE_NOTIFIER=1`. `cloudpin doctor` checks too,
+  and `cloudpin version` works as well as `--version`.
+
 ### Fixed
 
 - `cloudpin doctor` and `cloudpin status` no longer warn about Supabase (or Wrangler) in a folder that has no

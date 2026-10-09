@@ -86,7 +86,7 @@ describe("supabase.resolve: which project a command targets", () => {
   it("stops when no project can be found, since the CLI would prompt or fail", async () => {
     const { root } = project();
     const res = await resolve(["db", "push"], root);
-    expect(res).toMatchObject({ kind: "error", message: expect.stringMatching(/supabase link/) });
+    expect(res).toMatchObject({ kind: "error", noTarget: true, message: expect.stringMatching(/supabase link/) });
   });
 
   it("stops on a branch name in --project-ref, which only the API can map to a project", async () => {

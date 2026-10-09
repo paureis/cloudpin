@@ -137,3 +137,13 @@ describe("status with environments", () => {
     expect(seen).toEqual({ CLOUDPIN_ENV: "staging" });
   });
 });
+
+describe("status for a CLI with nothing to target in this folder", () => {
+  it("says so instead of 'could not tell'", async () => {
+    const res: Resolution = { kind: "error", message: "no Supabase project for this command", noTarget: true };
+    const status = await collectStatus(deps(null, [provider("github", res)]), "/repo", {}, () => []);
+    expect(status.providers[0]).toEqual({ name: "github", state: "no-target", message: "no Supabase project for this command" });
+    const lines = await buildStatus(deps(null, [provider("github", res)]), "/repo", {}, () => []);
+    expect(lines.join("\n")).toMatch(/github {2}nothing in this folder says which one/);
+  });
+});

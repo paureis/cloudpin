@@ -157,7 +157,11 @@ export const supabase: ProviderDef<"supabase"> = {
       }
     }
     if (!ref) {
-      return { kind: "error", message: "no Supabase project for this command: run `supabase link --project-ref <ref>` here, or pass --project-ref" };
+      return {
+        kind: "error",
+        noTarget: true,
+        message: "no Supabase project for this command: run `supabase link --project-ref <ref>` here, or pass --project-ref",
+      };
     }
     if (!PROJECT_REF.test(ref)) {
       return {

@@ -6,6 +6,8 @@ export type ProviderStatus =
   | { name: string; state: "not-installed" }
   | { name: string; state: "logged-out"; hint: string }
   | { name: string; state: "error"; message: string }
+  /** Nothing in this folder names a project or account for it (see Resolution). */
+  | { name: string; state: "no-target"; message: string }
   | {
       name: string;
       state: "active";
@@ -55,7 +57,7 @@ export async function collectStatus(
     const name = provider.name;
     if (missing) providers.push({ name, state: "not-installed" });
     else if (res.kind === "logged-out") providers.push({ name, state: "logged-out", hint: res.hint });
-    else if (res.kind === "error") providers.push({ name, state: "error", message: res.message });
+    else if (res.kind === "error") providers.push({ name, state: res.noTarget ? "no-target" : "error", message: res.message });
     else {
       const pin = config?.pins[name] as Record<string, string> | undefined;
       if (!pin) {
@@ -115,6 +117,7 @@ export async function buildStatus(
     if (p.state === "not-installed") lines.push(`${label}not installed`);
     else if (p.state === "logged-out") lines.push(`${label}not logged in (${p.hint})`);
     else if (p.state === "error") lines.push(`${label}could not tell: ${p.message}`);
+    else if (p.state === "no-target") lines.push(`${label}nothing in this folder says which one (${p.message})`);
     else {
       lines.push(`${label}active: ${describe(p.identity)}`);
       if (!p.pin) lines.push(`${pad}not pinned here`);

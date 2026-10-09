@@ -252,6 +252,7 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     if (accounts.length !== 1) {
       return {
         kind: "error",
+        noTarget: true,
         message: `the credentials can see ${accounts.length} accounts and none is set for this command, so Wrangler would ask or fail; set account_id in the Wrangler config or CLOUDFLARE_ACCOUNT_ID`,
       };
     }

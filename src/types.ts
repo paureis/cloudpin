@@ -29,7 +29,16 @@ export type Identity = Record<string, string>;
 export type Resolution =
   | { kind: "identity"; identity: Identity; source: string }
   | { kind: "logged-out"; hint: string }
-  | { kind: "error"; message: string };
+  | {
+      kind: "error";
+      message: string;
+      /**
+       * Nothing in this folder says which project or account (no link, no config):
+       * normal outside a project. guard still blocks a pinned CLI; status and
+       * doctor only note it for an unpinned one.
+       */
+      noTarget?: boolean;
+    };
 
 export interface ProviderDef<P extends Provider = Provider> {
   name: P;

@@ -38,8 +38,9 @@ npx cloudpin --help
 Requires Node.js 22 or later. Works on Windows, macOS and Linux. cloudpin is in public beta (0.x): it works and
 is tested, and [feedback before 1.0](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
 
-**Latest release: 0.2.0** (2026-10-08): environments with protected production, Kubernetes (`kubectl`, `helm`),
-Vercel monorepos, and fixes from a safety review. See the [CHANGELOG](CHANGELOG.md).
+**Latest release: 0.2.1** (2026-10-08): published from GitHub Actions with npm provenance; 0.2.0 brought
+environments with protected production, Kubernetes (`kubectl`, `helm`) and Vercel monorepos. See the
+[CHANGELOG](CHANGELOG.md).
 
 ## Quick start
 

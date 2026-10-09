@@ -6,9 +6,15 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-08
+
+The first release published from GitHub Actions. No change to how cloudpin behaves.
+
 ### Added
 
-- An OpenSSF Scorecard workflow (weekly) and badge (#20).
+- Releases are published from GitHub Actions with npm trusted publishing and provenance (#19): npm shows which
+  commit and workflow built each version.
+- An OpenSSF Scorecard workflow (weekly) and badge (#20), and CodeQL static analysis.
 
 ## [0.2.0] - 2026-10-08
 

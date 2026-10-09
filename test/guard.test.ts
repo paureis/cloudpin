@@ -200,3 +200,16 @@ describe("guard with a protected environment", () => {
     expect(seen).toEqual({ CLOUDPIN_ENV: "staging" });
   });
 });
+
+describe("guard with a broken pin file", () => {
+  const broken = new ConfigError('use either provider sections or "environments" at the top level, not both');
+
+  it("still runs exempt commands, which never act on an account (#62)", async () => {
+    expect(await guard(req("gh", ["auth", "status"]), deps(me, broken))).toEqual({ action: "allow", reason: "exempt" });
+  });
+
+  it("blocks every other command, as before", async () => {
+    const v = await guard(req("gh", ["pr", "list"]), deps(me, broken));
+    expect(v).toMatchObject({ action: "block", problems: [expect.stringMatching(/invalid config/)] });
+  });
+});

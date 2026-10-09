@@ -13,6 +13,13 @@ export function releaseNotes(changelog, version) {
   const end = rest.findIndex((l) => l.startsWith("## ["));
   const body = (end === -1 ? rest : rest.slice(0, end)).join("\n").trim();
   const tarball = `cloudpin-${version}.tgz`;
+  const steps = [
+    [`gh attestation verify ${tarball} --repo paureis/cloudpin`, "signed build provenance"],
+    ["sha256sum -c SHA256SUMS", "checksum"],
+    [`npm view cloudpin@${version} dist.integrity`, "npm's sha512 for the same file"],
+  ];
+  // Pad to the longest command so the comments line up for any version length.
+  const width = Math.max(...steps.map(([command]) => command.length));
   return [
     body,
     "",
@@ -22,9 +29,7 @@ export function releaseNotes(changelog, version) {
     "release workflow. To check a download:",
     "",
     "```sh",
-    `gh attestation verify ${tarball} --repo paureis/cloudpin   # signed build provenance`,
-    "sha256sum -c SHA256SUMS                                      # checksum",
-    `npm view cloudpin@${version} dist.integrity                  # npm's sha512 for the same file`,
+    ...steps.map(([command, comment]) => `${command.padEnd(width)}   # ${comment}`),
     "```",
     "",
   ].join("\n");

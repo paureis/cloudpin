@@ -16,6 +16,7 @@ const PIN_FIELDS: Record<Provider, { fields: string[]; comment?: string }> = {
   github: { fields: ["user", "host"] },
   kubernetes: { fields: ["server", "namespace"], comment: "context" },
   supabase: { fields: ["project", "org"], comment: "name" },
+  cloudflare: { fields: ["account"], comment: "label" },
 };
 
 const DEFAULT_GITHUB_HOST = "github.com";

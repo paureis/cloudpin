@@ -10,6 +10,7 @@ import { azure } from "../dist/providers/azure.js";
 import { aws } from "../dist/providers/aws.js";
 import { github } from "../dist/providers/github.js";
 import { kubernetes } from "../dist/providers/kubernetes.js";
+import { supabase } from "../dist/providers/supabase.js";
 
 const ctx = { args: ["--cloudpin-smoke"], env: process.env, cwd: process.cwd() };
 const short = (v) => JSON.stringify(v).replace(/[0-9a-f]{8}-[0-9a-f-]{23}([0-9a-f]{4})/gi, "…$1");
@@ -71,8 +72,34 @@ async function smokeKubernetes() {
   rmSync(empty, { recursive: true, force: true });
 }
 
+// Read-only: `supabase projects list` only. Takes the first project the login
+// can see, pins it in a throwaway folder, and checks a wrong pin and an
+// unlinked folder as controls. Refs are shortened; names are not printed.
+// Well-formed but invalid; built at runtime so it never sits in the source as a token.
+const FAKE_SUPABASE_TOKEN = ["sbp", "0".repeat(40)].join("_");
+
+async function smokeSupabase() {
+  const list = await realExec("supabase", ["projects", "list", "--output-format", "json"], process.env);
+  const first = list.code === 0 ? JSON.parse(list.stdout).projects?.[0] : undefined;
+  if (!first) return show("supabase projects list", { code: list.code, projects: 0 });
+  const ref = first.id;
+  const brief = (r) => (r.kind === "identity" ? { kind: r.kind, keys: Object.keys(r.identity), source: r.source } : r);
+  const dir = mkdtempSync(join(tmpdir(), "cloudpin-supabase-"));
+  const res = await supabase.resolve({ ...ctx, cwd: dir, args: ["db", "push", "--project-ref", ref] }, realExec);
+  show("supabase resolve", brief(res));
+  if (res.kind === "identity") {
+    show("pin = active", supabase.compare({ project: ref, org: res.identity.org }, res.identity));
+    show("pin = other", supabase.compare({ project: "cloudpinnobodyaaaaaa" }, res.identity).map((p) => p.replace(ref, "…" + ref.slice(-4))));
+    show("org = other", supabase.compare({ project: ref, org: "cloudpin-nobody" }, res.identity).length);
+  }
+  show("unlinked folder", await supabase.resolve({ ...ctx, cwd: dir, args: ["db", "push"] }, realExec));
+  const bad = await supabase.resolve({ ...ctx, cwd: dir, args: ["db", "push", "--project-ref", ref], env: { ...process.env, SUPABASE_ACCESS_TOKEN: FAKE_SUPABASE_TOKEN } }, realExec);
+  show("bad token", bad.kind === "identity" ? brief(bad) : bad);
+  rmSync(dir, { recursive: true, force: true });
+}
+
 const wanted = process.argv.slice(2);
-const all = { github: smokeGithub, azure: smokeAzure, aws: smokeAws, kubernetes: smokeKubernetes };
+const all = { github: smokeGithub, azure: smokeAzure, aws: smokeAws, kubernetes: smokeKubernetes, supabase: smokeSupabase };
 for (const [name, run] of Object.entries(all)) {
   if (wanted.length === 0 || wanted.includes(name)) await run();
 }

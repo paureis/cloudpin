@@ -1,9 +1,11 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { hasAnyFlag, leadingWords } from "./args.js";
+import { commandWords as argWords, hasAnyFlag, leadingWords } from "./args.js";
 import type { Provider, ReadOnlyRules } from "./config.js";
 import { home } from "./paths.js";
 import { commandWords } from "./providers/kubernetes.js";
+import { VALUE_FLAGS as SUPABASE_VALUE_FLAGS } from "./providers/supabase.js";
+import { VALUE_FLAGS as WRANGLER_VALUE_FLAGS } from "./providers/cloudflare.js";
 
 /*
  * Which commands only read, so they skip the confirmation on a protected
@@ -76,6 +78,30 @@ const BUILT_IN: Record<
 
   // gh refuses an alias named like a built-in command (cli/cli pkg/cmd/alias/set),
   // so `<core group> list|view|status` always means what it says.
+  // Supabase: each command's SIDE_EFFECTS.md in github.com/supabase/cli
+  // (apps/cli/src/commands). `inspect db` runs read-only SELECTs (its only
+  // writes are a temporary login role and lifting a self-ban); `db pull` and
+  // `db query` are left out: pull can record migration history, query runs any SQL.
+  supabase: (_words, args) => {
+    const w = argWords(args, SUPABASE_VALUE_FLAGS);
+    const pair = w.slice(0, 2).join(" ");
+    if (pair === "inspect db") return w.length === 3;
+    if (SUPABASE_READ_WITH_NAME.has(pair)) return w.length <= 3;
+    return SUPABASE_READ.has(pair) && w.length === 2;
+  },
+
+  // Wrangler (developers.cloudflare.com/workers/wrangler/commands). `tail` is
+  // left out: it creates a tail on the Worker (src/tail/createTail.ts, a POST).
+  cloudflare: (_words, args) => {
+    const w = argWords(args, WRANGLER_VALUE_FLAGS);
+    const head = w.slice(0, 3).join(" ");
+    if (head === "d1 migrations list") return w.length <= 4;
+    if (WRANGLER_READ3.has(head)) return w.length === 3;
+    const pair = w.slice(0, 2).join(" ");
+    if (WRANGLER_READ_WITH_NAME.has(pair)) return w.length <= 3;
+    return WRANGLER_READ.has(pair) && w.length === 2;
+  },
+
   github: (words) => {
     if (words.length === 1) return words[0] === "status";
     return GH_GROUPS.has(words[0] ?? "") && ["list", "view", "status"].includes(words[1] ?? "");
@@ -85,6 +111,16 @@ const BUILT_IN: Record<
 // Verbs that change something, or that suggest the word after them is a name.
 const GCLOUD_VERB =
   /^(create|delete|update|deploy|set|unset|add|remove|start|stop|reset|resize|restart|suspend|resume|import|export|move|rename|enable|disable|apply|run|ssh|scp|attach|detach|patch|submit|cancel|rollback|promote|undelete|execute|call|get|describe|list)(-|$)/;
+
+const SUPABASE_READ = new Set([
+  "projects list", "orgs list", "functions list", "secrets list", "branches list", "backups list", "migration list",
+  "snippets list", "sso list", "gen types", "postgres-config get", "ssl-enforcement get", "network-restrictions get",
+]);
+const SUPABASE_READ_WITH_NAME = new Set(["branches get", "sso show"]);
+
+const WRANGLER_READ = new Set(["deployments list", "deployments status", "versions list", "secret list", "d1 list", "whoami"]);
+const WRANGLER_READ_WITH_NAME = new Set(["versions view", "d1 info"]);
+const WRANGLER_READ3 = new Set(["kv namespace list", "r2 bucket list"]);
 
 const GH_GROUPS = new Set([
   "pr", "issue", "repo", "release", "run", "workflow", "gist", "label", "secret", "variable",

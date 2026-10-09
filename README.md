@@ -9,7 +9,7 @@
 
 Pin cloud accounts to a project, and stop any command (yours or your AI agent's) that would run on the wrong one.
 
-`az`, `aws`, `gcloud`, `vercel`, `gh`, `kubectl` and `helm` act on whichever account or cluster you used last. With a work account, a
+`az`, `aws`, `gcloud`, `vercel`, `gh`, `kubectl`, `helm`, `supabase` and `wrangler` act on whichever account, cluster or project you used last. With a work account, a
 personal one and a client or two on the same machine, sooner or later something gets deployed to, or deleted
 from, the wrong place. Coding agents make it more likely: they run these commands for you and never stop to ask
 which account is active. cloudpin checks before the command runs.
@@ -90,7 +90,7 @@ cloudpin doctor [--json]
 # Run one command only if it would act on the pinned account; exit 3 if blocked
 cloudpin exec -- vercel deploy --prod
 
-# Shell functions that route az, aws, gcloud, vercel, gh, kubectl and helm through cloudpin
+# Shell functions that route az, aws, gcloud, vercel, gh, kubectl, helm, supabase and wrangler through cloudpin
 cloudpin shell-init bash|zsh|pwsh
 
 # Add or remove the hook in an agent's settings (this project, or yours with --user)
@@ -119,6 +119,11 @@ github:
 kubernetes:
   server: "https://acme-prod.hcp.westeurope.azmk8s.io:443" # acme-prod-admin
   namespace: "payments"
+supabase:
+  project: "abcdefghijklmnopqrst" # Acme prod
+  org: "acme"
+cloudflare:
+  account: "0123456789abcdef0123456789abcdef" # Acme
 ```
 
 Before a guarded command runs, cloudpin works out which account **that command** would use (asking the CLI, or for
@@ -132,6 +137,8 @@ the file:
 | `gcloud` | account, project | `--account`, `--project`, `--configuration`, `CLOUDSDK_*` |
 | `vercel` / `vc` | team ID | `--scope`, `--team`, `--token`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, linked project (`.vercel/project.json` or a repository's `.vercel/repo.json`) |
 | `gh` | user, host | `--hostname`, `GH_HOST`, `GH_TOKEN`, `GITHUB_TOKEN` |
+| `supabase` | project ref, organisation (optional) | `--project-ref`, `SUPABASE_PROJECT_ID`, the project `supabase link` saved, `--workdir`, `SUPABASE_WORKDIR`, `--profile`, `SUPABASE_ACCESS_TOKEN` |
+| `wrangler` (Cloudflare) | account ID | `account_id` in `wrangler.json`, `wrangler.jsonc` or `wrangler.toml` (and its `[env.NAME]` with `--env` / `CLOUDFLARE_ENV`), `--config`, `--cwd`, `CLOUDFLARE_ACCOUNT_ID`, the project's account cache, the credentials' only account |
 | `kubectl`, `helm` | API server URL, namespace (optional) | `--kubeconfig`, `KUBECONFIG`, `--context`, `--cluster`, `--server`, `-n`, `-A`, kuberc; helm's `--kube-context`, `--kube-apiserver`, `HELM_*` |
 
 For Kubernetes the server URL is pinned rather than the context name, because context names are personal: the same
@@ -140,6 +147,20 @@ pins the namespace only if your context sets one. With a namespace pinned, `-A` 
 Commands that never reach a cluster (`kubectl config`, `kubectl kustomize`, `helm template`, `helm repo`, ...) are
 never blocked, and standalone `kustomize` isn't guarded at all. cloudpin can't see a `namespace:` written inside a
 manifest you apply, so pin the namespace and keep manifests namespace-free if that matters to you.
+
+For Supabase the project ref is worked out the way the CLI does it, without a network call: `--project-ref`, then
+`SUPABASE_PROJECT_ID`, then the project `supabase link` saved in `supabase/.temp/`. A linked branch counts as its
+parent project. The organisation comes from `supabase projects list`. The local stack (`start`, `stop`, `status`,
+`functions serve`, and `db reset`, `db diff` or `migration up` without `--linked`) is never blocked. A `--db-url`
+pointing anywhere but your own machine is stopped, because cloudpin can't tell which project a URL belongs to.
+
+For Cloudflare, cloudpin follows Wrangler's own order: `account_id` in the config file Wrangler would find (it wins
+over `CLOUDFLARE_ACCOUNT_ID`), then that variable, then the account Wrangler cached for the project, then the only
+account your credentials can see (`wrangler whoami --json`). If they see several and none is set, Wrangler would ask
+or fail, so cloudpin stops the command. Local commands (`dev`, and `d1`, `kv key` or `r2 object` without `--remote`)
+are never blocked; `dev` with `remote: true` bindings in the config does reach your account and is not checked.
+The Cloudflare support is built to Wrangler's source and docs and has not yet been run against a real Cloudflare
+login; reports welcome.
 
 - **Match:** the command runs as if cloudpin wasn't there.
 - **Mismatch:** the command is stopped, and you're told which account is active and how to switch.

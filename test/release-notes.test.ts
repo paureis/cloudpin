@@ -32,6 +32,14 @@ describe("releaseNotes", () => {
     expect(notes).toContain("npm view cloudpin@0.4.0 dist.integrity");
   });
 
+  it.each(["0.4.0", "10.12.3-beta.1"])("lines up the comments in the verify block for %s", (version) => {
+    const changelog = `## [${version}] - 2026-10-10\n\nNotes.\n`;
+    const block = (releaseNotes(changelog, version).split("```sh\n")[1] ?? "").split("\n```")[0]!.split("\n");
+    expect(block).toHaveLength(3);
+    const columns = block.map((line) => line.indexOf("  # "));
+    expect(columns.every((c) => c > 0 && c === columns[0])).toBe(true);
+  });
+
   it("reads the last section to the end of the file", () => {
     expect(releaseNotes(CHANGELOG, "0.3.1")).toMatch(/^### Added\n\n- An update notice \(#50\)\./);
   });

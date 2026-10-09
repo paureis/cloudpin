@@ -9,6 +9,9 @@ slips moves to the next version with the reason in its issue. Open an
 
 Whatever the first outside testers find, fixed before 1.0.
 
+- **Cleaner GitHub Releases** ([#65](https://github.com/paureis/cloudpin/issues/65)): only the release files are
+  attached (v0.4.0 also got the repo's logo and demo), and the verify commands in the notes line up.
+
 ## 1.0.0: launch (target 2026-10-16)
 
 The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shipped in 0.2.0 to 0.3.0.

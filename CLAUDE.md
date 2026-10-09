@@ -55,6 +55,14 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
    stdin test turned `gh api user` into a PATCH; GitHub rejected it, but it should never have been sent).
 8. Login, logout, switch, whoami, version and help commands are always exempt (`isExempt`).
 
+## Planning: every item has a version and a target week (owner rule, 2026-10-09)
+
+- Whatever a brainstorm or plan agrees on becomes an issue in a version milestone (0.4.0, 1.0.0, 1.1.0, ...) with a
+  target week, and ROADMAP.md lists it under that version. "Unscheduled" exists only in ROADMAP's Ideas section; an
+  idea gets a version when work on it starts. New work found mid-session gets a version before it is started.
+- Targets are aims, not promises: a fix may ship in an unplanned patch release (x.y.z+1), and an item that slips moves
+  to the next version with the reason written in its issue.
+
 ## Commits
 
 - Small commits, one concern each. Write the message to a file and use `git commit -F <file>`
@@ -63,12 +71,11 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
 - **One branch per issue** (owner decision, 2026-10-08), e.g. `feat/12-environments`, `fix/7-heredocs`,
   `docs/...`, cut from an up-to-date `main` in this folder (no worktree). Run typecheck and tests locally,
   push the branch once when the issue is done (every push to an open PR costs a CI run), open a PR whose body
-  says `Closes #N`, and squash-merge it when the `check` job is green (`gh pr checks`). Free private repos
-  can't enforce branch protection, so this is a habit until go-public (#8), then turn protection on (it also
-  helps #20). `main` stays releasable: half-done work waits on its branch.
+  says `Closes #N`, and squash-merge it when the `check` job is green (`gh pr checks`; `main` is protected).
+  `main` stays releasable: half-done work waits on its branch.
 - **CI budget** (owner rule): PRs run one Linux job (`ci.yml`); Windows and the newest Node run nightly only
   when `main` changed (`nightly.yml`; run it by hand before a release); no macOS. Read
-  `node scripts/ci-minutes.mjs` at every session close (1,348 billed minutes on 2026-10-08, 76% macOS).
+  `node scripts/ci-minutes.mjs` at every session close.
 - **Personal details stay out of the repo** (owner rule, 2026-10-08; the repo is public): no emails, usernames,
   home or drive paths, machine specifics, real account IDs or session notes in tracked files or commit messages.
   Commits use the owner's GitHub noreply address (this checkout's git config); machine notes go in the

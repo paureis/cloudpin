@@ -1,32 +1,62 @@
 # Roadmap
 
-What's planned, in the order it's likely to ship. Each item links to its issue; open an
+Each version below is a [milestone](https://github.com/paureis/cloudpin/milestones) with a target date and the
+issues it ships. Dates are aims, not promises: a fix can go out in a patch release at any time, and anything that
+slips moves to the next version with the reason in its issue. Open an
 [issue](https://github.com/paureis/cloudpin/issues) to vote for an idea or suggest one.
 
-## 1.0
+## 0.4.0: trust (target 2026-10-10)
 
-The `.cloudpin.yml` format is stable from 1.0 on. Everything planned for 1.0 shipped in 0.2.0 to 0.3.0; what is
-left:
+- **Signed GitHub Releases** ([#53](https://github.com/paureis/cloudpin/issues/53)): every tag gets a release with
+  the package tarball, SHA-256 checksums and a signed provenance attestation, and docs on how to verify a download.
+- **Branch protection visible to Scorecard** ([#54](https://github.com/paureis/cloudpin/issues/54)): a read-only
+  token so the check can be scored.
+- **Hand checks** ([#55](https://github.com/paureis/cloudpin/issues/55)): the terminal prompt on a protected
+  environment and the "ask" inside a live Claude Code session, checked by a person.
 
-- **Wrangler against a real Cloudflare login:** the Cloudflare support is built to Wrangler's source and docs.
+## 0.4.x: early-tester fixes (week of 2026-10-12)
+
+Whatever the first outside testers find, fixed before 1.0.
+
+## 1.0.0: launch (target 2026-10-16)
+
+The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shipped in 0.2.0 to 0.3.0.
+
 - **A week of real use** by the author and early testers, then 1.0.0 and the launch
   ([#9](https://github.com/paureis/cloudpin/issues/9)).
+- **Wrangler against a real Cloudflare login** ([#56](https://github.com/paureis/cloudpin/issues/56)): the Cloudflare
+  support is built to Wrangler's source and docs.
+- **Tested inside every agent** ([#2](https://github.com/paureis/cloudpin/issues/2),
+  [#3](https://github.com/paureis/cloudpin/issues/3)): Cursor, Gemini CLI and Copilot CLI.
+- **Go-public checklist closed** ([#8](https://github.com/paureis/cloudpin/issues/8)).
 
-## 1.x
+## 1.1.0: Claude Code plugin and MCP server (target 2026-10-23)
+
+- **Claude Code plugin and MCP server** ([#15](https://github.com/paureis/cloudpin/issues/15)): one-click install,
+  and read-only tools agents can call to check the account before acting.
+
+## 1.2.0: GitHub Action (target 2026-10-30)
+
+- **GitHub Action** ([#10](https://github.com/paureis/cloudpin/issues/10)): `cloudpin check` before deploy jobs.
+
+## 1.3.0: installers (target 2026-11-06)
+
+- **Homebrew** ([#16](https://github.com/paureis/cloudpin/issues/16)), **Scoop and winget**
+  ([#17](https://github.com/paureis/cloudpin/issues/17)).
+
+## 1.4.0: `cloudpin switch` (target 2026-11-13)
 
 - **`cloudpin switch`** ([#14](https://github.com/paureis/cloudpin/issues/14)): move every CLI to the pinned
   accounts in one go, after one confirmation.
-- **Claude Code plugin and MCP server** ([#15](https://github.com/paureis/cloudpin/issues/15)): one-click install,
-  and read-only tools agents can call to check the account before acting.
-- **GitHub Action** ([#10](https://github.com/paureis/cloudpin/issues/10)): `cloudpin check` before deploy jobs.
-- **Installers:** Homebrew ([#16](https://github.com/paureis/cloudpin/issues/16)), Scoop and winget
-  ([#17](https://github.com/paureis/cloudpin/issues/17)).
+
+## 1.5.0: editor status bar (target 2026-11-20)
+
 - **VS Code / Cursor status bar** ([#18](https://github.com/paureis/cloudpin/issues/18)): a green or red pin
   showing whether the active accounts match the project.
-- **Tested inside every agent** ([#2](https://github.com/paureis/cloudpin/issues/2),
-  [#3](https://github.com/paureis/cloudpin/issues/3)): Cursor, Gemini CLI and Copilot CLI.
 
-## Ideas
+## Ideas (not scheduled yet)
+
+An idea gets a version when work on it starts.
 
 - **More CLIs** ([#11](https://github.com/paureis/cloudpin/issues/11)): `terraform` workspaces, `doctl`, `flyctl`,
   `firebase`, `heroku`, `stripe`, `netlify`.

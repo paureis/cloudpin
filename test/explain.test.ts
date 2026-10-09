@@ -142,3 +142,19 @@ describe("explain --agent on a protected environment", () => {
     expect(call!.reason).toContain("Claude Code, Copilot CLI and Cursor ask you first; Codex and Gemini CLI, which can't ask, stop it");
   });
 });
+
+describe("explain: environment chosen inside the line", () => {
+  const staging: FoundConfig = { ...flat, environment: { name: "staging", protected: false, source: "CLOUDPIN_ENV" } };
+  const byEnv: GuardDeps = {
+    ...deps(prod),
+    findConfig: (_cwd, env) => (env.CLOUDPIN_ENV === "staging" ? staging : prod),
+  };
+  const line = "CLOUDPIN_ENV=staging vercel deploy --prod";
+
+  it("lets a person pick the environment in the line, but not an agent", async () => {
+    const human = await explain(line, { mode: "shell", cwd: "/repo/app", env: {} }, byEnv);
+    expect(human[0]).toMatchObject({ verdict: "allow", environment: { name: "staging" } });
+    const agent = await explain(line, { mode: "agent", cwd: "/repo/app", env: {} }, byEnv);
+    expect(agent[0]).toMatchObject({ verdict: "ask", environment: { name: "production" } });
+  });
+});

@@ -124,5 +124,5 @@ describe("the PowerShell wrappers in Windows PowerShell", () => {
     expect(out).toContain("done");
     expect(out).toContain("cloudpin: alias gh -> hub runs instead of the cloudpin wrapper, so gh is not guarded in this shell");
     expect(out).not.toContain("alias kubectl");
-  });
+  }, 60_000); // powershell.exe took about 6 s to start on a GitHub Windows runner, past vitest's 5 s default
 });

@@ -6,6 +6,11 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A broken `.cloudpin.yml` no longer blocks exempt commands such as `gh auth status`, `az login` or `--help` (#62):
+  they never act on an account and are what you need to investigate. Every other guarded command is still stopped.
+
 ### Added
 
 - A GitHub Release for every tag (#53): the package tarball (the same file npm serves), its SHA-256 checksum and a

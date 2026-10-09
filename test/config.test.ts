@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { tempDir } from "./tmp.js";
@@ -52,6 +52,34 @@ github:
     expect(() => parseConfig("vercel:\n  teem: x\n")).toThrow(
       /vercel: unknown key "teem"/,
     );
+  });
+
+  describe("a name this version doesn't know (#67)", () => {
+    const version = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
+    const message = (text: string) => {
+      try {
+        parseConfig(text);
+      } catch (err) {
+        return (err as Error).message;
+      }
+      throw new Error("expected a ConfigError");
+    };
+
+    it.each([
+      ["a top-level section", "terraform:\n  workspace: prod\n"],
+      ["a key inside a provider", "azure:\n  subscription: x\n  management_group: y\n"],
+      ["a section inside an environment", "environments:\n  prod:\n    terraform: {}\n"],
+      ["a read_only provider", "read_only:\n  terraform: [plan]\n"],
+    ])("says %s may need a newer cloudpin, with this version and the update command", (_, text) => {
+      const got = message(text);
+      expect(got).toContain(`written for a newer cloudpin than this one (${version})`);
+      expect(got).toContain("npm install --global cloudpin@latest");
+    });
+
+    it("doesn't say so for a mistake no version would accept", () => {
+      expect(message("azure:\n  tenant: x\n")).not.toContain("newer cloudpin");
+      expect(message("environments:\n  a: {}\nbranches:\n  main: b\n")).not.toContain("newer cloudpin");
+    });
   });
 
   it("rejects a provider section missing its required key", () => {

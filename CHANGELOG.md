@@ -10,6 +10,9 @@ All notable changes to cloudpin are listed here. The format follows
 
 - GitHub Releases carry only the tarball, its signed bundle and `SHA256SUMS` (#65): v0.4.0 also got the repo's
   logo and demo SVGs, since removed by hand. The verify commands in the release notes now line up.
+- A `.cloudpin.yml` section or key that this cloudpin doesn't know is still refused, but the message now says the
+  file may need a newer cloudpin, with your version and the update command (#67). From 1.0 the format only adds
+  names, so this is what a teammate on an older version will see.
 
 ## [0.4.0] - 2026-10-09
 

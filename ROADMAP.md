@@ -11,6 +11,8 @@ Whatever the first outside testers find, fixed before 1.0.
 
 - **Cleaner GitHub Releases** ([#65](https://github.com/paureis/cloudpin/issues/65)): only the release files are
   attached (v0.4.0 also got the repo's logo and demo), and the verify commands in the notes line up.
+- **Shell wrappers and aliases** ([#69](https://github.com/paureis/cloudpin/issues/69)): an existing alias of a
+  guarded CLI no longer switches the guard off silently.
 
 ## 1.0.0: launch (target 2026-10-16)
 

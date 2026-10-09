@@ -10,14 +10,14 @@ export interface ToolContext {
   cwd: string;
   env: NodeJS.ProcessEnv;
   read: (path: string) => string | null;
-  exists: (path: string) => boolean;
+  isDir: (path: string) => boolean;
 }
 
 function folder(ctx: ToolContext, value: unknown): string {
   if (value === undefined) return ctx.cwd;
   if (typeof value !== "string") throw new Error("cwd must be a string");
   const dir = resolve(ctx.cwd, value);
-  if (!ctx.exists(dir)) throw new Error(`folder not found: ${dir}`);
+  if (!ctx.isDir(dir)) throw new Error(`folder not found: ${dir}`);
   return dir;
 }
 

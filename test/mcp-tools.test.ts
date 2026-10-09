@@ -35,7 +35,7 @@ const ctx = {
   cwd: ROOT,
   env: { HOME } as NodeJS.ProcessEnv,
   read: (p: string) => files[p] ?? null,
-  exists: (p: string) => p.startsWith(resolve("/work")),
+  isDir: (p: string) => p.startsWith(resolve("/work")) && !p.endsWith(".yml"),
 };
 const tools = cloudpinTools(deps, ctx);
 const tool = (name: string) => tools.find((t) => t.name === name)!;
@@ -72,6 +72,7 @@ describe("relative and missing cwd", () => {
     const res = (await tool("cloudpin_check").call({ command: "vercel ls", cwd: "sub" })) as { calls: { cwd: string }[] };
     expect(res.calls[0]!.cwd).toBe(join(ROOT, "sub"));
     await expect(tool("cloudpin_status").call({ cwd: resolve("/elsewhere") })).rejects.toThrow(/folder not found/);
+    await expect(tool("cloudpin_status").call({ cwd: ".cloudpin.yml" })).rejects.toThrow(/folder not found/);
     await expect(tool("cloudpin_check").call({ command: "vercel ls", cwd: 7 })).rejects.toThrow(/cwd must be a string/);
   });
 });

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import spawn from "cross-spawn";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -180,7 +180,9 @@ const readOrNull = (path: string): string | null => {
   }
 };
 
-const version = () => (createRequire(import.meta.url)("../package.json") as { version: string }).version;
+const isDir = (path: string): boolean => statSync(path, { throwIfNoEntry: false })?.isDirectory() ?? false;
+
+const version =() => (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 /** True if cloudpin can create and remove a file in `dir` (its own cache folder). */
 function writable(dir: string): boolean {
@@ -385,7 +387,7 @@ export async function main(argv: string[]): Promise<number> {
       return explainCommand(rest);
     case "mcp": {
       // Fresh answers (no identity cache), like check and explain. stdout carries only JSON-RPC lines.
-      const tools = cloudpinTools(deps, { cwd: process.cwd(), env: process.env, read: readOrNull, exists: existsSync });
+      const tools = cloudpinTools(deps, { cwd: process.cwd(), env: process.env, read: readOrNull, isDir });
       await serve(createHandler({ version: version(), tools }), process.stdin, process.stdout);
       return 0;
     }

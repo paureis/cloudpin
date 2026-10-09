@@ -7,12 +7,8 @@ slips moves to the next version with the reason in its issue. Open an
 
 ## 0.4.x: early-tester fixes (week of 2026-10-12)
 
-Whatever the first outside testers find, fixed before 1.0.
-
-- **Cleaner GitHub Releases** ([#65](https://github.com/paureis/cloudpin/issues/65)): only the release files are
-  attached (v0.4.0 also got the repo's logo and demo), and the verify commands in the notes line up.
-- **Shell wrappers and aliases** ([#69](https://github.com/paureis/cloudpin/issues/69)): an existing alias of a
-  guarded CLI no longer switches the guard off silently.
+Whatever the first outside testers find, fixed before 1.0. 0.4.1 shipped the fixes found before testing began (see
+Shipped).
 
 ## 1.0.0: launch (target 2026-10-16)
 
@@ -23,8 +19,6 @@ The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shi
 - **Tested inside every agent** ([#2](https://github.com/paureis/cloudpin/issues/2),
   [#3](https://github.com/paureis/cloudpin/issues/3)): Cursor, Gemini CLI and Copilot CLI.
 - **Go-public checklist closed** ([#8](https://github.com/paureis/cloudpin/issues/8)).
-- **Pin files from newer versions** ([#67](https://github.com/paureis/cloudpin/issues/67)): a section or key this
-  cloudpin doesn't know is still refused, with a message that says to update.
 
 ## 1.1.0: Claude Code plugin and MCP server (target 2026-10-23)
 
@@ -68,6 +62,10 @@ An idea gets a version when work on it starts.
 
 ## Shipped
 
+- **0.4.1** (2026-10-09): bash and zsh wrappers that keep guarding when an alias of the CLI already exists, and warn
+  about an alias that runs another program ([#69](https://github.com/paureis/cloudpin/issues/69)); pin files from a
+  newer cloudpin say to update ([#67](https://github.com/paureis/cloudpin/issues/67)); GitHub Releases carry only
+  the release files ([#65](https://github.com/paureis/cloudpin/issues/65)).
 - **0.4.0** (2026-10-09): signed GitHub Releases with build provenance
   ([#53](https://github.com/paureis/cloudpin/issues/53)), branch protection visible to Scorecard
   ([#54](https://github.com/paureis/cloudpin/issues/54)), hand checks of the protected-environment prompt and the

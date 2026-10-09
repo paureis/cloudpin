@@ -39,11 +39,11 @@ npx cloudpin --help
 Requires Node.js 22 or later. Works on Windows, macOS and Linux. cloudpin is in public beta (0.x): it works and
 is tested, and [feedback before 1.0](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
 
-**Latest release: 0.4.0** (2026-10-09): every release is now also a GitHub Release with the package tarball, its
-checksum and a signed build-provenance attestation (see [SECURITY.md](SECURITY.md), Verifying a release), and
-exempt commands such as `gh auth status` or `--help` run even when `.cloudpin.yml` is broken. 0.3.x brought the
-update notice, Supabase, Cloudflare Wrangler, `cloudpin doctor` and `cloudpin explain`. See the
-[CHANGELOG](CHANGELOG.md).
+**Latest release: 0.4.1** (2026-10-09): the bash and zsh wrappers keep working when you already have an alias for
+a guarded CLI (before, such an alias silently switched the guard off), and a `.cloudpin.yml` written for a newer
+cloudpin says to update. 0.4.0 made every release a GitHub Release with a signed build-provenance attestation (see
+[SECURITY.md](SECURITY.md), Verifying a release); 0.3.x brought the update notice, Supabase, Cloudflare Wrangler,
+`cloudpin doctor` and `cloudpin explain`. See the [CHANGELOG](CHANGELOG.md).
 
 ## Quick start
 

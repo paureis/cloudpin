@@ -6,6 +6,11 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-09
+
+Shell wrappers that survive your aliases, a clear message for pin files from a newer cloudpin, and cleaner GitHub
+Releases.
+
 ### Fixed
 
 - The bash and zsh wrappers no longer break on an existing alias of a guarded CLI (#69). Before, such an alias left

@@ -19,10 +19,7 @@ const PIN_FIELDS: Record<Provider, { fields: string[]; comment?: string }> = {
 
 const DEFAULT_GITHUB_HOST = "github.com";
 
-const HEADER = [
-  "# cloudpin: the cloud accounts this project uses. Commit this file.",
-  "# Docs: https://github.com/paureis/cloudpin",
-];
+const HEADER = ["# cloudpin: the cloud accounts this project uses. Commit this file."];
 
 /** One section per provider. Values are double-quoted (JSON is valid YAML). */
 function providerLines(found: FoundIdentity[]): string[] {

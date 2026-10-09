@@ -16,7 +16,6 @@ describe("renderConfig", () => {
     expect(renderConfig(found)).toBe(
       [
         "# cloudpin: the cloud accounts this project uses. Commit this file.",
-        "# Docs: https://github.com/paureis/cloudpin",
         "azure:",
         '  subscription: "3f2a-sub" # Acme Prod',
         '  tenant: "8b1d-ten"',
@@ -61,7 +60,6 @@ describe("addEnvironment", () => {
     expect(addEnvironment(null, "production", true, prod, false)).toBe(
       [
         "# cloudpin: the cloud accounts this project uses. Commit this file.",
-        "# Docs: https://github.com/paureis/cloudpin",
         "environments:",
         "  production:",
         "    protected: true",

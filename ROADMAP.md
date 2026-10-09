@@ -8,7 +8,14 @@ What's planned, in the order it's likely to ship. Each item links to its issue; 
 The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shipped in 0.2.0, and verifiable
 releases in 0.2.1; what is left:
 
-- **A week of real use** by the author and early testers, then 1.0.0.
+- **`cloudpin doctor`** ([#35](https://github.com/paureis/cloudpin/issues/35)): checks the whole setup (hooks,
+  shell wrappers, CLIs, pins) and says exactly what to fix.
+- **`cloudpin explain`** ([#36](https://github.com/paureis/cloudpin/issues/36)): shows which account a command
+  would use and what cloudpin would decide, without running it.
+- **Supabase and Cloudflare Wrangler** ([#37](https://github.com/paureis/cloudpin/issues/37)): pin the project and
+  account.
+- **A week of real use** by the author and early testers, then 1.0.0 and the launch
+  ([#9](https://github.com/paureis/cloudpin/issues/9)).
 
 ## 1.x
 

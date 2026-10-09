@@ -6,6 +6,20 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- GitHub Releases carry only the tarball, its signed bundle and `SHA256SUMS` (#65): v0.4.0 also got the repo's
+  logo and demo SVGs, since removed by hand. The verify commands in the release notes now line up.
+
+## [0.4.0] - 2026-10-09
+
+Releases you can verify, and exempt commands that still run when the pin file is broken.
+
+### Fixed
+
+- A broken `.cloudpin.yml` no longer blocks exempt commands such as `gh auth status`, `az login` or `--help` (#62):
+  they never act on an account and are what you need to investigate. Every other guarded command is still stopped.
+
 ### Added
 
 - A Claude Code plugin (#15): `claude plugin install cloudpin --marketplace paureis/cloudpin` installs the hook, a

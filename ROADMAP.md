@@ -5,18 +5,12 @@ issues it ships. Dates are aims, not promises: a fix can go out in a patch relea
 slips moves to the next version with the reason in its issue. Open an
 [issue](https://github.com/paureis/cloudpin/issues) to vote for an idea or suggest one.
 
-## 0.4.0: trust (target 2026-10-10)
-
-- **Signed GitHub Releases** ([#53](https://github.com/paureis/cloudpin/issues/53)): every tag gets a release with
-  the package tarball, SHA-256 checksums and a signed provenance attestation, and docs on how to verify a download.
-- **Branch protection visible to Scorecard** ([#54](https://github.com/paureis/cloudpin/issues/54)): a read-only
-  token so the check can be scored.
-- **Hand checks** ([#55](https://github.com/paureis/cloudpin/issues/55)): the terminal prompt on a protected
-  environment and the "ask" inside a live Claude Code session, checked by a person.
-
 ## 0.4.x: early-tester fixes (week of 2026-10-12)
 
 Whatever the first outside testers find, fixed before 1.0.
+
+- **Cleaner GitHub Releases** ([#65](https://github.com/paureis/cloudpin/issues/65)): only the release files are
+  attached (v0.4.0 also got the repo's logo and demo), and the verify commands in the notes line up.
 
 ## 1.0.0: launch (target 2026-10-16)
 
@@ -24,8 +18,6 @@ The `.cloudpin.yml` format is stable from 1.0 on. Everything that changes it shi
 
 - **A week of real use** by the author and early testers, then 1.0.0 and the launch
   ([#9](https://github.com/paureis/cloudpin/issues/9)).
-- **Wrangler against a real Cloudflare login** ([#56](https://github.com/paureis/cloudpin/issues/56)): the Cloudflare
-  support is built to Wrangler's source and docs.
 - **Tested inside every agent** ([#2](https://github.com/paureis/cloudpin/issues/2),
   [#3](https://github.com/paureis/cloudpin/issues/3)): Cursor, Gemini CLI and Copilot CLI.
 - **Go-public checklist closed** ([#8](https://github.com/paureis/cloudpin/issues/8)).
@@ -60,6 +52,9 @@ An idea gets a version when work on it starts.
 
 - **More CLIs** ([#11](https://github.com/paureis/cloudpin/issues/11)): `terraform` workspaces, `doctl`, `flyctl`,
   `firebase`, `heroku`, `stripe`, `netlify`.
+- **Wrangler against a real Cloudflare login** ([#56](https://github.com/paureis/cloudpin/issues/56)): the Cloudflare
+  support is built to Wrangler's source and docs and tested with fakes; it waits for someone with a Cloudflare
+  account to try it.
 - **Team policy:** a shared file that requires certain projects to be pinned.
 - **Fish and Nushell** wrappers.
 - **OpenSSF Best Practices silver, then gold** (passing since 2026-10-08,
@@ -69,6 +64,11 @@ An idea gets a version when work on it starts.
 
 ## Shipped
 
+- **0.4.0** (2026-10-09): signed GitHub Releases with build provenance
+  ([#53](https://github.com/paureis/cloudpin/issues/53)), branch protection visible to Scorecard
+  ([#54](https://github.com/paureis/cloudpin/issues/54)), hand checks of the protected-environment prompt and the
+  Claude Code "ask" ([#55](https://github.com/paureis/cloudpin/issues/55)), and exempt commands that run with a
+  broken pin file ([#62](https://github.com/paureis/cloudpin/issues/62)).
 - **0.3.1** (2026-10-09): the update notice and `cloudpin version` ([#50](https://github.com/paureis/cloudpin/issues/50)),
   and no false Supabase warning outside a project ([#48](https://github.com/paureis/cloudpin/issues/48)).
 - **0.3.0** (2026-10-09): Supabase and Cloudflare Wrangler ([#37](https://github.com/paureis/cloudpin/issues/37)),

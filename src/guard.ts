@@ -83,8 +83,11 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   try {
     config = deps.findConfig(req.cwd, req.env);
   } catch (err) {
-    // A broken pin file must not silently switch protection off.
+    // A broken pin file must not silently switch protection off. Exempt
+    // commands (login, whoami, help, ...) never act on an account, and are
+    // what a person needs to investigate, so they still run (#62).
     if (err instanceof ConfigError) {
+      if (provider.isExempt(req.args, name)) return { action: "allow", reason: "exempt" };
       return { action: "block", provider: provider.name, problems: [`invalid config: ${err.message}`] };
     }
     throw err;

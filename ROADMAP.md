@@ -7,8 +7,8 @@ slips moves to the next version with the reason in its issue. Open an
 
 ## 0.4.x: early-tester fixes (week of 2026-10-12)
 
-Whatever the first outside testers find, fixed before 1.0. 0.4.1 shipped the fixes found before testing began (see
-Shipped).
+Whatever the first outside testers find, fixed before 1.0. 0.4.1 and 0.4.2 shipped the fixes found before testing
+began (see Shipped).
 
 ## 1.0.0: launch (target 2026-10-16)
 
@@ -62,6 +62,8 @@ An idea gets a version when work on it starts.
 
 ## Shipped
 
+- **0.4.2** (2026-10-10): a clearer first run: `init`, `status` and `doctor` call a CLI you don't have "not
+  installed" ([#75](https://github.com/paureis/cloudpin/issues/75)).
 - **0.4.1** (2026-10-09): bash and zsh wrappers that keep guarding when an alias of the CLI already exists, and warn
   about an alias that runs another program ([#69](https://github.com/paureis/cloudpin/issues/69)); pin files from a
   newer cloudpin say to update ([#67](https://github.com/paureis/cloudpin/issues/67)); GitHub Releases carry only

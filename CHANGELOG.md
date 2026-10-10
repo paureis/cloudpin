@@ -6,6 +6,10 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-10
+
+A clearer first run: CLIs you don't have are called "not installed".
+
 ### Fixed
 
 - `init`, `status`, `doctor` and the MCP `cloudpin_status` say "not installed" for a CLI that isn't (#75). `init` used

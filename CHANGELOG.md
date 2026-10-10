@@ -6,6 +6,12 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `init`, `status`, `doctor` and the MCP `cloudpin_status` say "not installed" for a CLI that isn't (#75). `init` used
+  to print `az account show failed (exit 127)` or `spawn wrangler ENOENT`, and `status` and `doctor` told someone
+  without Vercel, kubectl or Supabase to log in to it.
+
 ## [0.4.1] - 2026-10-09
 
 Shell wrappers that survive your aliases, a clear message for pin files from a newer cloudpin, and cleaner GitHub

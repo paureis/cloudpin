@@ -20,6 +20,16 @@ export interface GuardDeps {
   findConfig: (cwd: string, env: NodeJS.ProcessEnv) => FoundConfig | null;
   /** Optional wrapper around `exec` per provider, e.g. the identity cache. */
   wrapExec?: (provider: ProviderDef, env: NodeJS.ProcessEnv, exec: Exec) => Exec;
+  /**
+   * Finds a command on `env`'s PATH. `status`, `doctor` and the MCP tools use it to call a CLI
+   * not installed when none of its commands is found, since some providers never spawn it (#75).
+   */
+  onPath?: (bin: string, env: NodeJS.ProcessEnv) => string | null;
+}
+
+/** False only when `onPath` is given and finds none of the provider's commands. */
+export function installed(provider: ProviderDef, env: NodeJS.ProcessEnv, onPath?: GuardDeps["onPath"]): boolean {
+  return !onPath || provider.bins.some((bin) => onPath(bin, env) !== null);
 }
 
 export type Verdict =

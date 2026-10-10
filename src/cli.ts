@@ -57,7 +57,8 @@ Exit codes: 0 ok, 1 usage or check failure, ${EXIT_BLOCKED} command blocked.`;
 
 // `check` always asks the CLIs directly; `exec` and the hooks use the short-lived
 // identity cache (src/cache.ts), which CLOUDPIN_NO_CACHE=1 turns off.
-const deps: GuardDeps = { providers, exec: realExec, findConfig };
+const onPath = (bin: string, env: NodeJS.ProcessEnv) => findOnPath(bin, env, process.platform, existsSync);
+const deps: GuardDeps = { providers, exec: realExec, findConfig, onPath };
 const cachedDeps: GuardDeps = {
   ...deps,
   wrapExec: (provider, env, exec) =>
@@ -87,7 +88,7 @@ async function init(flags: string[]): Promise<number> {
     throw err;
   }
   console.log("cloudpin: reading the accounts your CLIs are logged into...");
-  const { found, skipped } = await discover(providers, realExec, process.env, process.cwd());
+  const { found, skipped } = await discover(providers, realExec, process.env, process.cwd(), onPath);
   for (const line of skipped) console.log(`  skipped ${line}`);
   if (found.length === 0) {
     console.error("cloudpin init: no logged-in CLI found; log in to the accounts this project uses first.");
@@ -223,7 +224,7 @@ async function doctor(flags: string[]): Promise<number> {
       }
     },
     writable,
-    onPath: (name: string) => findOnPath(name, process.env, process.platform, existsSync),
+    onPath: (name: string) => onPath(name, process.env),
     latest: () => fetchLatest(fetch, 3000),
   };
   const checks = await runDoctor(d);

@@ -6,6 +6,11 @@ All notable changes to cloudpin are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-16
+
+The first stable release: the `.cloudpin.yml` format is stable from here on (later versions only add sections and
+keys), and every agent hook except Gemini CLI's is tested inside the real agent.
+
 ### Fixed
 
 - Cursor: a command on your Cursor allowlist runs again when the account matches (#2). cloudpin answered `ask`, which

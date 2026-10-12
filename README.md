@@ -258,8 +258,8 @@ environment by setting `CLOUDPIN_ENV` in their own command, and need your OK to 
 | Claude Code | `.claude/settings.json` | Tested inside the agent |
 | Codex | `.codex/hooks.json` | Tested inside the agent |
 | Cursor | `.cursor/hooks.json` | Built to the documented hook format |
-| GitHub Copilot CLI | `.github/hooks/cloudpin.json` | Built to the documented hook format |
-| Antigravity (CLI, IDE and 2.0) | `.agents/hooks.json` | Built to the documented hook format |
+| GitHub Copilot CLI | `.github/hooks/cloudpin.json` | Tested inside the agent |
+| Antigravity (CLI, IDE and 2.0) | `.agents/hooks.json` | Tested inside Antigravity CLI |
 | Gemini CLI | `.gemini/settings.json` | Built to the documented hook format |
 
 Google replaced Gemini CLI with Antigravity CLI for free and consumer accounts on 2026-06-18; Gemini CLI still

@@ -18,7 +18,6 @@ keys), and every agent hook except Gemini CLI's is tested inside the real agent.
   `GH_TOKEN=$(cat other.token) gh ...` read the token as empty. cloudpin now follows `export`, `unset` and `$env:`
   through the line, and stops a command whose account depends on a value only known when it runs, saying why. Found
   in the threat-model review.
-
 - Cursor: a command on your Cursor allowlist runs again when the account matches (#2). cloudpin answered `ask`, which
   stopped even allowlisted commands; it now answers `allow`, which Cursor treats exactly like having no hook (measured
   in Cursor CLI 2026.10.01: commands not on the allowlist still need your approval). Wrong accounts are still blocked.

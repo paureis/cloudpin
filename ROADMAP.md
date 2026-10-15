@@ -47,7 +47,7 @@ An idea gets a version when work on it starts.
 
 ## Shipped
 
-- **1.0.0** (2026-10-16): the first stable release and the launch ([#9](https://github.com/paureis/cloudpin/issues/9)).
+- **1.0.0** (2026-10-15): the first stable release and the launch ([#9](https://github.com/paureis/cloudpin/issues/9)).
   The `.cloudpin.yml` format is stable; Antigravity hooks ([#80](https://github.com/paureis/cloudpin/issues/80));
   Copilot CLI, Antigravity and Cursor tested inside the agents ([#3](https://github.com/paureis/cloudpin/issues/3),
   [#2](https://github.com/paureis/cloudpin/issues/2)); go-public checklist closed

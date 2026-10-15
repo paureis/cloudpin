@@ -39,7 +39,7 @@ npx cloudpin --help
 Requires Node.js 22 or later. Works on Windows, macOS and Linux. The `.cloudpin.yml` format is stable from 1.0 on
 (see Configuration), and [feedback](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
 
-**Latest release: 1.0.0** (2026-10-16): the first stable release. Antigravity, Gemini CLI's successor, joins the
+**Latest release: 1.0.0** (2026-10-15): the first stable release. Antigravity, Gemini CLI's successor, joins the
 supported agents, and the Claude Code, Codex, Cursor, Copilot CLI and Antigravity hooks are all tested inside the real
 agents. Variables an agent sets earlier in its command line (`export AWS_PROFILE=...; aws ...`) now count, and
 commands on your Cursor allowlist run again when the account matches. Since 0.4: shell wrappers that keep guarding

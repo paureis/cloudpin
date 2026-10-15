@@ -27,7 +27,7 @@ We found no popular standalone tool for per-project cloud account pinning.
 | CLIs | az (subscription + tenant ID), aws (account ID), gcloud (account + project ID), vercel (team ID), gh (user + host) |
 | Terminal | Shell wrappers for bash, zsh and PowerShell, enabled by one line in the shell profile; plus `cloudpin check` for scripts and CI |
 | Speed | Identity results cached; cache invalidated when the CLI's own config/credential file changes |
-| Agents | Every agent with a real blocking pre-command hook (Claude Code, Cursor; Codex, Gemini CLI and Copilot CLI **(verify)**), via `cloudpin install-hook <agent>`. Agents without a blocking hook get documented `cloudpin check` integration, never a fake hook |
+| Agents | Every agent with a real blocking pre-command hook (Claude Code, Cursor; Codex, Gemini CLI and Copilot CLI **(verify)**; Antigravity, Gemini CLI's successor, added for 1.0 in #80), via `cloudpin install-hook <agent>`. Agents without a blocking hook get documented `cloudpin check` integration, never a fake hook |
 | Block rule | On mismatch, block every command except login, logout, switch, whoami, `--version` and help |
 | Override | `CLOUDPIN_SKIP=1` works in the terminal; ignored in agent-hook mode |
 | Scope | The full product at launch; iterate on issues afterwards |
@@ -43,6 +43,9 @@ We found no popular standalone tool for per-project cloud account pinning.
 - A command picks the account itself (`--subscription`, `--profile`, `--scope`, `--project`, or env vars such
   as `AWS_PROFILE` / `CLOUDSDK_CORE_PROJECT`): check that account, not the default one.
 - cloudpin only ever reads identity, never prints tokens, and never logs in or changes accounts.
+- A pin file uses a section or key this version doesn't know: refuse it (fail closed, since it may be a typo that
+  would leave a CLI unguarded) and say it may need a newer cloudpin, naming the running version (#67). From 1.0 the
+  format only adds names, so this is how a teammate on an older version finds out.
 
 ## Repo and release
 
@@ -50,8 +53,10 @@ We found no popular standalone tool for per-project cloud account pinning.
   complete, to stop private-repo Actions minutes; it is now the bar for **1.0.0** instead. Personal details were
   removed first: a fresh repository with the history rewritten (author emails, paths), the session notes
   (`HANDOFF.md`) kept local, and the original repository archived privately.
-- Before 1.0.0, all of these:
+- 1.0.0 (2026-10-15) shipped after all of these:
   1. Every CLI and every supported agent tested on real accounts (Windows), with the nightly Windows run green.
+     Two exceptions, labelled as such in the README: Wrangler (no Cloudflare account yet, #56) and Gemini CLI (paid
+     keys and enterprise only since 2026-06-18; its successor Antigravity is tested).
   2. About a week of the owner using it on real projects.
   3. Safety review: read-only, no token output, switching never blocked.
   4. README with a short animated demo, one-line install, clean uninstall, and the origin story.

@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { formatBlock, formatConfirm } from "../format.js";
 import { commandName, guard, type GuardDeps } from "../guard.js";
-import { findInvocations } from "../shellwords.js";
+import { envFor, findInvocations } from "../shellwords.js";
 
 /** How one agent hands a shell command to its hook and reads the answer. */
 export interface AgentHook {
@@ -92,10 +92,41 @@ export const AGENTS = {
     noObjection: "",
   },
 
+  // Antigravity CLI, IDE and 2.0 (antigravity.google/docs/hooks; Gemini CLI's
+  // successor, #80): PreToolUse gets camelCase { toolCall: { name, args } }.
+  // run_command carries CommandLine and Cwd; manage_task with send_input types
+  // Input into a running terminal, so it is checked too. `decision` is required:
+  // "allow" would auto-approve and skip Antigravity's own approval, so no
+  // objection is "ask" (which honours the user's "Always Allow" settings), and a
+  // confirmation is "force_ask", which a cached approval can't skip.
+  antigravity: {
+    parse(input) {
+      const i = obj(input);
+      const call = obj(i.toolCall);
+      const args = obj(call.args);
+      const workspace = Array.isArray(i.workspacePaths) ? str(i.workspacePaths[0]) : undefined;
+      const fallback = workspace ?? process.cwd();
+      if (str(call.name) === "run_command") {
+        const command = str(args.CommandLine);
+        return command === undefined ? null : { command, cwd: str(args.Cwd) ?? fallback };
+      }
+      if (str(call.name) === "manage_task" && str(args.Action) === "send_input") {
+        const command = str(args.Input);
+        return command === undefined ? null : { command, cwd: fallback };
+      }
+      return null;
+    },
+    deny: (reason) => JSON.stringify({ decision: "deny", reason }),
+    ask: (reason) => JSON.stringify({ decision: "force_ask", reason }),
+    noObjection: JSON.stringify({ decision: "ask" }),
+  },
+
   // Cursor (cursor.com/docs/agent/hooks): beforeShellExecution gets
-  // { command, cwd }. Output must be valid JSON with a permission, and the
-  // docs do not say whether "allow" skips Cursor's own approval, so
-  // "no objection" is "ask": Cursor's normal approval applies.
+  // { command, cwd }. Output must be valid JSON with a permission. The docs
+  // don't say how "allow" relates to Cursor's own approval, so it was measured
+  // (#2, Cursor CLI 2026.10.01): "allow" ran an allowlisted command and still
+  // stopped one that wasn't, exactly as with no hook, while "ask" stopped even
+  // the allowlisted one. So "no objection" is "allow".
   cursor: {
     parse(input) {
       const i = obj(input);
@@ -109,18 +140,9 @@ export const AGENTS = {
         agent_message: reason,
       }),
     ask: (reason) => JSON.stringify({ permission: "ask", user_message: reason, agent_message: reason }),
-    noObjection: JSON.stringify({ permission: "ask" }),
+    noObjection: JSON.stringify({ permission: "allow" }),
   },
 } satisfies Record<string, AgentHook>;
-
-// Set by the user before starting the agent, these count; set by the agent
-// inside its own command, they would let it pick a laxer environment, confirm
-// for the user or skip the check, so they are dropped.
-const USER_ONLY_VARS = ["CLOUDPIN_ENV", "CLOUDPIN_CONFIRM", "CLOUDPIN_SKIP"];
-
-export function withoutUserOnlyVars(vars: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(Object.entries(vars).filter(([k]) => !USER_ONLY_VARS.includes(k)));
-}
 
 /** A request for the user's OK: the text an agent asks with, or the one it is denied with. */
 interface Confirmation {
@@ -216,7 +238,7 @@ async function checkCommand(
       {
         bin: inv.bin,
         args: inv.args,
-        env: { ...env, ...withoutUserOnlyVars(inv.env) },
+        env: envFor(env, inv, { agent: true }),
         cwd: inv.cwd ?? call.cwd,
         mode: "agent",
       },

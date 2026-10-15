@@ -36,21 +36,22 @@ npx cloudpin --help
 
 </details>
 
-Requires Node.js 22 or later. Works on Windows, macOS and Linux. cloudpin is in public beta (0.x): it works and
-is tested, and [feedback before 1.0](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
+Requires Node.js 22 or later. Works on Windows, macOS and Linux. The `.cloudpin.yml` format is stable from 1.0 on
+(see Configuration), and [feedback](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
 
-**Latest release: 0.4.0** (2026-10-09): every release is now also a GitHub Release with the package tarball, its
-checksum and a signed build-provenance attestation (see [SECURITY.md](SECURITY.md), Verifying a release), and
-exempt commands such as `gh auth status` or `--help` run even when `.cloudpin.yml` is broken. 0.3.x brought the
-update notice, Supabase, Cloudflare Wrangler, `cloudpin doctor` and `cloudpin explain`. See the
-[CHANGELOG](CHANGELOG.md).
+**Latest release: 1.0.0** (2026-10-15): the first stable release. Antigravity, Gemini CLI's successor, joins the
+supported agents, and the Claude Code, Codex, Cursor, Copilot CLI and Antigravity hooks are all tested inside the real
+agents. Variables an agent sets earlier in its command line (`export AWS_PROFILE=...; aws ...`) now count, and
+commands on your Cursor allowlist run again when the account matches. Since 0.4: shell wrappers that keep guarding
+when you have an alias for a guarded CLI, "not installed" for CLIs you don't have, and signed GitHub Releases with
+build provenance (see [SECURITY.md](SECURITY.md), Verifying a release). See the [CHANGELOG](CHANGELOG.md).
 
 ## Quick start
 
 ```sh
 cd your-project
 cloudpin init                        # pin the accounts you are logged into now
-cloudpin install-hook claude         # protect your AI agent (or codex, cursor, gemini, copilot)
+cloudpin install-hook claude         # protect your AI agent (or codex, cursor, copilot, antigravity, gemini)
 echo 'eval "$(cloudpin shell-init bash)"' >> ~/.bashrc   # protect your terminal
 ```
 
@@ -208,8 +209,8 @@ status` and every message say which environment applies and why.
 
 - In a terminal: `Continue? [y/N]`.
 - Without a terminal (CI, scripts): the command stops unless `CLOUDPIN_CONFIRM=<name>` is set.
-- Claude Code, Copilot CLI and Cursor ask you through the agent's own prompt. Codex and Gemini CLI have no working
-  "ask" in their hooks, so the command is blocked and the agent is told to hand it to you.
+- Claude Code, Copilot CLI, Antigravity and Cursor ask you through the agent's own prompt. Codex and Gemini CLI have
+  no working "ask" in their hooks, so the command is blocked and the agent is told to hand it to you.
 
 The built-in read-only list is short on purpose (`az ... list|show`, `aws <service> describe-*|list-*|get-*` and
 `s3 ls`, `gcloud ... list|describe`, `vercel ls|inspect|logs` and `<group> ls`, `gh <group> list|view|status`,
@@ -237,6 +238,11 @@ cloudpin shell-init pwsh | Out-String | Invoke-Expression   # $PROFILE
 If cloudpin is ever uninstalled, the functions fall back to the real CLI, so they never get in your way. To run one
 command anyway, on purpose: `CLOUDPIN_SKIP=1 <command>`.
 
+**Aliases.** An alias that calls the CLI itself, such as `alias kubectl='kubectl --context dev'`, is still guarded.
+An alias that runs another program, such as `alias kubectl=kubecolor` or `alias gh='command gh'`, bypasses cloudpin,
+so each new shell prints a warning naming it (bash 4+, zsh and PowerShell; PowerShell runs any alias before the
+wrapper). Put the `cloudpin shell-init` line after your aliases so it can see them.
+
 ## Protect your AI agent
 
 ```sh
@@ -252,14 +258,21 @@ environment by setting `CLOUDPIN_ENV` in their own command, and need your OK to 
 |---|---|---|
 | Claude Code | `.claude/settings.json` | Tested inside the agent |
 | Codex | `.codex/hooks.json` | Tested inside the agent |
-| Cursor | `.cursor/hooks.json` | Built to the documented hook format |
+| Cursor | `.cursor/hooks.json` | Tested inside the agent (Cursor CLI) |
+| GitHub Copilot CLI | `.github/hooks/cloudpin.json` | Tested inside the agent |
+| Antigravity (CLI, IDE and 2.0) | `.agents/hooks.json` | Tested inside Antigravity CLI |
 | Gemini CLI | `.gemini/settings.json` | Built to the documented hook format |
-| GitHub Copilot CLI | `.github/hooks/cloudpin.json` | Built to the documented hook format |
+
+Google replaced Gemini CLI with Antigravity CLI for free and consumer accounts on 2026-06-18; Gemini CLI still
+serves paid API keys and enterprise licenses, so both are supported.
 
 cloudpin reads the whole command line the agent is about to run, so it also catches
 `cd ../other && npx vercel deploy`, `bash -c "..."`, pipelines, `$( )`, `xargs`, `find -exec`, heredocs fed to a shell
 (`bash <<EOF`), commands held in a variable (`CLI=vercel; $CLI deploy`) and PowerShell assignments
-(`$prs = gh pr list`). It can't see inside a script file the agent writes and runs later (`bash deploy.sh`).
+(`$prs = gh pr list`). Variables set earlier in the line count too (`export AWS_PROFILE=other; aws ...`,
+`$env:AWS_PROFILE = 'other'`), and when one that decides the account is set from something only known when it runs
+(`GH_TOKEN=$(cat file) gh ...`), the command is stopped with the reason. It can't see inside a script file the agent
+writes and runs later (`bash deploy.sh`).
 
 ### Claude Code plugin
 
@@ -299,6 +312,10 @@ Asking a CLI who it is takes 0.5 to 2 seconds, so cloudpin remembers a successfu
 The cache is dropped the moment anything that decides the account changes: the command's flags, the relevant
 environment variables, or the CLI's own account files (which `az account set`, `gh auth switch` and
 `vercel switch` rewrite). `cloudpin check` always asks the CLI.
+
+From 1.0 on, `.cloudpin.yml` only grows: a new version may add sections and keys, never change or remove them. A
+file that uses a name your cloudpin doesn't know is refused rather than half read, so a typo such as `azrue:` can't
+switch protection off. The message names your version and says to update in case the file was written for a newer one.
 
 | Exit code | Meaning |
 |---|---|

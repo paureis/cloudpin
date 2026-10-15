@@ -1,6 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { parseConfig } from "../src/config.js";
-import { addEnvironment, renderConfig, type FoundIdentity } from "../src/init.js";
+import { addEnvironment, discover, renderConfig, type FoundIdentity } from "../src/init.js";
+import type { Exec, ProviderDef } from "../src/types.js";
+
+describe("discover (#75)", () => {
+  const def = (name: string, bin: string, resolve: ProviderDef["resolve"]) => ({ name, bins: [bin], resolve }) as unknown as ProviderDef;
+  const spawning = (bin: string): ProviderDef["resolve"] => async (_req, exec) => {
+    const r = await exec(bin, ["whoami"], {});
+    return r.code === 0 ? { kind: "identity", identity: { user: r.stdout }, source: "t" } : { kind: "error", message: `${bin} whoami failed (exit ${r.code})` };
+  };
+  const exec: Exec = async (bin) =>
+    bin === "gh" ? { code: 0, stdout: "me", stderr: "" } : { code: 127, stdout: "", stderr: `spawn ${bin} ENOENT`, notFound: true };
+
+  it("says a CLI that isn't installed is not installed, whether PATH or the spawn tells", async () => {
+    const providers = [
+      def("github", "gh", spawning("gh")),
+      def("azure", "az", spawning("az")), // on PATH by the lookup, but the spawn finds nothing
+      def("vercel", "vercel", async () => ({ kind: "logged-out", hint: "vercel login" })), // never spawns
+    ];
+    const onPath = (bin: string) => (bin === "vercel" ? null : `/usr/bin/${bin}`);
+    expect(await discover(providers, exec, {}, "/p", onPath)).toEqual({
+      found: [{ provider: "github", identity: { user: "me" } }],
+      skipped: ["azure: not installed", "vercel: not installed"],
+    });
+  });
+
+  it("still reports a logged-out CLI with its login hint", async () => {
+    const providers = [def("vercel", "vercel", async () => ({ kind: "logged-out", hint: "vercel login" }))];
+    expect((await discover(providers, exec, {}, "/p", () => "/usr/bin/vercel")).skipped).toEqual(["vercel: not logged in (vercel login)"]);
+  });
+});
 
 describe("renderConfig", () => {
   const found: FoundIdentity[] = [

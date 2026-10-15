@@ -13,7 +13,7 @@ const gh: ProviderDef<"github"> = {
   compare: (pin, id) => (pin.user === id.user ? [] : [`user: expected "${pin.user}", active is "${id.user}"`]),
   switchHint: (pin) => `gh auth switch --user ${pin.user}`,
   statusCommand: "gh auth status",
-  cacheInputs: () => ({ env: [], files: [], dirs: [] }),
+  cacheInputs: () => ({ env: ["FAKE_GH_USER", "GH_TOKEN"], files: [], dirs: [] }),
 };
 const config: FoundConfig = { path: "/repo/.cloudpin.yml", pins: { github: { user: "paureis" } } };
 const deps: GuardDeps = {
@@ -37,7 +37,50 @@ const inputs = {
       tool_input: { command, ...(dir ? { dir_path: dir } : {}) },
     }),
   cursor: (command: string) => JSON.stringify({ command, cwd: "/repo", sandbox: false }),
+  // antigravity.google/docs/hooks, PreToolUse example (camelCase, toolCall.args).
+  antigravity: (command: string, cwd: string | undefined = "/repo") =>
+    JSON.stringify({
+      toolCall: { name: "run_command", args: { CommandLine: command, ...(cwd ? { Cwd: cwd } : {}), WaitMsBeforeAsync: 5000 } },
+      stepIdx: 19,
+      conversationId: "ec33ebf9-0cba-4100-8142-c61503f6c587",
+      workspacePaths: ["/repo"],
+      transcriptPath: "~/.gemini/antigravity-cli/brain/x/.system_generated/logs/transcript.jsonl",
+      artifactDirectoryPath: "~/.gemini/antigravity-cli/brain/x",
+      modelName: "gemini-3.6-flash-medium",
+    }),
 };
+
+// #86: variables set earlier in the agent's line decide the account the CLI uses.
+describe("runHook: environment set earlier in the line", () => {
+  const decision = async (command: string, env: NodeJS.ProcessEnv = {}) =>
+    JSON.parse((await runHook(AGENTS.codex, inputs.codex(command), deps, env)) || "{}").hookSpecificOutput?.permissionDecision ?? "none";
+
+  it("denies when an export earlier in the line switches to the wrong account", async () => {
+    expect(await decision("export FAKE_GH_USER=someone; gh pr list")).toBe("deny");
+    expect(await decision("$env:FAKE_GH_USER = 'someone'; gh pr list")).toBe("deny");
+    expect(await decision("export FAKE_GH_USER=paureis; gh pr list")).toBe("none");
+  });
+
+  it("counts a plain assignment only when the variable is already exported", async () => {
+    expect(await decision("FAKE_GH_USER=someone; gh pr list")).toBe("none");
+    expect(await decision("FAKE_GH_USER=someone; gh pr list", { FAKE_GH_USER: "paureis" })).toBe("deny");
+  });
+
+  it("follows unset", async () => {
+    expect(await decision("unset FAKE_GH_USER; gh pr list", { FAKE_GH_USER: "someone" })).toBe("none");
+  });
+
+  it("denies, saying why, when a variable that decides the account is set from something unknown in advance", async () => {
+    const out = JSON.parse(await runHook(AGENTS.codex, inputs.codex("GH_TOKEN=$(cat other.token) gh repo list"), deps, {}));
+    expect(out.hookSpecificOutput.permissionDecision).toBe("deny");
+    expect(out.hookSpecificOutput.permissionDecisionReason).toContain("GH_TOKEN");
+    expect(await decision("export GH_TOKEN=$(cat other.token); gh repo list")).toBe("deny");
+  });
+
+  it("ignores an unknown value for a variable that doesn't decide the account", async () => {
+    expect(await decision("export PAGER=$(which less); gh pr list")).toBe("none");
+  });
+});
 
 describe("runHook: codex (same protocol as Claude Code)", () => {
   it("denies through hookSpecificOutput", async () => {
@@ -80,6 +123,34 @@ describe("runHook: gemini", () => {
   });
 });
 
+describe("runHook: antigravity (#80)", () => {
+  const sendInput = (Input: string) =>
+    JSON.stringify({ toolCall: { name: "manage_task", args: { Action: "send_input", TaskId: "t1", Input } }, workspacePaths: ["/repo"] });
+
+  it("denies run_command with decision and reason", async () => {
+    const out = JSON.parse(await runHook(AGENTS.antigravity, inputs.antigravity("gh pr list"), deps, wrong));
+    expect(out.decision).toBe("deny");
+    expect(out.reason).toContain("blocked `gh pr list`");
+  });
+  it("answers ask, never allow, when there is no problem: allow would skip Antigravity's own approval", async () => {
+    expect(JSON.parse(await runHook(AGENTS.antigravity, inputs.antigravity("gh pr list"), deps, {}))).toEqual({ decision: "ask" });
+  });
+  it("checks against Cwd, and falls back to the first workspace path without one", async () => {
+    expect(JSON.parse(await runHook(AGENTS.antigravity, inputs.antigravity("gh pr list", "/elsewhere"), deps, wrong)).decision).toBe("ask");
+    expect(JSON.parse(await runHook(AGENTS.antigravity, inputs.antigravity("gh pr list", undefined), deps, wrong)).decision).toBe("deny");
+  });
+  it("checks text typed into a running terminal (manage_task send_input)", async () => {
+    expect(JSON.parse(await runHook(AGENTS.antigravity, sendInput("gh pr list\n"), deps, wrong)).decision).toBe("deny");
+    const list = JSON.stringify({ toolCall: { name: "manage_task", args: { Action: "list" } }, workspacePaths: ["/repo"] });
+    expect(JSON.parse(await runHook(AGENTS.antigravity, list, deps, wrong))).toEqual({ decision: "ask" });
+  });
+  it("ignores other tools and answers valid JSON even for unreadable input", async () => {
+    const view = JSON.stringify({ toolCall: { name: "view_file", args: { AbsolutePath: "/repo/gh" } }, workspacePaths: ["/repo"] });
+    expect(JSON.parse(await runHook(AGENTS.antigravity, view, deps, wrong))).toEqual({ decision: "ask" });
+    expect(JSON.parse(await runHook(AGENTS.antigravity, "not json", deps, wrong))).toEqual({ decision: "ask" });
+  });
+});
+
 describe("runHook: cursor", () => {
   it("denies with messages for the user and the agent", async () => {
     const out = JSON.parse(await runHook(AGENTS.cursor, inputs.cursor("gh pr list"), deps, wrong));
@@ -87,9 +158,11 @@ describe("runHook: cursor", () => {
     expect(out.user_message).toContain("blocked `gh pr list`");
     expect(out.agent_message).toContain("ask the user");
   });
-  it("answers ask (Cursor's own approval) rather than allow when there is no problem", async () => {
+  it("answers allow when there is no problem, which leaves Cursor's own approval rules in charge (#2)", async () => {
+    // Measured in Cursor CLI 2026.10.01: "allow" ran an allowlisted command and still stopped one that wasn't,
+    // exactly as with no hook; "ask" stopped even the allowlisted one.
     expect(JSON.parse(await runHook(AGENTS.cursor, inputs.cursor("gh pr list"), deps, {}))).toEqual({
-      permission: "ask",
+      permission: "allow",
     });
   });
 });
@@ -145,6 +218,12 @@ describe("runHook: protected environments", () => {
   it("gemini denies, having no ask decision", async () => {
     const out = JSON.parse(await runHook(AGENTS.gemini, inputs.gemini("gh pr merge 12"), envDeps, {}));
     expect(out.decision).toBe("deny");
+  });
+
+  it("antigravity force-asks, so a cached Always Allow can't skip the confirmation", async () => {
+    const out = JSON.parse(await runHook(AGENTS.antigravity, inputs.antigravity("gh pr merge 12"), envDeps, {}));
+    expect(out.decision).toBe("force_ask");
+    expect(out.reason).toContain("needs your OK");
   });
 
   it("cursor asks, with messages for the user and the agent", async () => {

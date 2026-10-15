@@ -1,7 +1,8 @@
 import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
+import { envNameMatches } from "./cache.js";
 import { isReadOnly } from "./readonly.js";
-import type { Exec, ProviderDef, Resolution } from "./types.js";
+import { type Exec, type ProviderDef, type Resolution, UNKNOWN_VALUE } from "./types.js";
 
 export interface GuardRequest {
   /** The executable as typed or resolved, e.g. "az" or "C:\\...\\gh.exe". */
@@ -20,6 +21,16 @@ export interface GuardDeps {
   findConfig: (cwd: string, env: NodeJS.ProcessEnv) => FoundConfig | null;
   /** Optional wrapper around `exec` per provider, e.g. the identity cache. */
   wrapExec?: (provider: ProviderDef, env: NodeJS.ProcessEnv, exec: Exec) => Exec;
+  /**
+   * Finds a command on `env`'s PATH. `status`, `doctor` and the MCP tools use it to call a CLI
+   * not installed when none of its commands is found, since some providers never spawn it (#75).
+   */
+  onPath?: (bin: string, env: NodeJS.ProcessEnv) => string | null;
+}
+
+/** False only when `onPath` is given and finds none of the provider's commands. */
+export function installed(provider: ProviderDef, env: NodeJS.ProcessEnv, onPath?: GuardDeps["onPath"]): boolean {
+  return !onPath || provider.bins.some((bin) => onPath(bin, env) !== null);
 }
 
 export type Verdict =
@@ -116,7 +127,23 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
     if (result.notFound) cliMissing = true;
     return result;
   };
-  const res = await provider.resolve({ args: req.args, env: req.env, cwd: req.cwd, bin: name }, exec);
+  // A variable the line sets from something only known when it runs (#86): if it
+  // decides this CLI's account, cloudpin can't tell which account will be used.
+  const identityVars = provider.cacheInputs(req.env).env;
+  const unknown = Object.keys(req.env).filter((k) => req.env[k] === UNKNOWN_VALUE && envNameMatches(identityVars, k));
+  if (unknown.length > 0) {
+    return {
+      ...base,
+      uncertain: true,
+      problems: [
+        `${unknown.join(", ")} ${unknown.length > 1 ? "are" : "is"} set by the command line from something cloudpin can't read in advance ($(...), backticks or another variable), so it can't tell which account this command would use`,
+      ],
+      fix: `set ${unknown[0]} to a literal value, or run the command yourself`,
+    };
+  }
+  // Other unknown values don't decide the account; the CLI's identity check runs without them.
+  const env = Object.fromEntries(Object.entries(req.env).filter(([, v]) => v !== UNKNOWN_VALUE));
+  const res = await provider.resolve({ args: req.args, env, cwd: req.cwd, bin: name }, exec);
   trace.resolution = res;
   if (res.kind === "error" && cliMissing) return { action: "allow", reason: "not-installed" };
   switch (res.kind) {

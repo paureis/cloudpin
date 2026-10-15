@@ -1,5 +1,6 @@
 import { parseDocument, type YAMLMap } from "yaml";
 import { ConfigError, isEnvironmentName, parseConfig, type Provider } from "./config.js";
+import { type GuardDeps, installed } from "./guard.js";
 import type { Exec, Identity, ProviderDef } from "./types.js";
 
 export interface FoundIdentity {
@@ -94,18 +95,34 @@ export interface Discovery {
   skipped: string[];
 }
 
-/** Reads the active account of every supported CLI that is installed. */
+/**
+ * Reads the active account of every supported CLI that is installed. A CLI is
+ * not installed when `onPath` finds none of its commands or spawning it finds
+ * nothing (#75); some providers never spawn, so the lookup comes first.
+ */
 export async function discover(
   providers: ProviderDef[],
   exec: Exec,
   env: NodeJS.ProcessEnv,
   cwd: string,
+  onPath?: GuardDeps["onPath"],
 ): Promise<Discovery> {
   const found: FoundIdentity[] = [];
   const skipped: string[] = [];
   for (const provider of providers) {
-    const res = await provider.resolve({ args: [], env, cwd }, exec);
-    if (res.kind === "identity") found.push({ provider: provider.name, identity: res.identity });
+    if (!installed(provider, env, onPath)) {
+      skipped.push(`${provider.name}: not installed`);
+      continue;
+    }
+    let missing = false;
+    const tracked: Exec = async (bin, args, e) => {
+      const r = await exec(bin, args, e);
+      if (r.notFound) missing = true;
+      return r;
+    };
+    const res = await provider.resolve({ args: [], env, cwd }, tracked);
+    if (missing && res.kind !== "identity") skipped.push(`${provider.name}: not installed`);
+    else if (res.kind === "identity") found.push({ provider: provider.name, identity: res.identity });
     else if (res.kind === "logged-out") skipped.push(`${provider.name}: not logged in (${res.hint})`);
     else skipped.push(`${provider.name}: ${res.message}`);
   }

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { parse, YAMLParseError } from "yaml";
 import { chooseEnvironment, currentBranch, findGitDir } from "./git.js";
@@ -40,6 +41,19 @@ export class ConfigError extends Error {
   override name = "ConfigError";
 }
 
+const VERSION = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
+
+/**
+ * From 1.0 the format only grows: later versions add sections and keys. An
+ * older cloudpin still refuses a name it doesn't know (ignoring it would let a
+ * typo switch protection off), but says how to get the version that knows it (#67).
+ */
+function unknownName(message: string): ConfigError {
+  return new ConfigError(
+    `${message}. If this file was written for a newer cloudpin than this one (${VERSION}), update it: npm install --global cloudpin@latest`,
+  );
+}
+
 // Allowed keys per section; the first `required` entries must be present.
 const SCHEMA: Record<Provider, { keys: string[]; required: string[] }> = {
   azure: { keys: ["subscription", "tenant"], required: ["subscription"] },
@@ -76,9 +90,7 @@ function parsePins(doc: Record<string, unknown>, skip: string[]): Pins {
   for (const [section, body] of Object.entries(doc)) {
     if (skip.includes(section)) continue;
     if (!isProvider(section)) {
-      throw new ConfigError(
-        `unknown section "${section}" (expected one of: ${[...PROVIDERS, ...PROJECT_KEYS].join(", ")})`,
-      );
+      throw unknownName(`unknown section "${section}" (expected one of: ${[...PROVIDERS, ...PROJECT_KEYS].join(", ")})`);
     }
     const { keys, required } = SCHEMA[section];
     const fields: Record<string, string> = {};
@@ -86,7 +98,7 @@ function parsePins(doc: Record<string, unknown>, skip: string[]): Pins {
       if (!isMapping(body)) throw new ConfigError(`${section}: expected a mapping of keys`);
       for (const [key, value] of Object.entries(body)) {
         if (!keys.includes(key)) {
-          throw new ConfigError(`${section}: unknown key "${key}" (expected: ${keys.join(", ")})`);
+          throw unknownName(`${section}: unknown key "${key}" (expected: ${keys.join(", ")})`);
         }
         if (typeof value !== "string" || value.trim() === "") {
           throw new ConfigError(`${section}: "${key}" must be a non-empty value`);
@@ -147,7 +159,7 @@ function parseReadOnly(body: unknown): ReadOnlyRules {
   const rules: ReadOnlyRules = {};
   for (const [provider, list] of Object.entries(body)) {
     if (!isProvider(provider)) {
-      throw new ConfigError(`read_only: unknown provider "${provider}" (expected one of: ${PROVIDERS.join(", ")})`);
+      throw unknownName(`read_only: unknown provider "${provider}" (expected one of: ${PROVIDERS.join(", ")})`);
     }
     if (!Array.isArray(list)) throw new ConfigError(`read_only.${provider}: expected a list of commands`);
     rules[provider] = list.map((entry) => {

@@ -14,10 +14,57 @@ All notable changes to cloudpin are listed here. The format follows
 - `cloudpin mcp` (#15): a read-only MCP server (stdio) with `cloudpin_status` and `cloudpin_check`, for any agent that
   supports MCP. No new dependency.
 
+## [1.0.0] - 2026-10-15
+
+The first stable release: the `.cloudpin.yml` format is stable from here on (later versions only add sections and
+keys), and every agent hook except Gemini CLI's is tested inside the real agent.
+
 ### Fixed
 
+- Variables an agent sets earlier in its command line now count (#86). `export AWS_PROFILE=other; aws ...` and
+  PowerShell `$env:AWS_PROFILE = 'other'; aws ...` were checked against the default account and ran on another; and
+  `GH_TOKEN=$(cat other.token) gh ...` read the token as empty. cloudpin now follows `export`, `unset` and `$env:`
+  through the line, and stops a command whose account depends on a value only known when it runs, saying why. Found
+  in the threat-model review.
+- Cursor: a command on your Cursor allowlist runs again when the account matches (#2). cloudpin answered `ask`, which
+  stopped even allowlisted commands; it now answers `allow`, which Cursor treats exactly like having no hook (measured
+  in Cursor CLI 2026.10.01: commands not on the allowlist still need your approval). Wrong accounts are still blocked.
+
+### Added
+
+- Antigravity hooks (#80): `cloudpin install-hook antigravity` guards Antigravity CLI, the IDE and Antigravity 2.0
+  (`.agents/hooks.json`, or `~/.gemini/config/hooks.json` with `--user`). Google replaced Gemini CLI with Antigravity
+  CLI for free and consumer accounts on 2026-06-18. The hook checks `run_command` and text typed into a running
+  terminal; it asks rather than allows when nothing is wrong, so Antigravity's own approvals still apply.
+- The Copilot CLI and Antigravity CLI hooks are tested inside the real agents (#3): a wrong pin blocks the command, a
+  right one lets it run, and Antigravity's own approval still applies to commands you haven't allowed.
+
+## [0.4.2] - 2026-10-10
+
+A clearer first run: CLIs you don't have are called "not installed".
+
+### Fixed
+
+- `init`, `status`, `doctor` and the MCP `cloudpin_status` say "not installed" for a CLI that isn't (#75). `init` used
+  to print `az account show failed (exit 127)` or `spawn wrangler ENOENT`, and `status` and `doctor` told someone
+  without Vercel, kubectl or Supabase to log in to it.
+
+## [0.4.1] - 2026-10-09
+
+Shell wrappers that survive your aliases, a clear message for pin files from a newer cloudpin, and cleaner GitHub
+Releases.
+
+### Fixed
+
+- The bash and zsh wrappers no longer break on an existing alias of a guarded CLI (#69). Before, such an alias left
+  that CLI unguarded without a word, and in zsh every CLI after it too. An alias that calls the CLI itself is now
+  guarded; one that runs another program (`kubectl=kubecolor`) can't be, so each new shell warns about it, in
+  PowerShell as well.
 - GitHub Releases carry only the tarball, its signed bundle and `SHA256SUMS` (#65): v0.4.0 also got the repo's
   logo and demo SVGs, since removed by hand. The verify commands in the release notes now line up.
+- A `.cloudpin.yml` section or key that this cloudpin doesn't know is still refused, but the message now says the
+  file may need a newer cloudpin, with your version and the update command (#67). From 1.0 the format only adds
+  names, so this is what a teammate on an older version will see.
 
 ## [0.4.0] - 2026-10-09
 

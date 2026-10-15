@@ -1,5 +1,5 @@
 import type { ActiveEnvironment, FoundConfig } from "./config.js";
-import type { GuardDeps } from "./guard.js";
+import { type GuardDeps, installed } from "./guard.js";
 import type { Exec, Identity } from "./types.js";
 
 export type ProviderStatus =
@@ -46,6 +46,10 @@ export async function collectStatus(
   }
   const providers: ProviderStatus[] = [];
   for (const provider of deps.providers) {
+    if (!installed(provider, env, deps.onPath)) {
+      providers.push({ name: provider.name, state: "not-installed" });
+      continue;
+    }
     let missing = false;
     const base = deps.wrapExec ? deps.wrapExec(provider, env, deps.exec) : deps.exec;
     const exec: Exec = async (bin, args, e) => {

@@ -54,6 +54,26 @@ describe("collectStatus", () => {
       hooks: ["claude (personal)"],
     });
   });
+
+  it("says not installed, without resolving, when none of a CLI's commands is on PATH (#75)", async () => {
+    // A provider that never spawns (like vercel, kubernetes, supabase) would otherwise report "not logged in".
+    let resolved = 0;
+    const loggedOut = { ...provider("aws", { kind: "logged-out", hint: "aws login" }), resolve: async () => (resolved++, { kind: "logged-out", hint: "aws login" }) } as ProviderDef;
+    const seen: string[] = [];
+    const onPath = (bin: string, env: NodeJS.ProcessEnv) => (seen.push(`${bin}:${env.PATH}`), bin === "gh" ? "/usr/bin/gh" : null);
+    const status = await collectStatus(
+      { ...deps(null, [provider("github", { kind: "logged-out", hint: "gh auth login" }), loggedOut]), onPath },
+      "/repo",
+      { PATH: "/usr/bin" },
+      () => [],
+    );
+    expect(status.providers).toEqual([
+      { name: "github", state: "logged-out", hint: "gh auth login" },
+      { name: "aws", state: "not-installed" },
+    ]);
+    expect(resolved).toBe(0);
+    expect(seen).toEqual(["gh:/usr/bin", "aws:/usr/bin"]); // looked up on the PATH of the env it was given
+  });
 });
 
 describe("buildStatus", () => {

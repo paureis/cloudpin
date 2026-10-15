@@ -8,7 +8,9 @@ const REPO = "paureis/cloudpin";
 const month = process.argv[2] ?? new Date().toISOString().slice(0, 7);
 const MULTIPLIER = { ubuntu: 1, windows: 2, macos: 10 };
 
-const api = (path) => JSON.parse(execFileSync("gh", ["api", "--paginate", "--slurp", path], { encoding: "utf8" }));
+// A month of runs outgrew execFileSync's 1 MB default (ENOBUFS on 2026-10-09: 91 runs, 1.1 MB of JSON).
+const api = (path) =>
+  JSON.parse(execFileSync("gh", ["api", "--paginate", "--slurp", path], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }));
 
 const pages = api(`repos/${REPO}/actions/runs?per_page=100&created=${month}-01..${month}-31`);
 const runs = pages.flatMap((p) => p.workflow_runs);

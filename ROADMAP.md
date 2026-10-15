@@ -9,6 +9,8 @@ slips moves to the next version with the reason in its issue. Open an
 
 - **Claude Code plugin and MCP server** ([#15](https://github.com/paureis/cloudpin/issues/15)): one-click install,
   and read-only tools agents can call to check the account before acting.
+- **Threat model** ([#84](https://github.com/paureis/cloudpin/issues/84)): what cloudpin protects against, what it
+  trusts and what it doesn't try to stop, in [THREAT_MODEL.md](THREAT_MODEL.md).
 
 ## 1.2.0: GitHub Action (target 2026-10-30)
 

@@ -5,12 +5,13 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { cachedExec } from "./cache.js";
+import { checkExitCode, formatCheckText, runCheck } from "./check.js";
 import { doctorJson, formatDoctor, runDoctor } from "./doctor.js";
 import { explain, formatExplain } from "./explain.js";
 import { createHandler, serve } from "./mcp.js";
 import { cloudpinTools } from "./mcp-tools.js";
 import { confirmProtected } from "./confirm.js";
-import { CONFIG_FILE, ConfigError, findConfig, PROVIDERS } from "./config.js";
+import { CONFIG_FILE, ConfigError, findConfig } from "./config.js";
 import { realExec } from "./exec.js";
 import { formatBlock } from "./format.js";
 import { guard, type GuardDeps } from "./guard.js";
@@ -118,58 +119,10 @@ async function init(flags: string[]): Promise<number> {
 }
 
 async function check(): Promise<number> {
-  let config;
-  try {
-    config = findConfig(process.cwd());
-  } catch (err) {
-    if (err instanceof ConfigError) {
-      console.error(`cloudpin: invalid config: ${err.message}`);
-      return 1;
-    }
-    throw err;
-  }
-  if (!config) {
-    console.log("cloudpin: no .cloudpin.yml found here or in any parent folder; nothing is pinned.");
-    return 0;
-  }
-  console.log(`cloudpin: checking ${config.path}`);
-  if (config.environment) {
-    const { name, source } = config.environment;
-    console.log(`  environment: ${name}${config.environment.protected ? " (protected)" : ""}, chosen by ${source}`);
-  }
-  let ok = true;
-  for (const name of PROVIDERS) {
-    if (!config.pins[name]) continue;
-    const provider = providers.find((p) => p.name === name);
-    if (!provider) {
-      console.log(`  ? ${name}: pinned, but not supported by this version of cloudpin yet`);
-      ok = false;
-      continue;
-    }
-    // "agent" mode so CLOUDPIN_SKIP cannot make a check report success.
-    const verdict = await guard(
-      { bin: provider.bins[0]!, args: [], env: process.env, cwd: process.cwd(), mode: "agent" },
-      deps,
-    );
-    if (verdict.action === "allow" && verdict.reason === "not-installed") {
-      console.log(`  -  ${name}: ${provider.bins[0]} is not installed here, nothing to check`);
-    } else if (verdict.action === "allow" || verdict.action === "confirm") {
-      // "confirm" means the account matches on a protected environment.
-      console.log(`  ok ${name}: active account matches the pin`);
-    } else {
-      ok = false;
-      if (verdict.uncertain) {
-        console.log(`  x  ${name}: could not tell which account is active, so commands will be stopped`);
-        for (const problem of verdict.problems) console.log(`     - reason: ${problem}`);
-        if (verdict.fix) console.log(`     to see what is wrong: ${verdict.fix}`);
-      } else {
-        console.log(`  x  ${name}`);
-        for (const problem of verdict.problems) console.log(`     - ${problem}`);
-        if (verdict.fix) console.log(`     fix: ${verdict.fix}`);
-      }
-    }
-  }
-  return ok ? 0 : 1;
+  const report = await runCheck(process.cwd(), process.env, deps);
+  // An invalid pin file goes to stderr, as it always did.
+  for (const line of formatCheckText(report)) (report.error !== undefined ? console.error : console.log)(line);
+  return checkExitCode(report);
 }
 
 /** A file's text, or null if it can't be read. */

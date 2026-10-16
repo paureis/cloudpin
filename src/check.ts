@@ -19,6 +19,8 @@ export interface CheckReport {
   environment: { name: string; protected: boolean; source: string } | null;
   /** An invalid pin file, or a bad `--only` list. */
   error?: string;
+  /** The normalized `--only` list, set only in that strict mode. */
+  only?: string[];
   /** Pinned providers, in PROVIDERS order (only the listed ones with `only`). */
   providers: CheckEntry[];
 }
@@ -38,15 +40,17 @@ export async function runCheck(
   deps: GuardDeps,
   opts: { only?: string[] } = {},
 ): Promise<CheckReport> {
+  let only: string[] | undefined;
+  const strict = () => (only ? { only } : {});
   const fail = (error: string, config: FoundConfig | null = null): CheckReport => ({
     result: "error",
     path: config?.path ?? null,
     environment: environmentOf(config),
     error,
+    ...strict(),
     providers: [],
   });
 
-  let only: string[] | undefined;
   if (opts.only) {
     only = [...new Set(opts.only.map((name) => name.trim().toLowerCase()).filter((name) => name !== ""))];
     if (only.length === 0) return fail("--only names no provider");
@@ -118,7 +122,7 @@ export async function runCheck(
     : has("mismatch", "not-logged-in") || (only && has("not-installed"))
       ? "mismatch"
       : "match";
-  return { result, path: config.path, environment: environmentOf(config), providers };
+  return { result, path: config.path, environment: environmentOf(config), ...strict(), providers };
 }
 
 function environmentOf(config: FoundConfig | null): CheckReport["environment"] {
@@ -183,7 +187,8 @@ export function formatCheckText(report: CheckReport): string[] {
         lines.push(`  ? ${name}: ${problems[0] ?? NOT_SUPPORTED}`);
         break;
       case "not-installed":
-        lines.push(`  -  ${name}: ${problems[0]}, nothing to check`);
+        // With --only a listed CLI must be installed, so its absence is a failure.
+        lines.push(report.only ? `  x  ${name}: ${problems[0]}` : `  -  ${name}: ${problems[0]}, nothing to check`);
         break;
       case "match":
         lines.push(`  ok ${name}: active account matches the pin`);

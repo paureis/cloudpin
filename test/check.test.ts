@@ -243,6 +243,15 @@ describe("formatCheckText", () => {
     ]);
   });
 
+  it("with only, prints a missing CLI as a failure, not as nothing to check", async () => {
+    const d = deps(githubPinned, [provider("github", as("me"))], () => null);
+    const report = await runCheck("/repo", {}, d, { only: [" GitHub "] });
+    expect(report.only).toEqual(["github"]);
+    const lines = formatCheckText(report);
+    expect(lines).toContain("  x  github: gh is not installed here");
+    expect(lines.some((line) => line.includes("nothing to check"))).toBe(false);
+  });
+
   it("prints the environment, can't-tell, not logged in and unsupported as before", () => {
     const report: CheckReport = {
       result: "error",

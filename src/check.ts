@@ -127,6 +127,41 @@ function environmentOf(config: FoundConfig | null): CheckReport["environment"] {
   return { name, protected: isProtected, source };
 }
 
+/**
+ * `check`'s flags: `--json`, and `--only a,b` or `--only=a,b` (repeatable; the
+ * lists add up). Names are split on commas only; runCheck trims and lowercases
+ * them. A `--only` with no name in it is an error: an empty CI input must
+ * never mean "check nothing and pass".
+ */
+export function parseCheckArgs(args: string[]): { json: boolean; only?: string[] } | { error: string } {
+  let json = false;
+  let only: string[] | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    let value: string | undefined;
+    if (arg === "--json") {
+      json = true;
+      continue;
+    } else if (arg === "--only") {
+      const next = args[i + 1];
+      if (next !== undefined && !next.startsWith("-")) {
+        value = next;
+        i++;
+      }
+    } else if (arg.startsWith("--only=")) {
+      value = arg.slice("--only=".length);
+    } else {
+      return { error: `unknown argument "${arg}"` };
+    }
+    const names = (value ?? "").split(",");
+    if (names.every((name) => name.trim() === "")) {
+      return { error: "--only needs a comma-separated list of providers, e.g. --only azure,aws" };
+    }
+    only = [...(only ?? []), ...names];
+  }
+  return only ? { json, only } : { json };
+}
+
 /** 0 when everything pinned matches (or nothing is pinned), 1 otherwise. */
 export const checkExitCode = (r: CheckReport): 0 | 1 => (r.result === "match" || r.result === "unpinned" ? 0 : 1);
 

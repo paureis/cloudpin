@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { cachedExec } from "./cache.js";
-import { checkExitCode, formatCheckText, runCheck } from "./check.js";
+import { checkExitCode, formatCheckText, parseCheckArgs, runCheck } from "./check.js";
 import { doctorJson, formatDoctor, runDoctor } from "./doctor.js";
 import { explain, formatExplain } from "./explain.js";
 import { createHandler, serve } from "./mcp.js";
@@ -35,7 +35,10 @@ Usage:
   cloudpin init [--env <name> [--protected]] [--yes] [--force]
                               Pin the accounts you are logged into now, in ./.cloudpin.yml
                               (--env adds them as one environment of the file)
-  cloudpin check              Check every CLI pinned in the nearest .cloudpin.yml
+  cloudpin check [--only <clouds>] [--json]
+                              Check every CLI pinned in the nearest .cloudpin.yml
+                              (--only azure,aws: just these, each must be installed and logged in;
+                              --json: the result as JSON, for CI)
   cloudpin status [--json]    Show each CLI's active account, the pins here, and installed hooks
   cloudpin explain [--json] [--agent] -- <cmd...>
                               What cloudpin would decide for a command, and why, without running it
@@ -118,8 +121,20 @@ async function init(flags: string[]): Promise<number> {
   return 0;
 }
 
-async function check(): Promise<number> {
-  const report = await runCheck(process.cwd(), process.env, deps);
+const CHECK_USAGE = "usage: cloudpin check [--only <clouds>] [--json]";
+
+async function check(args: string[]): Promise<number> {
+  const parsed = parseCheckArgs(args);
+  if ("error" in parsed) {
+    console.error(`cloudpin check: ${parsed.error}\n${CHECK_USAGE}`);
+    return 1;
+  }
+  const report = await runCheck(process.cwd(), process.env, deps, parsed.only ? { only: parsed.only } : {});
+  if (parsed.json) {
+    // stdout carries the JSON and nothing else.
+    console.log(JSON.stringify(report, null, 2));
+    return checkExitCode(report);
+  }
   // An invalid pin file goes to stderr, as it always did.
   for (const line of formatCheckText(report)) (report.error !== undefined ? console.error : console.log)(line);
   return checkExitCode(report);
@@ -318,7 +333,7 @@ export async function main(argv: string[]): Promise<number> {
     case "init":
       return init(rest);
     case "check":
-      return check();
+      return check(rest);
     case "use": {
       const result = useCommand(rest, process.cwd(), process.env);
       for (const line of result.lines) (result.code === 0 ? console.log : console.error)(line);

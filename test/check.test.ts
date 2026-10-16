@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkExitCode, formatCheckText, runCheck, type CheckReport } from "../src/check.js";
+import { checkExitCode, formatCheckText, parseCheckArgs, runCheck, type CheckReport } from "../src/check.js";
 import { ConfigError, type FoundConfig } from "../src/config.js";
 import type { GuardDeps } from "../src/guard.js";
 import type { Exec, ProviderDef, Resolution } from "../src/types.js";
@@ -279,5 +279,35 @@ describe("formatCheckText", () => {
       }, []),
     );
     expect(formatCheckText(invalid)).toEqual(["cloudpin: invalid config: /repo/.cloudpin.yml: bad"]);
+  });
+});
+
+describe("parseCheckArgs", () => {
+  it.each([
+    [[], { json: false }],
+    [["--json"], { json: true }],
+    // Split on commas only: runCheck trims and lowercases.
+    [["--only", "azure, aws"], { json: false, only: ["azure", " aws"] }],
+    [["--only=azure,aws", "--json"], { json: true, only: ["azure", "aws"] }],
+    [["--json", "--only", "Azure"], { json: true, only: ["Azure"] }],
+    // Repeated --only adds to the list: stricter, never laxer.
+    [["--only", "azure", "--only=aws"], { json: false, only: ["azure", "aws"] }],
+  ])("accepts %j", (args, expected) => {
+    expect(parseCheckArgs(args)).toEqual(expected);
+  });
+
+  it.each([[["--only"]], [["--only", ""]], [["--only", " , "]], [["--only="]], [["--only", ","]], [["--only", "--json"]]])(
+    "refuses %j: --only needs at least one name (an empty workflow input must not check nothing)",
+    (args) => {
+      const parsed = parseCheckArgs(args);
+      expect(parsed).toHaveProperty("error");
+      expect((parsed as { error: string }).error).toMatch(/--only/);
+    },
+  );
+
+  it.each([[["--frob"]], [["aws"]], [["--json", "--frob"]]])("refuses anything else: %j", (args) => {
+    const parsed = parseCheckArgs(args);
+    expect(parsed).toHaveProperty("error");
+    expect((parsed as { error: string }).error).toContain(args[args.length - 1]!);
   });
 });

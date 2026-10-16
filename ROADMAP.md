@@ -8,6 +8,8 @@ slips moves to the next version with the reason in its issue. Open an
 ## 1.2.0: GitHub Action (target 2026-10-30)
 
 - **GitHub Action** ([#10](https://github.com/paureis/cloudpin/issues/10)): `cloudpin check` before deploy jobs.
+- **Threat model** ([#84](https://github.com/paureis/cloudpin/issues/84)): what cloudpin protects against and what it
+  doesn't, in THREAT_MODEL.md.
 
 ## 1.3.0: installers (target 2026-11-06)
 

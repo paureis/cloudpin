@@ -172,7 +172,8 @@ export function installMethod(
     const prefix = dir.endsWith(path.sep) ? dir : dir + path.sep;
     return p.startsWith(prefix) ? p.slice(prefix.length).split(path.sep).join("/") : null;
   };
-  const [run, real = run] = forms(script).map(norm);
+  const run = norm(script);
+  const real = norm(forms(script).at(-1) ?? script);
   // A launcher found on the path as run is the layout's when it is a file (or can't be followed), or a link to the
   // layout's own shim; any other link leads somewhere else, and that place decides (an npm bin in a folder that is
   // also PNPM_HOME is npm's).

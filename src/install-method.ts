@@ -33,8 +33,14 @@ interface Layout {
   /** Global folders laid out like a project, with cloudpin's package at a path below that `pkg` matches. */
   globals?: (string | undefined)[];
   pkg?: RegExp;
-  /** Folders of launchers (links, scripts, exes): a `cloudpin` launcher directly inside counts. */
+  /**
+   * Folders of launchers (links, scripts, exes): a `cloudpin` launcher directly inside counts when it is a file.
+   * When it is a link, its target decides instead, unless the target is one of `shims` (a file name) or inside
+   * one of `shimDirs`: another folder of the same install's own.
+   */
   bins?: (string | undefined)[];
+  shims?: string[];
+  shimDirs?: (string | undefined)[];
 }
 
 // `cloudpin` with the extensions launchers get on Windows: Scoop's shims (.cmd, .ps1, .exe), pnpm's (.cmd, .ps1),
@@ -72,7 +78,13 @@ function layouts(
   // in <home>/tools/image/packages/<name>/ (crates/volta-layout/src/v4.rs). Its shims are in <home>/bin: links to
   // volta-shim on macOS and Linux, a `volta run` .cmd plus a bash script on Windows (crates/volta-core/src/shim.rs).
   const volta = [get("VOLTA_HOME"), windows ? under(localAppData, "Volta") : under(home, ".volta")];
-  os.push({ method: "volta", apps: volta.map((v) => under(v, "tools", "image", "packages", "cloudpin")), bins: volta.map((v) => under(v, "bin")) });
+  // volta-shim sits wherever Volta itself was installed, so only its name counts.
+  os.push({
+    method: "volta",
+    apps: volta.map((v) => under(v, "tools", "image", "packages", "cloudpin")),
+    bins: volta.map((v) => under(v, "bin")),
+    shims: ["volta-shim", "volta-shim.exe"],
+  });
 
   // pnpm's home is PNPM_HOME, else $XDG_DATA_HOME/pnpm, else ~/Library/pnpm, ~/.local/share/pnpm or
   // %LOCALAPPDATA%\pnpm (getDataDir, pnpm11/config/reader/src/dirs.ts in github.com/pnpm/pnpm; pnpm.io/npmrc).
@@ -91,6 +103,8 @@ function layouts(
     globals: pnpm.map((p) => under(p, "global")),
     pkg: PNPM_PKG,
     bins: [...pnpm, ...pnpm.map((p) => under(p, "bin"))],
+    // preferSymlinkedExecutables: a bin that is a link into the global virtual store.
+    shimDirs: pnpm.map((p) => under(p, "store", "v11", "links")),
   });
 
   // Yarn classic (github.com/yarnpkg/yarn, frozen at 1.22): `yarn global dir` is <data>/global, data being
@@ -155,17 +169,24 @@ export function installMethod(
     const prefix = dir.endsWith(path.sep) ? dir : dir + path.sep;
     return p.startsWith(prefix) ? p.slice(prefix.length).split(path.sep).join("/") : null;
   };
-  const matches = (p: string, layout: Layout): boolean =>
+  const [run, real = run] = forms(script).map(norm);
+  // A launcher found on the path as run is the layout's when it is a file (or can't be followed), or a link to the
+  // layout's own shim; any other link leads somewhere else, and that place decides (an npm bin in a folder that is
+  // also PNPM_HOME is npm's).
+  const ownLauncher = (layout: Layout): boolean =>
+    run === real || (layout.shims ?? []).includes(path.basename(real)) || dirs(layout.shimDirs).some((dir) => below(real, dir) !== null);
+  const matches = (p: string, layout: Layout, launchers: boolean): boolean =>
     dirs(layout.apps).some((dir) => below(p, dir) !== null) ||
     dirs(layout.globals).some((dir) => layout.pkg!.test(below(p, dir) ?? "")) ||
-    dirs(layout.bins).some((dir) => {
-      const rest = below(p, dir);
-      return rest !== null && LAUNCHER.test(rest);
-    });
+    (launchers &&
+      dirs(layout.bins).some((dir) => {
+        const rest = below(p, dir);
+        return rest !== null && LAUNCHER.test(rest);
+      }));
   const all = layouts(platform, get, path.join);
   // Where the code really is first; then the path as run, which is all a shim or a link to a shim gives.
-  for (const p of forms(script).reverse().map(norm)) {
-    const found = all.find((layout) => matches(p, layout));
+  for (const [p, asRun] of [[real, false], [run, true]] as const) {
+    const found = all.find((layout) => matches(p, layout, !asRun || ownLauncher(layout)));
     if (found) return found.method;
   }
   return "npm";

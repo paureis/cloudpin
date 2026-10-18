@@ -194,6 +194,14 @@ describe("installMethod: package-manager lookalikes stay npm", () => {
     expect(win("C:\\Users\\me\\scoop\\apps\\cloudpin\\current\\dist\\cli.js", { ...WIN_PM_ENV, PNPM_HOME: "C:\\Users\\me\\scoop\\persist\\pnpm" })).toBe("scoop");
   });
 
+  it("is npm for an npm launcher in a folder that is also pnpm's home, when its link leads outside every layout", () => {
+    const env = { ...LINUX_ENV, PNPM_HOME: "/home/me/.local/bin" };
+    const realpath = follows({ "/home/me/.local/bin/cloudpin": "/home/me/.local/lib/node_modules/cloudpin/dist/cli.js" });
+    expect(linux("/home/me/.local/bin/cloudpin", env, realpath)).toBe("npm");
+    // Control: a pnpm script there (a file, not a link) is still pnpm's.
+    expect(linux("/home/me/.local/bin/cloudpin", env)).toBe("pnpm");
+  });
+
   it("is pnpm, not Scoop, for a pnpm global when pnpm's home is in Scoop's persist folder", () => {
     const env = { ...WIN_PM_ENV, PNPM_HOME: "C:\\Users\\me\\scoop\\persist\\pnpm" };
     expect(win("C:\\Users\\me\\scoop\\persist\\pnpm\\global\\v11\\abc\\node_modules\\cloudpin\\dist\\cli.js", env)).toBe("pnpm");
@@ -253,6 +261,12 @@ describe("installMethod: Volta", () => {
     expect(linux("/home/me/.volta/bin/cloudpin", LINUX_ENV, realpath)).toBe("volta");
     expect(win("C:\\Users\\me\\AppData\\Local\\Volta\\bin\\cloudpin.cmd", WIN_PM_ENV)).toBe("volta");
     expect(win("C:\\Users\\me\\AppData\\Local\\Volta\\bin\\cloudpin", WIN_PM_ENV)).toBe("volta");
+    // A Volta installed elsewhere (a package manager's volta) links to its own volta-shim, wherever that is.
+    const elsewhere = follows({ "/home/me/.volta/bin/cloudpin": "/home/linuxbrew/.linuxbrew/Cellar/volta/2.0.2/bin/volta-shim" });
+    expect(linux("/home/me/.volta/bin/cloudpin", LINUX_ENV, elsewhere)).toBe("volta");
+    // Control: a link in Volta's bin folder to something that is not Volta's shim is not Volta's.
+    const other = follows({ "/home/me/.volta/bin/cloudpin": "/home/me/.local/lib/node_modules/cloudpin/dist/cli.js" });
+    expect(linux("/home/me/.volta/bin/cloudpin", LINUX_ENV, other)).toBe("npm");
   });
 });
 

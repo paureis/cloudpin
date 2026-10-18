@@ -202,6 +202,7 @@ async function doctor(flags: string[]): Promise<number> {
     version: version(),
     self: process.argv[1] ?? "",
     install: installedWith(),
+    realpath: (p: string) => realpathSync(p),
     node: process.versions.node,
     read: readOrNull,
     writable,

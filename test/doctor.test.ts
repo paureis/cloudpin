@@ -46,6 +46,7 @@ interface Setup {
   platform?: NodeJS.Platform;
   latest?: string | null;
   install?: InstallMethod;
+  realpath?: (path: string) => string;
 }
 
 function deps(s: Setup = {}): DoctorDeps {
@@ -72,6 +73,7 @@ function deps(s: Setup = {}): DoctorDeps {
     node: s.node ?? "22.17.0",
     self: "/usr/lib/node_modules/cloudpin/dist/cli.js",
     install: s.install ?? "npm",
+    realpath: s.realpath ?? ((path) => path),
     read: (path) => files[path] ?? null,
     writable: () => s.writable ?? true,
     onPath: () => (s.onPath === undefined ? "/usr/bin/cloudpin" : s.onPath),
@@ -114,23 +116,45 @@ describe("runDoctor: cloudpin itself", () => {
     expect(path.fix).toBe("npm install --global cloudpin");
   });
 
-  it("names the fixes for how this cloudpin was installed", async () => {
-    const fixes = async (install: InstallMethod) => ({
-      missing: one(await runDoctor(deps({ onPath: null, install })), "path").fix,
-      other: one(await runDoctor(deps({ pathVersion: "0.2.1", install })), "path").fix,
-      silent: one(await runDoctor(deps({ pathVersion: "", install })), "path").fix,
-    });
-    expect(await fixes("npm")).toEqual({
-      missing: "npm install --global cloudpin",
-      other: "npm install --global cloudpin",
-      silent: "npm install --global cloudpin",
-    });
-    const brew = await fixes("brew");
-    expect(brew.missing).toMatch(/^brew link cloudpin/);
-    expect(brew).toMatchObject({ other: "brew upgrade cloudpin", silent: "brew reinstall cloudpin" });
-    const scoop = await fixes("scoop");
-    expect(scoop.missing).toMatch(/^scoop reset cloudpin/);
-    expect(scoop).toMatchObject({ other: "scoop update cloudpin", silent: "scoop uninstall cloudpin, then scoop install cloudpin" });
+  it("with no cloudpin on PATH, names the fix for how this one was installed", async () => {
+    const missing = async (install: InstallMethod) => one(await runDoctor(deps({ onPath: null, install })), "path").fix;
+    expect(await missing("npm")).toBe("npm install --global cloudpin");
+    expect(await missing("brew")).toMatch(/^brew link cloudpin/);
+    expect(await missing("scoop")).toMatch(/^scoop reset cloudpin/);
+  });
+
+  // The fix is for the cloudpin on PATH, so it names how that one was installed, not this one.
+  const BREW_LINK = "/opt/homebrew/bin/cloudpin";
+  const BREW_KEG = "/opt/homebrew/Cellar/cloudpin/0.2.1/libexec/lib/node_modules/cloudpin/dist/cli.js";
+  const brewLink = (path: string) => (path === BREW_LINK ? BREW_KEG : path);
+
+  it("names brew's commands for a brew cloudpin on PATH when this one came from npm (npx cloudpin@latest doctor)", async () => {
+    const at = (pathVersion: string) => deps({ install: "npm", onPath: BREW_LINK, realpath: brewLink, pathVersion, platform: "darwin" });
+    expect(one(await runDoctor(at("0.2.1")), "path").fix).toBe("brew upgrade cloudpin");
+    expect(one(await runDoctor(at("")), "path").fix).toBe("brew reinstall cloudpin");
+    // Control: the update check is about this cloudpin, so it keeps this one's command.
+    const update = one(await runDoctor({ ...at("0.2.1"), latest: async () => "0.4.0" }), "update");
+    expect(update.fix).toBe("npm install --global cloudpin");
+  });
+
+  it("names npm's commands for an npm cloudpin on PATH when this one came from brew", async () => {
+    const at = (pathVersion: string) =>
+      deps({ install: "brew", onPath: "/usr/local/bin/cloudpin", realpath: brewLink, pathVersion, platform: "darwin" });
+    expect(one(await runDoctor(at("0.2.1")), "path").fix).toBe("npm install --global cloudpin");
+    expect(one(await runDoctor(at("")), "path").fix).toBe("npm install --global cloudpin");
+  });
+
+  it("names Scoop's commands for a Scoop shim on PATH", async () => {
+    const at = (pathVersion: string) =>
+      deps({
+        install: "npm",
+        onPath: "C:\\Users\\me\\scoop\\shims\\cloudpin.cmd",
+        env: { USERPROFILE: "C:\\Users\\me" },
+        pathVersion,
+        platform: "win32",
+      });
+    expect(one(await runDoctor(at("0.2.1")), "path").fix).toBe("scoop update cloudpin");
+    expect(one(await runDoctor(at("")), "path").fix).toBe("scoop uninstall cloudpin, then scoop install cloudpin");
   });
 
   it("keeps the fix text in --json", async () => {

@@ -86,6 +86,18 @@ describe("installMethod: Scoop", () => {
     expect(win("C:\\Users\\me\\scoop\\apps\\cloudpin-nightly\\current\\dist\\cli.js", WIN_ENV)).toBe("npm");
   });
 
+  it("is scoop for cloudpin's shims, which are files in <root>\\shims, not links (doctor classifies the one on PATH)", () => {
+    for (const shim of ["cloudpin.cmd", "cloudpin", "cloudpin.ps1", "cloudpin.exe", "CloudPin.CMD"]) {
+      expect(win(`C:\\Users\\me\\scoop\\shims\\${shim}`, WIN_ENV), shim).toBe("scoop");
+    }
+    expect(win("D:\\s\\shims\\cloudpin.cmd", { SCOOP: "D:\\s" })).toBe("scoop");
+    // Controls: another app's shim, a cloudpin outside shims, and a nested folder.
+    expect(win("C:\\Users\\me\\scoop\\shims\\node.cmd", WIN_ENV)).toBe("npm");
+    expect(win("C:\\Users\\me\\scoop\\shims\\cloudpin-nightly.cmd", WIN_ENV)).toBe("npm");
+    expect(win("C:\\Users\\me\\AppData\\Roaming\\npm\\cloudpin.cmd", WIN_ENV)).toBe("npm");
+    expect(win("C:\\Users\\me\\scoop\\shims\\x\\cloudpin.cmd", WIN_ENV)).toBe("npm");
+  });
+
   it("stays npm for a plain npm global install and never says scoop off Windows", () => {
     expect(win("C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\cloudpin\\dist\\cli.js", WIN_ENV)).toBe("npm");
     expect(linux("/home/me/scoop/apps/cloudpin/current/dist/cli.js", { SCOOP: "/home/me/scoop" })).toBe("npm");

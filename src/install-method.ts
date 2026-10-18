@@ -60,7 +60,12 @@ export function installMethod(
     const path = norm(real);
     // The app folder as written and as realpath reports it: ~\scoop can be a junction to another drive.
     const apps = roots.flatMap((root) => forms(win32.join(root, "apps", "cloudpin")));
-    return apps.some((dir) => inside(path, norm(dir), "\\")) ? "scoop" : "npm";
+    if (apps.some((dir) => inside(path, norm(dir), "\\"))) return "scoop";
+    // Scoop's shims are files, not links: `shim` in Scoop's lib/core.ps1 writes <root>\shims\cloudpin
+    // plus .cmd (a .cmd target), .ps1 or .exe. That is the path PATH finds, which doctor classifies.
+    const shims = roots.flatMap((root) => forms(win32.join(root, "shims"))).map(norm);
+    const isShim = /^cloudpin(\.(cmd|ps1|exe))?$/.test(win32.basename(path)) && shims.includes(win32.dirname(path));
+    return isShim ? "scoop" : "npm";
   }
   const cellars = [env.HOMEBREW_CELLAR, ...DEFAULT_CELLARS].filter((c): c is string => Boolean(c));
   const path = posix.normalize(real);

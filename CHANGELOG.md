@@ -32,7 +32,9 @@ All notable changes to cloudpin are listed here. The format follows
   `brew upgrade cloudpin`, `scoop update cloudpin`, `pnpm add --global cloudpin`, `volta install cloudpin`,
   `yarn global add cloudpin` (Yarn classic) or `bun add --global cloudpin@latest`, otherwise
   `npm install --global cloudpin` as before; so does the error for a `.cloudpin.yml` written for a newer cloudpin.
-  A global folder moved in a package manager's config file, rather than its environment variable, still reads as npm.
+  Global folders are found at each package manager's defaults and where its folder variables move them
+  (`PNPM_HOME`, `PNPM_CONFIG_GLOBAL_DIR`, `VOLTA_HOME`, `BUN_INSTALL` and the like); one moved any other way, such
+  as in a config file, still reads as npm.
 
 ## [1.1.0] - 2026-10-16
 

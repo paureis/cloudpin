@@ -16,9 +16,9 @@ import { posix, win32 } from "node:path";
  * including `npm install --global` with Homebrew's node or Scoop's nodejs-lts,
  * a project's own node_modules and npx's cache, is npm.
  *
- * Only each tool's environment variables and defaults are read, not its config
- * files: a global folder moved in .npmrc, pnpm's config.yaml, .yarnrc or
- * bunfig.toml reads as npm, the advice cloudpin gave before.
+ * Only the environment variables cited below and each tool's defaults are read,
+ * not config files: a global folder moved in .npmrc, pnpm's config.yaml,
+ * .yarnrc or bunfig.toml reads as npm, the advice cloudpin gave before.
  */
 
 export type InstallMethod = "npm" | "brew" | "scoop" | "pnpm" | "volta" | "yarn" | "bun";
@@ -98,9 +98,12 @@ function layouts(
     under(get("XDG_DATA_HOME"), "pnpm"),
     windows ? under(localAppData, "pnpm") : platform === "darwin" ? under(home, "Library", "pnpm") : under(home, ".local", "share", "pnpm"),
   ];
+  // PNPM_CONFIG_GLOBAL_DIR or pnpm_config_global_dir (prefix and name in one case: getEnvKeySuffix,
+  // config/reader/src/env.ts) sets globalDir, which replaces <home>/global (applyGlobalDirEnvVars in
+  // getConfig/envVars.ts; resolveGlobalDirs joins the layout version onto it).
   os.push({
     method: "pnpm",
-    globals: pnpm.map((p) => under(p, "global")),
+    globals: [get("PNPM_CONFIG_GLOBAL_DIR"), get("pnpm_config_global_dir"), ...pnpm.map((p) => under(p, "global"))],
     pkg: PNPM_PKG,
     bins: [...pnpm, ...pnpm.map((p) => under(p, "bin"))],
     // preferSymlinkedExecutables: a bin that is a link into the global virtual store.

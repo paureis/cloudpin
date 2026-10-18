@@ -227,6 +227,17 @@ describe("installMethod: pnpm", () => {
     expect(win("D:\\pnpm\\global\\v11\\abc\\node_modules\\cloudpin\\dist\\cli.js", { ...WIN_PM_ENV, pnpm_home: "D:\\pnpm" })).toBe("pnpm");
   });
 
+  it("honours PNPM_CONFIG_GLOBAL_DIR (or pnpm_config_global_dir), which replaces <home>/global", () => {
+    const v11 = "/srv/pnpm-global/v11/abc/node_modules/cloudpin/dist/cli.js";
+    const v10 = "/srv/pnpm-global/5/.pnpm/cloudpin@1.2.0/node_modules/cloudpin/dist/cli.js";
+    expect(linux(v11, LINUX_ENV)).toBe("npm");
+    expect(linux(v11, { ...LINUX_ENV, PNPM_CONFIG_GLOBAL_DIR: "/srv/pnpm-global" })).toBe("pnpm");
+    expect(linux(v10, { ...LINUX_ENV, pnpm_config_global_dir: "/srv/pnpm-global" })).toBe("pnpm");
+    expect(win("D:\\pg\\v11\\abc\\node_modules\\cloudpin\\dist\\cli.js", { ...WIN_PM_ENV, PNPM_CONFIG_GLOBAL_DIR: "D:\\pg" })).toBe("pnpm");
+    // Control: the folder itself is not <home>/global, so nothing below a `global` subfolder of it counts.
+    expect(linux("/srv/pnpm-global/global/v11/abc/node_modules/cloudpin/dist/cli.js", { ...LINUX_ENV, PNPM_CONFIG_GLOBAL_DIR: "/srv/pnpm-global" })).toBe("npm");
+  });
+
   it("is pnpm through the global virtual store, where only the path as run is in the global folder (pnpm 11+)", () => {
     const script = "/home/me/.local/share/pnpm/global/v11/0d9f/node_modules/cloudpin/dist/cli.js";
     const realpath = follows({ [script]: "/home/me/.local/share/pnpm/store/v11/links/@/cloudpin/1.2.0/abc/node_modules/cloudpin/dist/cli.js" });

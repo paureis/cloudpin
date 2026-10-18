@@ -23,7 +23,7 @@ pnpm add --global cloudpin
 ```
 
 On macOS and Linux, Homebrew works too, from [paureis/homebrew-tap](https://github.com/paureis/homebrew-tap) (it
-installs Node.js if you don't have it):
+runs on Homebrew's own Node.js, installed if it isn't there yet):
 
 ```sh
 brew install paureis/tap/cloudpin

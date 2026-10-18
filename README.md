@@ -29,6 +29,15 @@ runs on Homebrew's own Node.js, installed if it isn't there yet):
 brew install paureis/tap/cloudpin
 ```
 
+On Windows, from 1.2.0, Scoop works too, from [paureis/scoop-bucket](https://github.com/paureis/scoop-bucket). It
+installs Scoop's own Node.js (`nodejs-lts`) if it isn't there yet, and cloudpin always runs on that one. A global
+install (`scoop install -g`) needs `nodejs-lts` installed globally too.
+
+```powershell
+scoop bucket add paureis https://github.com/paureis/scoop-bucket
+scoop install paureis/cloudpin
+```
+
 <details>
 <summary>npm, Yarn, Bun, or no install</summary>
 

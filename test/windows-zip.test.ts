@@ -42,12 +42,19 @@ function tgz(entries: TarEntry[]): Buffer {
   return gzipSync(Buffer.concat(blocks));
 }
 
-/** A pax extended header holding one `path` record. */
-function pax(path: string): TarEntry {
-  const body = ` path=${path}\n`;
-  let len = body.length + 1;
-  while (String(len).length + body.length !== len) len = String(len).length + body.length;
-  return { name: "PaxHeader", type: "x", data: `${len}${body}` };
+/** One pax record, "<len> key=value\n", where len counts the record's UTF-8 bytes. */
+function paxRecord(key: string, value: string): string {
+  const body = ` ${key}=${value}\n`;
+  const bytes = enc(body).length;
+  let len = bytes + 1;
+  while (String(len).length + bytes !== len) len = String(len).length + bytes;
+  return `${len}${body}`;
+}
+
+/** A pax extended header holding a `path` record, after any `before` records. */
+function pax(path: string, before: [string, string][] = []): TarEntry {
+  const records = [...before, ["path", path] as [string, string]].map(([k, v]) => paxRecord(k, v));
+  return { name: "PaxHeader", type: "x", data: records.join("") };
 }
 
 /** The entries of a zip, read from its central directory, inflated and crc-checked. */
@@ -135,6 +142,19 @@ describe("readTarGz", () => {
       ]),
     );
     expect(files.map((f) => f.path)).toEqual([long, "package/gnu/long.js", "package/deep/file.js"]);
+  });
+
+  it("reads a pax path that is not ASCII, whose record length counts bytes", () => {
+    const files = readTarGz(
+      tgz([
+        pax("package/dist/ü.js"),
+        { name: "package/dist/u.js", data: "1" },
+        // A non-ASCII record before the path: its byte length must not shift the next one.
+        pax("package/dist/€.js", [["uname", "jürgen"]]),
+        { name: "package/dist/e.js", data: "2" },
+      ]),
+    );
+    expect(files.map((f) => f.path)).toEqual(["package/dist/ü.js", "package/dist/€.js"]);
   });
 
   it("refuses links and a corrupt header", () => {

@@ -31,17 +31,21 @@ function field(block, start, length) {
   return new TextDecoder().decode(end === -1 ? bytes : bytes.subarray(0, end));
 }
 
-/** The `path` record of a pax extended header ("<len> path=<value>\n" records), if any. */
+/**
+ * The `path` record of a pax extended header ("<len> path=<value>\n" records), if any.
+ * Each <len> counts the record's bytes, so the records are split on the bytes and
+ * only the value is decoded as UTF-8 (POSIX pax, "pax Extended Header").
+ */
 function paxPath(data) {
-  const text = new TextDecoder().decode(data);
+  const bytes = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   let i = 0;
-  while (i < text.length) {
-    const space = text.indexOf(" ", i);
+  while (i < bytes.length) {
+    const space = bytes.indexOf(0x20, i);
     if (space === -1) break;
-    const len = Number(text.slice(i, space));
+    const len = Number(bytes.subarray(i, space).toString("latin1"));
     if (!Number.isInteger(len) || len <= 0) throw new Error("tarball: a pax header record has no valid length");
-    const record = text.slice(space + 1, i + len - 1);
-    if (record.startsWith("path=")) return record.slice(5);
+    const record = bytes.subarray(space + 1, i + len - 1);
+    if (record.subarray(0, 5).toString("latin1") === "path=") return new TextDecoder().decode(record.subarray(5));
     i += len;
   }
   return undefined;

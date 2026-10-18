@@ -22,6 +22,13 @@ which account is active. cloudpin checks before the command runs.
 pnpm add --global cloudpin
 ```
 
+On macOS and Linux, Homebrew works too, from [paureis/homebrew-tap](https://github.com/paureis/homebrew-tap) (it
+installs Node.js if you don't have it):
+
+```sh
+brew install paureis/tap/cloudpin
+```
+
 <details>
 <summary>npm, Yarn, Bun, or no install</summary>
 

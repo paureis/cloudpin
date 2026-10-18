@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { FoundConfig } from "../src/config.js";
 import { doctorJson, formatDoctor, runDoctor, type Check, type DoctorDeps } from "../src/doctor.js";
 import { planInstall } from "../src/install.js";
+import type { InstallMethod } from "../src/install-method.js";
 import { findOnPath } from "../src/paths.js";
 import type { Exec, ProviderDef, Resolution } from "../src/types.js";
 
@@ -44,6 +45,7 @@ interface Setup {
   writable?: boolean;
   platform?: NodeJS.Platform;
   latest?: string | null;
+  install?: InstallMethod;
 }
 
 function deps(s: Setup = {}): DoctorDeps {
@@ -69,6 +71,7 @@ function deps(s: Setup = {}): DoctorDeps {
     version: "0.3.0",
     node: s.node ?? "22.17.0",
     self: "/usr/lib/node_modules/cloudpin/dist/cli.js",
+    install: s.install ?? "npm",
     read: (path) => files[path] ?? null,
     writable: () => s.writable ?? true,
     onPath: () => (s.onPath === undefined ? "/usr/bin/cloudpin" : s.onPath),
@@ -108,6 +111,32 @@ describe("runDoctor: cloudpin itself", () => {
     const path = one(await runDoctor(deps({ pathVersion: "0.2.1" })), "path");
     expect(path.level).toBe("warn");
     expect(path.title).toContain("0.2.1");
+    expect(path.fix).toBe("npm install --global cloudpin");
+  });
+
+  it("names the fixes for how this cloudpin was installed", async () => {
+    const fixes = async (install: InstallMethod) => ({
+      missing: one(await runDoctor(deps({ onPath: null, install })), "path").fix,
+      other: one(await runDoctor(deps({ pathVersion: "0.2.1", install })), "path").fix,
+      silent: one(await runDoctor(deps({ pathVersion: "", install })), "path").fix,
+    });
+    expect(await fixes("npm")).toEqual({
+      missing: "npm install --global cloudpin",
+      other: "npm install --global cloudpin",
+      silent: "npm install --global cloudpin",
+    });
+    const brew = await fixes("brew");
+    expect(brew.missing).toMatch(/^brew link cloudpin/);
+    expect(brew).toMatchObject({ other: "brew upgrade cloudpin", silent: "brew reinstall cloudpin" });
+    const scoop = await fixes("scoop");
+    expect(scoop.missing).toMatch(/^scoop reset cloudpin/);
+    expect(scoop).toMatchObject({ other: "scoop update cloudpin", silent: "scoop uninstall cloudpin, then scoop install cloudpin" });
+  });
+
+  it("keeps the fix text in --json", async () => {
+    const d = deps({ latest: "0.4.0", install: "brew" });
+    const json = doctorJson(await runDoctor(d), d);
+    expect(json.checks.find((c) => c.id === "update")).toMatchObject({ fix: "brew upgrade cloudpin" });
   });
 });
 
@@ -117,6 +146,14 @@ describe("runDoctor: newer version", () => {
     const update = one(await runDoctor(deps({ latest: "0.4.0" })), "update");
     expect(update).toMatchObject({ level: "warn", fix: "npm install --global cloudpin" });
     expect(update.title).toContain("0.4.0");
+  });
+
+  it.each([
+    ["brew", "brew upgrade cloudpin"],
+    ["scoop", "scoop update cloudpin"],
+  ] as const)("names the upgrade command for a %s install", async (install, command) => {
+    const update = one(await runDoctor(deps({ latest: "0.4.0", install })), "update");
+    expect(update).toMatchObject({ level: "warn", fix: command });
   });
 
   it("notes when npm can't be reached, and asks nothing when the check is turned off", async () => {

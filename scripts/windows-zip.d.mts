@@ -1,9 +1,6 @@
 /** `cloudpin-<version>-windows.zip`. */
 export function zipName(version: string): string;
 
-/** The cloudpin.cmd launcher, CRLF line ends. */
-export const LAUNCHER: string;
-
 /** The regular files of a gzipped tarball; throws on links, other entry types or a bad header checksum. */
 export function readTarGz(gz: Uint8Array): { path: string; data: Uint8Array }[];
 

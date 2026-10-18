@@ -3,8 +3,10 @@
 //   node scripts/windows-zip.mjs <cloudpin-X.Y.Z.tgz> <out-dir>
 // writes <out-dir>/cloudpin-X.Y.Z-windows.zip holding, at the zip root, the
 // files of the npm-packed tarball (dist, package.json, README, LICENSE...),
-// the production node_modules installed from this repository's
-// package-lock.json, and the cloudpin.cmd launcher.
+// and the production node_modules installed from this repository's
+// package-lock.json. There is no launcher: the bucket's manifest makes Scoop's
+// exe shim run nodejs-lts's node.exe with dist\cli.js (a .cmd launcher would
+// let cmd.exe re-parse every argument; see the installers design).
 //
 // It runs the same on ubuntu-latest (release.yml) and on Windows, so it needs
 // no tar or zip program: Node's zlib reads the tarball and writes the zip.
@@ -21,39 +23,6 @@ const TARBALL = /^cloudpin-(\d+\.\d+\.\d+)\.tgz$/;
 
 /** The zip's name for a version. */
 export const zipName = (version) => `cloudpin-${version}-windows.zip`;
-
-/*
- * The launcher Scoop shims (`"bin": "cloudpin.cmd"`). Its shape is npm's
- * cmd-shim (the cloudpin.cmd that `npm install --global` writes): find this
- * folder in a subroutine, then end the batch with a `goto` to a missing label
- * on the same line that starts node, so node is the last thing the batch runs
- * (its exit code is the batch's, and Ctrl+C asks no "Terminate batch job?").
- * Node is Scoop's own nodejs-lts when the same Scoop root has it
- * (<root>\apps\cloudpin\current\ -> <root>\apps\nodejs-lts\current\node.exe:
- * Scoop's lib/core.ps1 `appdir`/`currentdir`, and the main bucket's
- * nodejs-lts.json extracts node.exe at the top of its folder), else node on PATH.
- * Batch files need CRLF line ends, so the lines are joined with CRLF here.
- */
-export const LAUNCHER = [
-  "@ECHO off",
-  "GOTO start",
-  ":find_dp0",
-  "SET dp0=%~dp0",
-  "EXIT /b",
-  ":start",
-  "SETLOCAL DisableDelayedExpansion",
-  "CALL :find_dp0",
-  "",
-  'IF EXIST "%dp0%..\\..\\nodejs-lts\\current\\node.exe" (',
-  '  SET "_prog=%dp0%..\\..\\nodejs-lts\\current\\node.exe"',
-  ") ELSE (",
-  '  SET "_prog=node"',
-  "  SET PATHEXT=%PATHEXT:;.JS;=;%",
-  ")",
-  "",
-  'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%" "%dp0%dist\\cli.js" %*',
-  "",
-].join("\r\n");
 
 /** A NUL-terminated field of a tar header. */
 function field(block, start, length) {
@@ -229,8 +198,8 @@ export function buildWindowsZip({ tarball, outDir, lockfile, install = npmCi }) 
   const pkg = JSON.parse(new TextDecoder().decode(pkgFile.data));
   if (pkg.version !== version) throw new Error(`tarball: package.json says ${pkg.version}, the file name ${version}`);
   if (!files.some((f) => f.name === "dist/cli.js")) throw new Error("tarball: no package/dist/cli.js");
-  if (files.some((f) => f.name === "cloudpin.cmd" || f.name.startsWith("node_modules/"))) {
-    throw new Error("tarball: already has cloudpin.cmd or node_modules");
+  if (files.some((f) => f.name.startsWith("node_modules/"))) {
+    throw new Error("tarball: already has node_modules");
   }
 
   const staging = mkdtempSync(join(tmpdir(), "cloudpin-windows-zip-"));
@@ -242,7 +211,7 @@ export function buildWindowsZip({ tarball, outDir, lockfile, install = npmCi }) 
     if (!statSync(modules, { throwIfNoEntry: false })?.isDirectory()) throw new Error("the install made no node_modules");
     // npm's own record of the tree, which only speeds up later npm runs.
     const deps = filesUnder(modules, staging).filter((f) => f.name !== "node_modules/.package-lock.json");
-    const entries = [...files, ...deps, { name: "cloudpin.cmd", data: new TextEncoder().encode(LAUNCHER) }];
+    const entries = [...files, ...deps];
     mkdirSync(outDir, { recursive: true });
     const zipPath = join(outDir, zipName(version));
     writeFileSync(zipPath, writeZip(entries));

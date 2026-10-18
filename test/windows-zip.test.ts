@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { crc32, gzipSync, inflateRawSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
-import { buildWindowsZip, LAUNCHER, readTarGz, writeZip, zipName } from "../scripts/windows-zip.mjs";
+import { buildWindowsZip, readTarGz, writeZip, zipName } from "../scripts/windows-zip.mjs";
 import { tempDir } from "./tmp.js";
 
 const enc = (s: string) => new TextEncoder().encode(s);
@@ -181,22 +181,8 @@ describe("writeZip", () => {
   });
 });
 
-describe("LAUNCHER", () => {
-  it("has CRLF line ends only, as batch files need", () => {
-    expect(LAUNCHER.split("\r\n").length).toBeGreaterThan(5);
-    expect(LAUNCHER.replace(/\r\n/g, "")).not.toMatch(/[\r\n]/);
-  });
-
-  it("prefers the same Scoop root's nodejs-lts, falls back to node on PATH, and passes every argument", () => {
-    expect(LAUNCHER).toContain('IF EXIST "%dp0%..\\..\\nodejs-lts\\current\\node.exe" (');
-    expect(LAUNCHER).toContain('SET "_prog=node"');
-    expect(LAUNCHER).toMatch(/"%_prog%" "%dp0%dist\\cli\.js" %\*\r\n$/);
-    expect(LAUNCHER).toContain("DisableDelayedExpansion");
-  });
-});
-
 describe("buildWindowsZip", () => {
-  it("puts the tarball's files at the zip root, with the production node_modules and the launcher", () => {
+  it("puts the tarball's files at the zip root with the production node_modules, and no launcher", () => {
     const seen: { pkg?: string; lock?: string } = {};
     const out = join(tempDir("cloudpin-zip-out-"), "nested");
     const { zipPath, names } = buildWindowsZip({ tarball: tarballFile(PACKED), outDir: out, lockfile: lockfile(), install: fakeInstall(seen) });
@@ -205,7 +191,6 @@ describe("buildWindowsZip", () => {
     const expected = [
       "LICENSE",
       "README.md",
-      "cloudpin.cmd",
       "dist/cli.js",
       "node_modules/yaml/dist/index.js",
       "node_modules/yaml/package.json",
@@ -214,7 +199,7 @@ describe("buildWindowsZip", () => {
     expect(names).toEqual(expected);
     const entries = readZip(readFileSync(zipPath));
     expect(entries.map((e) => e.name)).toEqual(expected);
-    expect(dec(entries.find((e) => e.name === "cloudpin.cmd")!.data)).toBe(LAUNCHER);
+    expect(names.some((n) => /\.(cmd|bat|ps1)$/i.test(n))).toBe(false);
     expect(dec(entries.find((e) => e.name === "dist/cli.js")!.data)).toBe("#!/usr/bin/env node\nconsole.log(1)\n");
   });
 

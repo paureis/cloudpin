@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs";
 import { posix, win32 } from "node:path";
 
 /*
@@ -72,6 +73,11 @@ export function installMethod(
   // The keg as written and as realpath reports it: on Fedora Silverblue /home is a link to /var/home.
   const kegs = cellars.flatMap((cellar) => forms(posix.join(posix.normalize(cellar), "cloudpin")));
   return kegs.some((keg) => inside(path, posix.normalize(keg), "/")) ? "brew" : "npm";
+}
+
+/** How this running cloudpin was installed, from the real path of process.argv[1]. */
+export function runningInstallMethod(): InstallMethod {
+  return installMethod(process.argv[1] ?? "", process.env, process.platform, (p) => realpathSync(p));
 }
 
 /** The command that upgrades cloudpin installed this way. */

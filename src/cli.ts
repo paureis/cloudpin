@@ -19,7 +19,7 @@ import { AGENTS, runHook, type AgentName } from "./hooks/agents.js";
 import { flagValue } from "./args.js";
 import { addEnvironment, discover, renderConfig, type FoundIdentity } from "./init.js";
 import { claudePluginEnabled, hookFile, installedHooks, planInstall, planUninstall } from "./install.js";
-import { installMethod } from "./install-method.js";
+import { runningInstallMethod } from "./install-method.js";
 import { cacheDir, findOnPath } from "./paths.js";
 import { shellInit } from "./shell-init.js";
 import { buildStatus, collectStatus } from "./status.js";
@@ -155,7 +155,7 @@ const isDir = (path: string): boolean => statSync(path, { throwIfNoEntry: false 
 const version =() => (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 /** How this cloudpin was installed (npm, brew or scoop), from the real path of the running script. */
-const installedWith = () => installMethod(process.argv[1] ?? "", process.env, process.platform, (p) => realpathSync(p));
+const installedWith = runningInstallMethod;
 
 /** True if cloudpin can create and remove a file in `dir` (its own cache folder). */
 function writable(dir: string): boolean {

@@ -30,6 +30,9 @@ end
 
 const SUMS = (version: string, sha = NEW_SHA) => `${sha}  cloudpin-${version}.tgz\n`;
 
+/** `text` as a regular expression that matches only itself (every metacharacter escaped, backslash included). */
+const escapeRegExp = (text: string) => text.replace(/[\\^$.*+?()[\]{}|\/-]/g, "\\$&");
+
 function tap(formula = FORMULA): string {
   const dir = tempDir("cloudpin-tap-");
   mkdirSync(join(dir, "Formula"));
@@ -155,7 +158,7 @@ describe("bumpInstallers", () => {
     [
       "the registry tarball differs from SHA256SUMS",
       fakeFetch(SUMS("1.2.0"), 200, { body: new Uint8Array([...TARBALL, 0]) }),
-      new RegExp(`${REGISTRY.replace(/[.\/-]/g, "\\$&")} has sha256 [0-9a-f]{64}, but SHA256SUMS says ${NEW_SHA}`),
+      new RegExp(`${escapeRegExp(REGISTRY)} has sha256 [0-9a-f]{64}, but SHA256SUMS says ${NEW_SHA}`),
     ],
     [
       "npm does not have the version yet",

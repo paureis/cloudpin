@@ -26,7 +26,8 @@ function inside(path: string, dir: string, sep: string): boolean {
 
 /**
  * `script` is the running script's path (process.argv[1]); `realpath` follows
- * its links and may throw, in which case the path is used as given.
+ * the links in it and in each Cellar or Scoop root, and may throw, in which
+ * case the path is used as given.
  */
 export function installMethod(
   script: string,
@@ -35,12 +36,15 @@ export function installMethod(
   realpath: (path: string) => string,
 ): InstallMethod {
   if (script === "") return "npm";
-  let real = script;
-  try {
-    real = realpath(script);
-  } catch {
-    // Keep the unresolved path.
-  }
+  // A path and its real path, links followed, or just the path when realpath fails.
+  const forms = (path: string): string[] => {
+    try {
+      return [path, realpath(path)];
+    } catch {
+      return [path];
+    }
+  };
+  const real = forms(script).at(-1)!;
   if (platform === "win32") {
     // Windows variable names and paths are case-insensitive; copies of the environment keep `ProgramData`, `PROGRAMDATA`...
     const get = (key: string) => Object.entries(env).find(([k]) => k.toUpperCase() === key)?.[1];
@@ -54,11 +58,15 @@ export function installMethod(
       programData ? win32.join(programData, "scoop") : undefined,
     ].filter((r): r is string => Boolean(r));
     const path = norm(real);
-    return roots.some((root) => inside(path, norm(win32.join(root, "apps", "cloudpin")), "\\")) ? "scoop" : "npm";
+    // The app folder as written and as realpath reports it: ~\scoop can be a junction to another drive.
+    const apps = roots.flatMap((root) => forms(win32.join(root, "apps", "cloudpin")));
+    return apps.some((dir) => inside(path, norm(dir), "\\")) ? "scoop" : "npm";
   }
   const cellars = [env.HOMEBREW_CELLAR, ...DEFAULT_CELLARS].filter((c): c is string => Boolean(c));
   const path = posix.normalize(real);
-  return cellars.some((cellar) => inside(path, posix.join(posix.normalize(cellar), "cloudpin"), "/")) ? "brew" : "npm";
+  // The keg as written and as realpath reports it: on Fedora Silverblue /home is a link to /var/home.
+  const kegs = cellars.flatMap((cellar) => forms(posix.join(posix.normalize(cellar), "cloudpin")));
+  return kegs.some((keg) => inside(path, posix.normalize(keg), "/")) ? "brew" : "npm";
 }
 
 /** The command that upgrades cloudpin installed this way. */

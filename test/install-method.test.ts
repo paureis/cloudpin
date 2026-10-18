@@ -92,6 +92,36 @@ describe("installMethod: Scoop", () => {
   });
 });
 
+describe("installMethod: a root reached through a link", () => {
+  // Fedora Silverblue and Universal Blue: /home is a link to /var/home, so realpath turns /home/... into /var/home/...
+  const silverblue = (path: string) => (path === "/home" || path.startsWith("/home/") ? `/var${path}` : path);
+  const KEG = "/home/linuxbrew/.linuxbrew/Cellar/cloudpin/1.2.0/libexec/lib/node_modules/cloudpin/dist/cli.js";
+
+  it("is brew when the Linuxbrew Cellar sits under a linked /home", () => {
+    expect(silverblue(KEG)).toBe(`/var${KEG}`);
+    expect(linux(KEG, {}, silverblue)).toBe("brew");
+    expect(linux(KEG, { HOMEBREW_CELLAR: "/home/linuxbrew/.linuxbrew/Cellar" }, silverblue)).toBe("brew");
+    // Control: a script under /var/home in another keg is still not cloudpin's.
+    expect(linux(KEG.replace("/Cellar/cloudpin/", "/Cellar/node/"), {}, silverblue)).toBe("npm");
+  });
+
+  // ~\scoop as a junction to D:\scoop: realpath reports the D: path, matched in any letter case.
+  const junction = (path: string) => {
+    const from = "c:\\users\\me\\scoop";
+    const lower = path.toLowerCase();
+    return lower === from || lower.startsWith(`${from}\\`) ? `D:\\scoop${path.slice(from.length)}` : path;
+  };
+
+  it("is scoop when the Scoop root is a junction", () => {
+    const script = "C:\\Users\\me\\scoop\\apps\\cloudpin\\current\\dist\\cli.js";
+    expect(junction(script)).toBe("D:\\scoop\\apps\\cloudpin\\current\\dist\\cli.js");
+    expect(win(script, WIN_ENV, junction)).toBe("scoop");
+    expect(win(script, { SCOOP: "C:\\Users\\me\\scoop" }, junction)).toBe("scoop");
+    // Control: nodejs-lts under the same junction is still npm.
+    expect(win(script.replace("\\apps\\cloudpin\\", "\\apps\\nodejs-lts\\"), WIN_ENV, junction)).toBe("npm");
+  });
+});
+
 describe("installMethod: fallbacks", () => {
   it("uses the unresolved path when realpath fails", () => {
     expect(mac("/opt/homebrew/Cellar/cloudpin/1.2.0/libexec/lib/node_modules/cloudpin/dist/cli.js", {}, fails)).toBe("brew");

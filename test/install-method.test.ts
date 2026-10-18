@@ -321,6 +321,14 @@ describe("installMethod: fallbacks", () => {
     expect(mac("/usr/local/lib/node_modules/cloudpin/dist/cli.js", {}, fails)).toBe("npm");
   });
 
+  it("lets the real path decide when the path as run and the real path match different installs", () => {
+    const script = "/home/me/.local/share/pnpm/global/5/node_modules/cloudpin/dist/cli.js";
+    const keg = "/home/linuxbrew/.linuxbrew/Cellar/cloudpin/1.2.0/libexec/lib/node_modules/cloudpin/dist/cli.js";
+    expect(linux(script, LINUX_ENV)).toBe("pnpm");
+    expect(linux(keg, LINUX_ENV)).toBe("brew");
+    expect(linux(script, LINUX_ENV, follows({ [script]: keg }))).toBe("brew");
+  });
+
   it("is npm with no script path at all", () => {
     expect(mac("")).toBe("npm");
     expect(win("", WIN_ENV)).toBe("npm");

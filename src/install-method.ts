@@ -197,7 +197,7 @@ export function runningInstallMethod(): InstallMethod {
   return installMethod(process.argv[1] ?? "", process.env, process.platform, (p) => realpathSync(p));
 }
 
-/** The command that upgrades cloudpin installed this way (README's install line for the package managers). */
+/** The command that upgrades cloudpin installed this way (README's install line for the package managers; Bun's names @latest). */
 export function upgradeCommand(method: InstallMethod): string {
   switch (method) {
     case "brew":
@@ -211,7 +211,8 @@ export function upgradeCommand(method: InstallMethod): string {
     case "yarn":
       return "yarn global add cloudpin";
     case "bun":
-      return "bun add --global cloudpin";
+      // bun.com/docs/pm/cli/add doesn't say a bare name upgrades an entry already in the global package.json.
+      return "bun add --global cloudpin@latest";
     case "npm":
       return "npm install --global cloudpin";
   }
@@ -248,7 +249,7 @@ export function pathFix(method: InstallMethod): string {
     case "yarn":
       return "yarn global add cloudpin, and check that Yarn's bin folder (yarn global bin) is on PATH";
     case "bun":
-      return "bun add --global cloudpin, and check that Bun's bin folder (bun pm bin --global) is on PATH";
+      return "bun add --global cloudpin@latest, and check that Bun's bin folder (bun pm bin --global) is on PATH";
     case "npm":
       return "npm install --global cloudpin";
   }

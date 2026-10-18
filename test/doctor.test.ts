@@ -166,8 +166,8 @@ describe("runDoctor: cloudpin itself", () => {
     ["volta", "darwin", "/Users/me/.volta/bin/cloudpin", { "/Users/me/.volta/bin/cloudpin": "/Users/me/.volta/bin/volta-shim" }, "volta install cloudpin"],
     ["yarn", "win32", "C:\\Users\\me\\AppData\\Local\\Yarn\\bin\\cloudpin.cmd", {}, "yarn global add cloudpin"],
     ["yarn", "linux", "/usr/local/bin/cloudpin", { "/usr/local/bin/cloudpin": "/home/me/.config/yarn/global/node_modules/cloudpin/dist/cli.js" }, "yarn global add cloudpin"],
-    ["bun", "win32", "C:\\Users\\me\\.bun\\bin\\cloudpin.exe", {}, "bun add --global cloudpin"],
-    ["bun", "linux", "/home/me/.bun/bin/cloudpin", { "/home/me/.bun/bin/cloudpin": "/home/me/.bun/install/global/node_modules/cloudpin/dist/cli.js" }, "bun add --global cloudpin"],
+    ["bun", "win32", "C:\\Users\\me\\.bun\\bin\\cloudpin.exe", {}, "bun add --global cloudpin@latest"],
+    ["bun", "linux", "/home/me/.bun/bin/cloudpin", { "/home/me/.bun/bin/cloudpin": "/home/me/.bun/install/global/node_modules/cloudpin/dist/cli.js" }, "bun add --global cloudpin@latest"],
   ])("names %s's command for its launcher on PATH (%s: %s)", async (_method, platform, onPath, links, command) => {
     const env = platform === "win32" ? WIN_HOME : { HOME: platform === "darwin" ? "/Users/me" : "/home/me" };
     const realpath = (path: string) => links[path] ?? path;
@@ -182,7 +182,7 @@ describe("runDoctor: cloudpin itself", () => {
     ["pnpm", "pnpm add --global cloudpin"],
     ["volta", "volta install cloudpin"],
     ["yarn", "yarn global add cloudpin"],
-    ["bun", "bun add --global cloudpin"],
+    ["bun", "bun add --global cloudpin@latest"],
   ])("names %s's commands for the update and a missing PATH copy when this cloudpin came from it", async (install, command) => {
     expect(one(await runDoctor(deps({ install, latest: "0.4.0" })), "update").fix).toBe(command);
     const missing = one(await runDoctor(deps({ install, onPath: null })), "path").fix!;

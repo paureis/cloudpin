@@ -344,7 +344,7 @@ describe("upgrade advice", () => {
     ["pnpm", "pnpm add --global cloudpin", "pnpm add --global cloudpin"],
     ["volta", "volta install cloudpin", "volta install cloudpin"],
     ["yarn", "yarn global add cloudpin", "yarn global add cloudpin"],
-    ["bun", "bun add --global cloudpin", "bun add --global cloudpin"],
+    ["bun", "bun add --global cloudpin@latest", "bun add --global cloudpin@latest"],
   ])("%s: upgrade with %s, reinstall with %s", (method, upgrade, reinstall) => {
     expect(upgradeCommand(method)).toBe(upgrade);
     expect(reinstallCommand(method)).toBe(reinstall);
@@ -359,7 +359,7 @@ describe("upgrade advice", () => {
     expect(pathFix("pnpm")).toMatch(/^pnpm add --global cloudpin, .*pnpm bin --global.* on PATH; pnpm setup adds it$/);
     expect(pathFix("volta")).toMatch(/^volta install cloudpin, .*VOLTA_HOME.* on PATH; volta setup adds it$/);
     expect(pathFix("yarn")).toMatch(/^yarn global add cloudpin, .*yarn global bin.* on PATH$/);
-    expect(pathFix("bun")).toMatch(/^bun add --global cloudpin, .*bun pm bin --global.* on PATH$/);
+    expect(pathFix("bun")).toMatch(/^bun add --global cloudpin@latest, .*bun pm bin --global.* on PATH$/);
   });
 
   it("never sends a package-manager install to npm", () => {

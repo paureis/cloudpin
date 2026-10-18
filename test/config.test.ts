@@ -94,7 +94,7 @@ github:
       ["pnpm", "update it: pnpm add --global cloudpin"],
       ["volta", "update it: volta install cloudpin"],
       ["yarn", "update it: yarn global add cloudpin"],
-      ["bun", "update it: bun add --global cloudpin"],
+      ["bun", "update it: bun add --global cloudpin@latest"],
     ])("names the update command for a %s install", (method, command) => {
       running.method = method;
       const got = message("terraform:\n  workspace: prod\n");

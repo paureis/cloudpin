@@ -2,8 +2,11 @@
 // Run by the release session after the vX.Y.Z tag's GitHub Release exists:
 //   node scripts/bump-installers.mjs <version> --tap <path-to-homebrew-tap-checkout> [--force]
 // It reads the sha256 from the release's SHA256SUMS (the same file the release
-// workflow attests) and rewrites the formula's url and sha256 lines. It never
+// workflow attests), checks that the npm registry tarball the formula's url
+// points at has that sha256 (so run it after the staged npm version is
+// approved), and rewrites the formula's url and sha256 lines. It never
 // commits or pushes: review the diff in the tap checkout, then push it.
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -86,6 +89,8 @@ const TARGETS = [
     key: "tap",
     file: join("Formula", "cloudpin.rb"),
     asset: (version) => `cloudpin-${version}.tgz`,
+    // What the formula's url downloads, checked against the asset's sha256 before writing.
+    source: registryUrl,
     current: (text) => readFormula(text).version,
     rewrite: bumpFormula,
   },
@@ -121,20 +126,33 @@ export function parseArgs(argv) {
   return { version: versions[0], ...out };
 }
 
-async function download(url, fetchImpl) {
+/** The response for `url`; `notFound` is added to the error for an HTTP 404. */
+async function download(url, fetchImpl, notFound = "") {
   let res;
   try {
     res = await fetchImpl(url);
   } catch (err) {
     throw new Error(`could not download ${url}: ${err instanceof Error ? err.message : String(err)}`);
   }
-  if (!res.ok) throw new Error(`could not download ${url}: HTTP ${res.status}`);
-  return res.text();
+  if (!res.ok) throw new Error(`could not download ${url}: HTTP ${res.status}${res.status === 404 ? notFound : ""}`);
+  return res;
+}
+
+/**
+ * Refuses unless the file the installer will download has the sha256 that
+ * SHA256SUMS lists: the formula's url is the npm registry tarball, which 404s
+ * until the owner approves the staged version on npmjs.com.
+ */
+async function checkSource(url, sha, fetchImpl) {
+  const res = await download(url, fetchImpl, "; the npm version may still be awaiting approval on npmjs.com (Staged Packages)");
+  const got = createHash("sha256").update(new Uint8Array(await res.arrayBuffer())).digest("hex");
+  if (got !== sha) throw new Error(`${url} has sha256 ${got}, but SHA256SUMS says ${sha}; nothing was written`);
 }
 
 /**
  * Checks every requested installer file first, then downloads SHA256SUMS
- * once, then writes. Returns one line per change.
+ * once, checks each installer's download against it, then writes. Returns
+ * one line per change.
  */
 export async function bumpInstallers(opts, fetchImpl = fetch) {
   const chosen = TARGETS.filter((t) => opts[t.key] !== undefined).map((t) => {
@@ -148,11 +166,12 @@ export async function bumpInstallers(opts, fetchImpl = fetch) {
     checkNewer(t.file, t.current(text), opts.version, opts.force);
     return { t, path, text };
   });
-  const sums = await download(sumsUrl(opts.version), fetchImpl);
+  const sums = await (await download(sumsUrl(opts.version), fetchImpl)).text();
   const planned = chosen.map(({ t, path, text }) => {
     const sha = shaFor(sums, t.asset(opts.version));
     return { t, path, sha, ...t.rewrite(text, opts.version, sha, opts.force) };
   });
+  for (const p of planned) await checkSource(p.t.source(opts.version), p.sha, fetchImpl);
   const lines = [];
   for (const p of planned) {
     writeFileSync(p.path, p.text);

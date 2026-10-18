@@ -19,5 +19,8 @@ export function bumpFormula(
   force: boolean,
 ): { text: string; from: { version: string; sha256: string } };
 
-/** Rewrites each requested installer from the release's SHA256SUMS; returns one line per change. */
+/**
+ * Rewrites each requested installer from the release's SHA256SUMS, after checking that the file the installer
+ * downloads (the npm registry tarball) has that sha256; writes nothing otherwise. Returns one line per change.
+ */
 export function bumpInstallers(opts: BumpOptions, fetchImpl?: typeof fetch): Promise<string[]>;

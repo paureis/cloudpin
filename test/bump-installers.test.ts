@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -5,7 +6,11 @@ import { bumpFormula, bumpInstallers, parseArgs, shaFor } from "../scripts/bump-
 import { tempDir } from "./tmp.js";
 
 const OLD_SHA = "4556f4ad13f9d2f9e8103cd8910edfd16cd8f19296e8cb9a3123583c7587a35a";
-const NEW_SHA = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+// Stand-in bytes for the 1.2.0 registry tarball, and their sha256 as SHA256SUMS lists it.
+const TARBALL = new Uint8Array([0x1f, 0x8b, 0x08, 0x00, 1, 2, 3, 4, 250, 251]);
+const NEW_SHA = createHash("sha256").update(TARBALL).digest("hex");
+const REGISTRY = "https://registry.npmjs.org/cloudpin/-/cloudpin-1.2.0.tgz";
+const RELEASE_SUMS = "https://github.com/paureis/cloudpin/releases/download/v1.2.0/SHA256SUMS";
 
 const FORMULA = `class Cloudpin < Formula
   desc "Pin cloud CLI accounts to a repo and block commands on the wrong one"
@@ -32,13 +37,27 @@ function tap(formula = FORMULA): string {
   return dir;
 }
 
-/** A fetch that serves `body` for the release's SHA256SUMS and records what was asked. */
-function fakeFetch(body: string | null, status = 200) {
+/** What the fake serves for one URL: a body (and status), or null for a network error. */
+type Reply = { body: string | Uint8Array; status?: number } | null;
+
+/**
+ * A fetch that serves `body` (null: offline) for the release's SHA256SUMS and
+ * `tarball` for the registry tarball, and records what was asked.
+ */
+function fakeFetch(body: string | null, status = 200, tarball: Reply = { body: TARBALL }) {
   const asked: string[] = [];
   const impl = (async (url: string) => {
     asked.push(url);
-    if (body === null) throw new Error("offline");
-    return { ok: status >= 200 && status < 300, status, text: async () => body };
+    const reply: Reply = url.endsWith("/SHA256SUMS") ? (body === null ? null : { body, status }) : url.endsWith(".tgz") ? tarball : { body: "", status: 404 };
+    if (reply === null) throw new Error("offline");
+    const bytes = typeof reply.body === "string" ? new TextEncoder().encode(reply.body) : reply.body;
+    const code = reply.status ?? 200;
+    return {
+      ok: code >= 200 && code < 300,
+      status: code,
+      text: async () => new TextDecoder().decode(bytes),
+      arrayBuffer: async () => bytes.slice().buffer,
+    };
   }) as unknown as typeof fetch;
   return { impl, asked };
 }
@@ -115,11 +134,11 @@ describe("bumpFormula", () => {
 });
 
 describe("bumpInstallers", () => {
-  it("downloads the release's SHA256SUMS, rewrites the formula and prints the change", async () => {
+  it("downloads the release's SHA256SUMS, checks the registry tarball, rewrites the formula and prints the change", async () => {
     const dir = tap();
     const f = fakeFetch(SUMS("1.2.0"));
     const lines = await bumpInstallers({ version: "1.2.0", tap: dir, force: false }, f.impl);
-    expect(f.asked).toEqual(["https://github.com/paureis/cloudpin/releases/download/v1.2.0/SHA256SUMS"]);
+    expect(f.asked).toEqual([RELEASE_SUMS, REGISTRY]);
     const formula = readFileSync(join(dir, "Formula", "cloudpin.rb"), "utf8");
     expect(formula).toContain('  url "https://registry.npmjs.org/cloudpin/-/cloudpin-1.2.0.tgz"\n');
     expect(formula).toContain(`  sha256 "${NEW_SHA}"\n`);
@@ -133,6 +152,17 @@ describe("bumpInstallers", () => {
     ["the release has no SHA256SUMS", fakeFetch("Not Found", 404), /could not download .*SHA256SUMS.*HTTP 404/],
     ["SHA256SUMS lacks the tarball", fakeFetch(SUMS("1.2.1")), /no line for cloudpin-1\.2\.0\.tgz/],
     ["the sha256 is malformed", fakeFetch(SUMS("1.2.0", "abc")), /64 hex/],
+    [
+      "the registry tarball differs from SHA256SUMS",
+      fakeFetch(SUMS("1.2.0"), 200, { body: new Uint8Array([...TARBALL, 0]) }),
+      new RegExp(`${REGISTRY.replace(/[.\/-]/g, "\\$&")} has sha256 [0-9a-f]{64}, but SHA256SUMS says ${NEW_SHA}`),
+    ],
+    [
+      "npm does not have the version yet",
+      fakeFetch(SUMS("1.2.0"), 200, { body: "Not Found", status: 404 }),
+      /cloudpin-1\.2\.0\.tgz.*HTTP 404.*awaiting approval.*npmjs\.com/s,
+    ],
+    ["the registry can't be reached", fakeFetch(SUMS("1.2.0"), 200, null), /could not download .*cloudpin-1\.2\.0\.tgz.*offline/],
   ])("leaves the formula alone when %s", async (_what, f, message) => {
     const dir = tap();
     await expect(bumpInstallers({ version: "1.2.0", tap: dir, force: false }, f.impl)).rejects.toThrow(message);

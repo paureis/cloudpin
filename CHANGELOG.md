@@ -28,8 +28,11 @@ All notable changes to cloudpin are listed here. The format follows
 
 ### Changed
 
-- The update notice and `cloudpin doctor` name the upgrade command for the way cloudpin was installed (#16):
-  `brew upgrade cloudpin`, `scoop update cloudpin`, otherwise `npm install --global cloudpin` as before.
+- The update notice and `cloudpin doctor` name the upgrade command for the way cloudpin was installed (#16, #98):
+  `brew upgrade cloudpin`, `scoop update cloudpin`, `pnpm add --global cloudpin`, `volta install cloudpin`,
+  `yarn global add cloudpin` (Yarn classic) or `bun add --global cloudpin`, otherwise
+  `npm install --global cloudpin` as before; so does the error for a `.cloudpin.yml` written for a newer cloudpin.
+  A global folder moved in a package manager's config file, rather than its environment variable, still reads as npm.
 
 ## [1.1.0] - 2026-10-16
 

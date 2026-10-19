@@ -36,6 +36,14 @@ All notable changes to cloudpin are listed here. The format follows
   (`PNPM_HOME`, `PNPM_CONFIG_GLOBAL_DIR`, `VOLTA_HOME`, `BUN_INSTALL` and the like); one moved any other way, such
   as in a config file, still reads as npm.
 
+### Security
+
+- Windows: CLIs installed by npm (vercel, wrangler, ...) no longer start a `node` found in the current folder:
+  cloudpin now tells Windows not to search the current folder for any process it starts, including the command
+  `cloudpin exec` runs
+  ([GHSA-3cf7-5v5w-q5vr](https://github.com/paureis/cloudpin/security/advisories/GHSA-3cf7-5v5w-q5vr); completes
+  the 1.1.1 fix).
+
 ## [1.1.1] - 2026-10-18
 
 A security fix for Windows. Please upgrade.

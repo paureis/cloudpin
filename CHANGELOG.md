@@ -36,6 +36,11 @@ All notable changes to cloudpin are listed here. The format follows
   (`PNPM_HOME`, `PNPM_CONFIG_GLOBAL_DIR`, `VOLTA_HOME`, `BUN_INSTALL` and the like); one moved any other way, such
   as in a config file, still reads as npm.
 
+### Security
+
+- Windows: cloudpin now runs each CLI by its full path from PATH and never from the current folder
+  (GHSA-3cf7-5v5w-q5vr). This covers the account checks and the command `cloudpin exec` runs.
+
 ## [1.1.0] - 2026-10-16
 
 Claude Code gets a one-step plugin, and any MCP agent can ask cloudpin before it acts.

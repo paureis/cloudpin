@@ -618,5 +618,15 @@ describe("runDoctor: Windows hook shells (#108)", () => {
         expect(one(await runDoctor(win({ files: upgraded }).d), "hook").level).toBe("ok");
       }
     });
+
+    it("calls a hook written where SystemRoot is C:\\WINDOWS current on a machine with C:\\Windows", async () => {
+      for (const agent of ["codex", "copilot"] as const) {
+        const files = { [settings(agent)]: planInstall(agent, null, "C:\\WINDOWS").content };
+        expect(one(await runDoctor(win({ files }).d), "hook").level).toBe("ok");
+        // Control: another drive is really another cmd.exe, so it is out of date.
+        const other = { [settings(agent)]: planInstall(agent, null, "D:\\Windows").content };
+        expect(one(await runDoctor(win({ files: other }).d), "hook").level).toBe("warn");
+      }
+    });
   });
 });

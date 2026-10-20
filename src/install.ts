@@ -267,7 +267,10 @@ function updateWindowsCommand(agent: AgentName, settings: Json, root: string): b
   const list = (event: string) => (Array.isArray(hooks?.[event]) ? (hooks[event] as Json[]) : []);
   let changed = false;
   const set = (entry: Json, key: string) => {
-    if (entry[key] === win) return;
+    // Windows paths ignore case: a file written where SystemRoot is C:\WINDOWS
+    // is current where it is C:\Windows. Rewriting it would change Codex's
+    // trust hash, so the hook would stop until reviewed, and flip back elsewhere.
+    if (typeof entry[key] === "string" && (entry[key] as string).toLowerCase() === win.toLowerCase()) return;
     entry[key] = win;
     changed = true;
   };

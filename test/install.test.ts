@@ -282,6 +282,15 @@ describe("planInstall on Windows (#108)", () => {
     expect(plan.content).toBe(planInstall("codex", null, WIN).content);
   });
 
+  it("treats a form that differs only in the case of SystemRoot as current (Windows paths ignore case)", () => {
+    // Rewriting it would change Codex's trust hash, and the next machine would flip it back.
+    for (const agent of ["codex", "copilot"] as const) {
+      const upper = planInstall(agent, null, "C:\\WINDOWS").content;
+      expect(upper).toContain("C:\\\\WINDOWS\\\\System32"); // control: the file holds the upper-case form
+      expect(planInstall(agent, upper, WIN)).toEqual({ content: upper, alreadyInstalled: true });
+    }
+  });
+
   it("keeps the Windows form off Windows or without a usable SystemRoot (a teammate's re-run changes nothing)", () => {
     for (const agent of ["codex", "copilot"] as const) {
       const win = planInstall(agent, null, WIN).content;

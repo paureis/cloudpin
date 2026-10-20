@@ -221,6 +221,41 @@ export function planInstall(
 
 const mentionsCloudpin = (value: unknown) => JSON.stringify(value).includes(MARKER);
 
+const isWindowsForm = (value: unknown) =>
+  typeof value === "string" && /\\cmd\.exe \/d \/s \/c "set NoDefaultCurrentDirectoryInExePath=1&& cloudpin hook /i.test(value);
+
+/**
+ * True when the agent runs cloudpin's hook in `content` on Windows as the bare
+ * command through PowerShell, which picks npm's cloudpin.ps1 for it: Gemini
+ * CLI always (no Windows-only field), Codex and Copilot CLI unless their
+ * Windows-only field holds the Windows form. False for a file that isn't JSON.
+ */
+export function bareInPowerShell(agent: AgentName, content: string): boolean {
+  let settings: Json;
+  try {
+    settings = parse(content);
+  } catch {
+    return false;
+  }
+  const hooks = settings.hooks as Json | undefined;
+  const list = (event: string) => (Array.isArray(hooks?.[event]) ? (hooks[event] as Json[]) : []);
+  switch (agent) {
+    case "gemini":
+      return mentionsCloudpin(settings);
+    case "codex":
+      return list("PreToolUse").some(
+        (group) =>
+          Array.isArray(group.hooks) &&
+          (group.hooks as Json[]).some((h) => mentionsCloudpin(h) && !isWindowsForm(h.commandWindows ?? h.command_windows)),
+      );
+    case "copilot":
+      // `command` is Copilot's cross-platform fallback when `powershell` is absent.
+      return list("preToolUse").some((e) => mentionsCloudpin(e) && !isWindowsForm(e.powershell ?? e.command));
+    default:
+      return false;
+  }
+}
+
 /**
  * Sets the Windows form on cloudpin's Codex and Copilot entries (layout());
  * true if any changed. Codex also reads `command_windows`, and two spellings

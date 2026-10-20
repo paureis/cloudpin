@@ -221,6 +221,18 @@ export function planInstall(
 
 const mentionsCloudpin = (value: unknown) => JSON.stringify(value).includes(MARKER);
 
+/**
+ * The line install-hook prints after writing `content`, or null. Codex runs a
+ * user or project hook only while its trust hash matches, and on Windows the
+ * hash covers `commandWindows` (codex-rs/hooks/src/engine/discovery.rs), so a
+ * hook written or upgraded with the Windows form waits for a review in /hooks.
+ */
+export function afterInstallNote(agent: AgentName, content: string): string | null {
+  return agent === "codex" && content.includes(command(agent)) && !bareInPowerShell(agent, content)
+    ? "cloudpin: Codex runs the changed hook only after you review it in /hooks."
+    : null;
+}
+
 const isWindowsForm = (value: unknown) =>
   typeof value === "string" && /\\cmd\.exe \/d \/s \/c "set NoDefaultCurrentDirectoryInExePath=1&& cloudpin hook /i.test(value);
 

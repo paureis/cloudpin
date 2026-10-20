@@ -1,6 +1,14 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudePluginEnabled, hookFile, installedHooks, planInstall, planUninstall, windowsRoot } from "../src/install.js";
+import {
+  afterInstallNote,
+  claudePluginEnabled,
+  hookFile,
+  installedHooks,
+  planInstall,
+  planUninstall,
+  windowsRoot,
+} from "../src/install.js";
 import { providers } from "../src/providers/index.js";
 
 const ROOT = "/repo";
@@ -289,6 +297,15 @@ describe("planInstall on Windows (#108)", () => {
       expect(upper).toContain("C:\\\\WINDOWS\\\\System32"); // control: the file holds the upper-case form
       expect(planInstall(agent, upper, WIN)).toEqual({ content: upper, alreadyInstalled: true });
     }
+  });
+
+  it("names the Codex /hooks review after writing the Windows form, and nothing otherwise", () => {
+    const note = "cloudpin: Codex runs the changed hook only after you review it in /hooks.";
+    expect(afterInstallNote("codex", planInstall("codex", null, WIN).content)).toBe(note);
+    expect(afterInstallNote("codex", planInstall("codex", JSON.stringify(bareCodex), WIN).content)).toBe(note);
+    expect(afterInstallNote("codex", planInstall("codex", null).content)).toBeNull();
+    expect(afterInstallNote("copilot", planInstall("copilot", null, WIN).content)).toBeNull();
+    expect(afterInstallNote("claude", planInstall("claude", null).content)).toBeNull();
   });
 
   it("keeps the Windows form off Windows or without a usable SystemRoot (a teammate's re-run changes nothing)", () => {

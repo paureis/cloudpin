@@ -17,7 +17,15 @@ import { guard, type GuardDeps } from "./guard.js";
 import { AGENTS, runHook, type AgentName } from "./hooks/agents.js";
 import { flagValue } from "./args.js";
 import { addEnvironment, discover, renderConfig, type FoundIdentity } from "./init.js";
-import { claudePluginEnabled, hookFile, installedHooks, planInstall, planUninstall, windowsRoot } from "./install.js";
+import {
+  afterInstallNote,
+  claudePluginEnabled,
+  hookFile,
+  installedHooks,
+  planInstall,
+  planUninstall,
+  windowsRoot,
+} from "./install.js";
 import { runningInstallMethod } from "./install-method.js";
 import { cacheDir, findOnPath, isExecutableFile } from "./paths.js";
 import { shellInit } from "./shell-init.js";
@@ -286,6 +294,8 @@ async function hookSetup(action: "install" | "uninstall", agent: string | undefi
       mkdirSync(dirname(path), { recursive: true });
       writeFileSync(path, plan.content);
       console.log(`cloudpin: installed${existing !== null ? ` (previous file saved as ${path}.cloudpin-backup)` : ""}.`);
+      const note = afterInstallNote(name, plan.content);
+      if (note !== null) console.log(note);
     } else {
       const plan = planUninstall(name, existing);
       if (!plan.found) {

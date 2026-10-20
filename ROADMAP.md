@@ -23,6 +23,9 @@ issues it ships. Open an [issue](https://github.com/paureis/cloudpin/issues) to 
   zip attached to each release.
 - **Upgrade advice for pnpm and Volta** ([#98](https://github.com/paureis/cloudpin/issues/98)): name the right
   upgrade command when cloudpin was installed globally with pnpm or Volta.
+- **Agent hooks under PowerShell's execution policy** ([#108](https://github.com/paureis/cloudpin/issues/108)):
+  Codex and Copilot CLI hooks on Windows start cloudpin through cmd.exe, so `Restricted` and `AllSigned` can't stop
+  them, and `cloudpin doctor` warns about what could still stop or bypass a hook there.
 
 ## 1.3.0: Fix it, see it (release 2026-12-03)
 

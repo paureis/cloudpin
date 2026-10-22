@@ -15,8 +15,15 @@ export interface McpTool {
   call(args: Record<string, unknown>): Promise<unknown>;
 }
 
-/** Newest first. Claude Code's newer client offers 2026-07-28 and falls back otherwise (code.claude.com, mcp). */
-export const PROTOCOL_VERSIONS: readonly string[] = ["2026-07-28", "2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
+/**
+ * The initialize-based revisions this server speaks, newest first. 2026-07-28 is not one: it has no initialize
+ * (versioning.mdx calls 2025-11-25 and earlier "legacy", the ones with the initialize handshake), and its clients
+ * probe with server/discover, which this server answers with -32601, then fall back to initialize
+ * (basic/transports/stdio.mdx, "Backward Compatibility"). A client that asks initialize for 2026-07-28 anyway, or for
+ * a version not listed, gets 2025-11-25: 2025-11-25's lifecycle.mdx says a server that doesn't support the requested
+ * version MUST answer with another it supports, and SHOULD pick its latest.
+ */
+export const PROTOCOL_VERSIONS: readonly string[] = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 type Id = string | number | null;
 interface Message {
@@ -46,8 +53,7 @@ export function createHandler(opts: { version: string; tools: McpTool[]; instruc
         const protocolVersion = typeof asked === "string" && PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0];
         // InitializeResult.instructions, "a hint to the model" that clients MAY add to the system prompt, is in
         // every initialize-based revision, 2024-11-05 to 2025-11-25 (schema/<version>/schema.ts in
-        // github.com/modelcontextprotocol/modelcontextprotocol). 2026-07-28 drops initialize and carries it in
-        // server/discover instead, which this server doesn't implement; its clients fall back to initialize.
+        // github.com/modelcontextprotocol/modelcontextprotocol). 2026-07-28 carries it in server/discover instead.
         const instructions = opts.instructions === undefined ? {} : { instructions: opts.instructions };
         return { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "cloudpin", version: opts.version }, ...instructions };
       }

@@ -54,6 +54,9 @@ All notable changes to cloudpin are listed here. The format follows
   working there. Re-run `cloudpin install-hook <agent>` (with `--user` if that is where it is) to update a hook
   installed before; it keeps your other hooks, and Codex runs the changed hook once you review it in `/hooks`.
   Gemini CLI has no Windows-only field, so its hook stays as it was.
+- `cloudpin mcp` answered `initialize` for an unknown protocol version with 2026-07-28, a revision that has no
+  `initialize`. It now answers with 2025-11-25, the newest revision that has one, and no longer lists 2026-07-28
+  (#111).
 - `cloudpin doctor` on Windows warns when PowerShell's execution policy would stop an installed agent hook, when
   PATH has `.` or another entry that is not a full path, and when Claude Code is older than 2.1.47, which ran hooks
   through cmd.exe (#108).

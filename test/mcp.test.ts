@@ -44,10 +44,18 @@ describe("initialize", () => {
     }
   });
 
-  it("answers with its newest version when the client asks for one it doesn't know", async () => {
-    const res = await ask(req(1, "initialize", { protocolVersion: "1999-01-01" }));
-    expect(res!.result.protocolVersion).toBe(PROTOCOL_VERSIONS[0]);
-    expect(PROTOCOL_VERSIONS[0]).toBe("2026-07-28");
+  it("supports exactly the initialize-based revisions, and echoes each one", async () => {
+    expect(PROTOCOL_VERSIONS).toEqual(["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"]);
+    for (const protocolVersion of PROTOCOL_VERSIONS) {
+      expect((await ask(req(1, "initialize", { protocolVersion })))!.result.protocolVersion).toBe(protocolVersion);
+    }
+  });
+
+  // 2026-07-28 has no initialize, so a client asking for it there gets the newest version that has one.
+  it("answers 2025-11-25 when the client asks for a version it doesn't know, or for 2026-07-28", async () => {
+    for (const protocolVersion of ["1999-01-01", "2026-07-28", 42, undefined]) {
+      expect((await ask(req(1, "initialize", { protocolVersion })))!.result.protocolVersion).toBe("2025-11-25");
+    }
   });
 });
 

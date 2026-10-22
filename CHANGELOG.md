@@ -25,6 +25,14 @@ All notable changes to cloudpin are listed here. The format follows
   and `^`). Like every install, it edits no shell profile and installs no agent hook.
 - Each GitHub Release also has `cloudpin-X.Y.Z-windows.zip` (#17), the file the Scoop bucket installs: the package's
   files plus their production `node_modules`, listed in `SHA256SUMS` and covered by the same signed attestation.
+- A standalone `cloudpin.exe` for 64-bit Windows (#96), in each GitHub Release as `cloudpin-X.Y.Z-win-x64.zip`
+  (listed in `SHA256SUMS` and covered by the signed attestation): a Node.js single executable application with
+  cloudpin and its two dependencies inside, built with the exact Node.js 26 pinned in `scripts/exe-node-version.txt`,
+  so it needs no Node.js installed. It names its own upgrade: `winget upgrade paureis.cloudpin` when winget installed
+  it, otherwise to download the latest zip. Nightly opens an issue when a newer Node.js 26 security release appears.
+- winget manifests for `paureis.cloudpin` (#96) in `packaging/winget/`: a portable zip installing `cloudpin.exe` as
+  the `cloudpin` command. `node scripts/bump-installers.mjs X.Y.Z --winget <dir>` renders them for a release, after
+  checking the exe zip against `SHA256SUMS`, and `docs/winget.md` lists the maintainer's steps to submit them.
 
 ### Changed
 

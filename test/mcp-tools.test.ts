@@ -4,7 +4,7 @@ import type { FoundConfig } from "../src/config.js";
 import { explain } from "../src/explain.js";
 import type { GuardDeps } from "../src/guard.js";
 import { hookFile, installedHooks, planInstall } from "../src/install.js";
-import { CLOUDPIN_INSTRUCTIONS, cloudpinTools } from "../src/mcp-tools.js";
+import { CLOUDPIN_INSTRUCTIONS, cloudpinHandler, cloudpinTools } from "../src/mcp-tools.js";
 import { collectStatus } from "../src/status.js";
 import type { ProviderDef, Resolution } from "../src/types.js";
 
@@ -96,6 +96,15 @@ describe("server instructions", () => {
 
   it("say the server only reads", () => {
     expect(head).toMatch(/never runs or switches anything/i);
+  });
+
+  it("are what `cloudpin mcp`'s handler sends at initialize, with both tools", async () => {
+    const handle = cloudpinHandler(deps, ctx, "9.9.9");
+    const init = JSON.parse((await handle(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-11-25" } })))!);
+    expect(init.result.instructions).toBe(CLOUDPIN_INSTRUCTIONS);
+    expect(init.result.serverInfo).toEqual({ name: "cloudpin", version: "9.9.9" });
+    const list = JSON.parse((await handle(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" })))!);
+    expect(list.result.tools.map((t: { name: string }) => t.name)).toEqual(["cloudpin_status", "cloudpin_check"]);
   });
 
   it("name every CLI the tools describe, as the skill does", () => {

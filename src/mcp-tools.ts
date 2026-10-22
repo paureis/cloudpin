@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { explain } from "./explain.js";
 import type { GuardDeps } from "./guard.js";
 import { installedHooks } from "./install.js";
-import type { McpTool } from "./mcp.js";
+import { createHandler, type McpTool } from "./mcp.js";
 import { collectStatus } from "./status.js";
 
 export interface ToolContext {
@@ -35,6 +35,11 @@ export const CLOUDPIN_INSTRUCTIONS = [
   "This server never runs or switches anything.",
 ].join(" ") +
   "\n\nSwitching accounts and editing .cloudpin.yml are the user's call. If this server may not be running in the project folder, pass it as cwd.";
+
+/** The handler `cloudpin mcp` serves: both tools, and the instructions at initialize. */
+export function cloudpinHandler(deps: GuardDeps, ctx: ToolContext, version: string): (line: string) => Promise<string | null> {
+  return createHandler({ version, tools: cloudpinTools(deps, ctx), instructions: CLOUDPIN_INSTRUCTIONS });
+}
 
 /**
  * The two MCP tools (#15). Both only read: they never run the command they are

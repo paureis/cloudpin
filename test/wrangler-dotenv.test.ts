@@ -1,6 +1,16 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// readFileSync fails with EACCES for files named .env.denied; everything else is untouched.
+vi.mock("node:fs", async (importOriginal) => {
+  const fs = await importOriginal<typeof import("node:fs")>();
+  const readFileSync = ((path: unknown, ...rest: unknown[]) => {
+    if (String(path).endsWith(".env.denied")) throw Object.assign(new Error("EACCES: permission denied"), { code: "EACCES" });
+    return (fs.readFileSync as (...a: unknown[]) => unknown)(path, ...rest);
+  }) as typeof fs.readFileSync;
+  return { ...fs, default: { ...fs, readFileSync }, readFileSync };
+});
 import { cloudflare } from "../src/providers/cloudflare.js";
 import { DOTENV_VARS, parseDotenv, wranglerDotenv } from "../src/providers/wrangler-dotenv.js";
 import { tempDir } from "./tmp.js";
@@ -158,6 +168,20 @@ describe("wranglerDotenv: the environment Wrangler gives itself", () => {
       env: { CLOUDFLARE_API_TOKEN: 'abc\\"def', CF_ACCOUNT_ID: B },
       from: { CLOUDFLARE_API_TOKEN: ".env.local", CF_ACCOUNT_ID: ".env.local" },
     });
+  });
+
+  it("skips a file it can't read for any reason, as Wrangler does (dotenv returns the error, Wrangler only logs it)", () => {
+    // The mocked readFileSync above fails with EACCES for this name.
+    const root = folder({ ".env.denied": `CLOUDFLARE_ACCOUNT_ID=${B}\n`, ".env.extra": `CLOUDFLARE_ACCOUNT_ID=${A}\n` });
+    expect(load(root, {}, ["deploy", "--env-file", ".env.extra", ".env.denied"])).toEqual({
+      env: { CLOUDFLARE_ACCOUNT_ID: A },
+      from: { CLOUDFLARE_ACCOUNT_ID: ".env.extra" },
+    });
+  });
+
+  it("skips a folder named like a .env file", () => {
+    const root = folder({ ".env/inside": "x", ".env.local": `CLOUDFLARE_ACCOUNT_ID=${A}\n` });
+    expect(load(root)).toEqual({ env: { CLOUDFLARE_ACCOUNT_ID: A }, from: { CLOUDFLARE_ACCOUNT_ID: ".env.local" } });
   });
 
   it("stops when DOTENV_KEY makes dotenv decrypt a .vault file instead of the plain one", () => {

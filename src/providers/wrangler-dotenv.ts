@@ -141,11 +141,10 @@ function defaultEnvFiles(envName: string | undefined): string[] {
 function readEnvFile(path: string): string | undefined {
   try {
     return readFileSync(path, "utf8");
-  } catch (err) {
-    // dotenv's error for a missing file or a folder is skipped by Wrangler.
-    const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || code === "EISDIR") return undefined;
-    throw err;
+  } catch {
+    // dotenv's configDotenv returns any read error (missing, a folder, no
+    // permission) and Wrangler's loadDotEnv only debug-logs it: the file is skipped.
+    return undefined;
   }
 }
 
@@ -160,7 +159,8 @@ export interface WranglerEnv {
  * The environment Wrangler would give itself for this command: `env` (the
  * command's own) with the DOTENV_VARS the .env files set, read from `start`
  * (the folder after --cwd; --config doesn't move it). Returns an error, naming
- * the file and variable but never a value, when a file can't be read exactly.
+ * the file and variable but never a value, when cloudpin can't work out a value
+ * Wrangler would use (a $ expansion, or a .vault file DOTENV_KEY would decrypt).
  */
 export function wranglerDotenv(
   args: string[],
@@ -189,12 +189,7 @@ export function wranglerDotenv(
         error: `DOTENV_KEY is set and ${vaultFile} exists, so Wrangler decrypts that file instead of ${file}, which cloudpin can't do: unset DOTENV_KEY for this command, or remove ${vaultFile}`,
       };
     }
-    let text: string | undefined;
-    try {
-      text = readEnvFile(path);
-    } catch {
-      return { error: `cloudpin can't read ${file}, which Wrangler loads into its environment` };
-    }
+    const text = readEnvFile(path);
     if (text === undefined) continue;
     for (const [key, value] of parseDotenv(text)) {
       const name = canonical.get(fold(key));

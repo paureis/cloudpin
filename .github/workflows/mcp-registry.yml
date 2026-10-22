@@ -3,21 +3,25 @@ name: MCP Registry
 # Lists a release in the official MCP Registry as io.github.paureis/cloudpin
 # (#111). Run it by hand, for the release's tag, after the npm version is
 # approved: release.yml only stages it on npm, and the registry checks the live
-# package's mcpName when it accepts server.json. A dry run validates only.
+# package's mcpName when it accepts server.json. A dry run checks that the tag,
+# package.json and server.json agree and validates server.json with the
+# registry; it skips npm, login and publish, so it works before npm approval.
 #
 # Sources (read 2026-10-21): github.com/modelcontextprotocol/registry,
 # docs/modelcontextprotocol-io/github-actions.mdx (OIDC needs id-token: write,
 # no secret), docs/reference/cli/commands.md (validate, login github-oidc,
-# publish), and release v1.8.1's registry_1.8.1_checksums.txt.
+# publish), v1.8.1's internal/api/handlers/v0/validate.go (/v0/validate runs
+# schema and semantic checks; the npm mcpName check runs on publish), and
+# release v1.8.1's registry_1.8.1_checksums.txt.
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to list, e.g. v1.2.0 (its npm version must be approved first)
+        description: Release tag to list, e.g. v1.2.0 (outside a dry run, its npm version must be approved first)
         required: true
         type: string
       dry_run:
-        description: Only validate server.json; don't log in or publish
+        description: Only check the versions and validate server.json, which works before the npm version is approved; skip npm, login and publish
         type: boolean
         default: false
 
@@ -68,9 +72,21 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "identifier=$identifier" >> "$GITHUB_OUTPUT"
+      - name: Install mcp-publisher (pinned, checked by SHA-256)
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/mcp-publisher.tar.gz" \
+            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "$MCP_PUBLISHER_SHA256  $RUNNER_TEMP/mcp-publisher.tar.gz" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/mcp-publisher.tar.gz" -C "$RUNNER_TEMP" mcp-publisher
+          "$RUNNER_TEMP/mcp-publisher" --version
+      # Sends server.json to the registry's /v0/validate; needs no login, and
+      # doesn't look at npm, so it runs in a dry run before approval too.
+      - name: Validate server.json
+        run: '"$RUNNER_TEMP/mcp-publisher" validate server.json'
       # The registry reads mcpName from registry.npmjs.org/<package>/<version>
       # (internal/validators/registries/npm.go); a staged version isn't there yet.
       - name: npm serves this version with the same mcpName
+        if: ${{ !inputs.dry_run }}
         env:
           NAME: ${{ steps.meta.outputs.name }}
           IDENTIFIER: ${{ steps.meta.outputs.identifier }}
@@ -82,16 +98,6 @@ jobs:
             exit 1
           fi
           echo "npm serves $IDENTIFIER@$VERSION with mcpName $live"
-      - name: Install mcp-publisher (pinned, checked by SHA-256)
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/mcp-publisher.tar.gz" \
-            "https://github.com/modelcontextprotocol/registry/releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
-          echo "$MCP_PUBLISHER_SHA256  $RUNNER_TEMP/mcp-publisher.tar.gz" | sha256sum --check --strict
-          tar -xzf "$RUNNER_TEMP/mcp-publisher.tar.gz" -C "$RUNNER_TEMP" mcp-publisher
-          "$RUNNER_TEMP/mcp-publisher" --version
-      # Sends server.json to the registry's /v0/validate; needs no login.
-      - name: Validate server.json
-        run: '"$RUNNER_TEMP/mcp-publisher" validate server.json'
       - name: Log in with GitHub OIDC
         if: ${{ !inputs.dry_run }}
         run: '"$RUNNER_TEMP/mcp-publisher" login github-oidc'

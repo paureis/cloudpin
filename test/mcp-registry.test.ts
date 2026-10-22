@@ -76,19 +76,22 @@ describe("the MCP Registry workflow", () => {
     expect(text).toContain("sha256sum --check --strict");
   });
 
-  it("checks the live npm version before logging in, and publishes only outside a dry run", () => {
+  // /v0/validate runs schema and semantic checks only; the npm mcpName check runs on publish (registry v1.8.1,
+  // internal/api/handlers/v0/validate.go). So a dry run validates before the npm version is approved.
+  it("validates first, and checks the live npm version, logs in and publishes only outside a dry run", () => {
     const at = (re: RegExp) => steps.findIndex((s) => re.test(String(s.run ?? "")));
-    const [agree, npm, validate, login, publish] = [
+    const [agree, install, validate, npm, login, publish] = [
       at(/jq -r \.version server\.json/),
-      at(/npm view /),
+      at(/sha256sum --check/),
       at(/mcp-publisher" validate /),
+      at(/npm view /),
       at(/mcp-publisher" login github-oidc/),
       at(/mcp-publisher" publish /),
     ];
-    expect([agree, npm, validate, login, publish].every((i) => i >= 0)).toBe(true);
-    expect(agree < npm && npm < validate && validate < login && login < publish).toBe(true);
-    expect(steps[login]!.if).toBe("${{ !inputs.dry_run }}");
-    expect(steps[publish]!.if).toBe("${{ !inputs.dry_run }}");
-    expect(steps[validate]!.if).toBeUndefined();
+    expect([agree, install, validate, npm, login, publish].every((i) => i >= 0)).toBe(true);
+    expect(agree < install && install < validate && validate < npm && npm < login && login < publish).toBe(true);
+    for (const i of [agree, install, validate]) expect(steps[i]!.if).toBeUndefined();
+    for (const i of [npm, login, publish]) expect(steps[i]!.if).toBe("${{ !inputs.dry_run }}");
+    expect(workflow.on.workflow_dispatch.inputs.dry_run.description).toMatch(/validate.*before the npm version is approved/i);
   });
 });

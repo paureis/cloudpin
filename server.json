@@ -3,7 +3,7 @@
   "name": "io.github.paureis/cloudpin",
   "title": "cloudpin",
   "description": "Read-only checks that cloud CLI commands run on the accounts a project pins in .cloudpin.yml.",
-  "websiteUrl": "https://github.com/paureis/cloudpin#mcp-server",
+  "websiteUrl": "https://github.com/paureis/cloudpin/blob/main/docs/mcp.md",
   "repository": {
     "url": "https://github.com/paureis/cloudpin",
     "source": "github"

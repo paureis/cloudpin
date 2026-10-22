@@ -25,6 +25,12 @@ All notable changes to cloudpin are listed here. The format follows
   and `^`). Like every install, it edits no shell profile and installs no agent hook.
 - Each GitHub Release also has `cloudpin-X.Y.Z-windows.zip` (#17), the file the Scoop bucket installs: the package's
   files plus their production `node_modules`, listed in `SHA256SUMS` and covered by the same signed attestation.
+- The MCP server for every agent (#111): `cloudpin mcp` now hands an agent short instructions when it connects (call
+  `cloudpin_status` before cloud work and `cloudpin_check` before a cloud CLI command; on a block, stop and tell the
+  user the reason and the fix; never work around it), which Codex and Gemini CLI add to the model's instructions.
+  [docs/mcp.md](docs/mcp.md) shows how to add the server to Codex, Cursor, VS Code, Gemini CLI, Windsurf, Claude
+  Desktop or any stdio client. The server stays read-only. Each release is also listed in the official MCP Registry
+  as `io.github.paureis/cloudpin` (`server.json`), by a manual workflow run once its npm version is live.
 
 ### Changed
 

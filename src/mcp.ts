@@ -35,7 +35,7 @@ class RpcError extends Error {
 }
 
 /** Answers one line: the JSON reply, or null for a notification (which never gets one). */
-export function createHandler(opts: { version: string; tools: McpTool[] }): (line: string) => Promise<string | null> {
+export function createHandler(opts: { version: string; tools: McpTool[]; instructions?: string }): (line: string) => Promise<string | null> {
   const reply = (id: Id, body: { result: unknown } | { error: { code: number; message: string } }) =>
     JSON.stringify({ jsonrpc: "2.0", id, ...body });
 
@@ -44,7 +44,12 @@ export function createHandler(opts: { version: string; tools: McpTool[] }): (lin
       case "initialize": {
         const asked = params.protocolVersion;
         const protocolVersion = typeof asked === "string" && PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0];
-        return { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "cloudpin", version: opts.version } };
+        // InitializeResult.instructions, "a hint to the model" that clients MAY add to the system prompt, is in
+        // every initialize-based revision, 2024-11-05 to 2025-11-25 (schema/<version>/schema.ts in
+        // github.com/modelcontextprotocol/modelcontextprotocol). 2026-07-28 drops initialize and carries it in
+        // server/discover instead, which this server doesn't implement; its clients fall back to initialize.
+        const instructions = opts.instructions === undefined ? {} : { instructions: opts.instructions };
+        return { protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "cloudpin", version: opts.version }, ...instructions };
       }
       case "ping":
         return {};

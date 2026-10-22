@@ -8,7 +8,7 @@ import { checkExitCode, formatCheckText, parseCheckArgs, runCheck } from "./chec
 import { doctorJson, formatDoctor, runDoctor } from "./doctor.js";
 import { explain, formatExplain } from "./explain.js";
 import { createHandler, serve } from "./mcp.js";
-import { cloudpinTools } from "./mcp-tools.js";
+import { CLOUDPIN_INSTRUCTIONS, cloudpinTools } from "./mcp-tools.js";
 import { confirmProtected } from "./confirm.js";
 import { CONFIG_FILE, ConfigError, findConfig } from "./config.js";
 import { realExec, runInherited } from "./exec.js";
@@ -366,7 +366,7 @@ export async function main(argv: string[]): Promise<number> {
     case "mcp": {
       // Fresh answers (no identity cache), like check and explain. stdout carries only JSON-RPC lines.
       const tools = cloudpinTools(deps, { cwd: process.cwd(), env: process.env, read: readOrNull, isDir });
-      await serve(createHandler({ version: version(), tools }), process.stdin, process.stdout);
+      await serve(createHandler({ version: version(), tools, instructions: CLOUDPIN_INSTRUCTIONS }), process.stdin, process.stdout);
       return 0;
     }
     case "doctor":

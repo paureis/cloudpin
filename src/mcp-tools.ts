@@ -22,6 +22,21 @@ function folder(ctx: ToolContext, value: unknown): string {
 }
 
 /**
+ * What the server tells every agent at initialize (#111), the plugin skill's rules in a few lines for agents
+ * without it. Codex reads this as server-wide guidance and asks that the first 512 characters stand alone
+ * (learn.chatgpt.com/docs/extend/mcp, "Server instructions"); a test holds them to that.
+ */
+export const CLOUDPIN_INSTRUCTIONS = [
+  "cloudpin keeps cloud CLIs (az, aws, gcloud, vercel, gh, kubectl, helm, supabase, wrangler) on the accounts .cloudpin.yml pins.",
+  "Call cloudpin_status before cloud work.",
+  "Before running any command that uses a cloud CLI, call cloudpin_check with the exact command line; run it only if the verdict is allow.",
+  "On block or ask, stop and tell the user the reason and the fix.",
+  "Never work around a block (another account, CLOUDPIN_SKIP, an environment variable, a script file).",
+  "This server never runs or switches anything.",
+].join(" ") +
+  "\n\nSwitching accounts and editing .cloudpin.yml are the user's call. If this server may not be running in the project folder, pass it as cwd.";
+
+/**
  * The two MCP tools (#15). Both only read: they never run the command they are
  * asked about, log in, switch or write. Fresh answers, no identity cache.
  */

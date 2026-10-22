@@ -30,6 +30,20 @@ describe("initialize", () => {
     expect(res!.result).toEqual({ protocolVersion: "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "cloudpin", version: "1.1.0" } });
   });
 
+  // InitializeResult.instructions is in every initialize-based revision, 2024-11-05 to 2025-11-25 (schema.ts of each).
+  it("returns its instructions with every protocol version it negotiates", async () => {
+    const guided = createHandler({ version: "1.1.0", tools: [echo], instructions: "Call echo_args first." });
+    for (const protocolVersion of PROTOCOL_VERSIONS) {
+      const out = await guided(JSON.stringify(req(1, "initialize", { protocolVersion, capabilities: {} })));
+      expect(JSON.parse(out!).result).toEqual({
+        protocolVersion,
+        capabilities: { tools: {} },
+        serverInfo: { name: "cloudpin", version: "1.1.0" },
+        instructions: "Call echo_args first.",
+      });
+    }
+  });
+
   it("answers with its newest version when the client asks for one it doesn't know", async () => {
     const res = await ask(req(1, "initialize", { protocolVersion: "1999-01-01" }));
     expect(res!.result.protocolVersion).toBe(PROTOCOL_VERSIONS[0]);

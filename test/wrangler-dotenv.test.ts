@@ -148,6 +148,12 @@ describe("wranglerDotenv: the environment Wrangler gives itself", () => {
     expect(load(root, {}, ["deploy", "--env-file", "missing.env"])).toEqual({ env: {}, from: {} });
   });
 
+  it("takes --envFile, the camel-case alias yargs gives --env-file", () => {
+    const root = folder({ ".env": `CLOUDFLARE_ACCOUNT_ID=${A}\n`, "other.env": `CLOUDFLARE_ACCOUNT_ID=${B}\n` });
+    expect(load(root, {}, ["deploy", "--envFile", "other.env"])).toMatchObject({ env: { CLOUDFLARE_ACCOUNT_ID: B } });
+    expect(load(root, {}, ["deploy", "--envFile=other.env"])).toMatchObject({ env: { CLOUDFLARE_ACCOUNT_ID: B } });
+  });
+
   it("only adds the variables that decide the account or credentials", () => {
     const root = folder({ ".env": `DATABASE_URL=postgres://\${HOST}/db\nCLOUDFLARE_ENV=staging\nWRANGLER_CACHE_DIR=.cache\n` });
     expect(load(root)).toEqual({ env: { CLOUDFLARE_ENV: "staging", WRANGLER_CACHE_DIR: ".cache" }, from: { CLOUDFLARE_ENV: ".env", WRANGLER_CACHE_DIR: ".env" } });

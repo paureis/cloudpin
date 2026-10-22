@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { cloudflare } from "../src/providers/cloudflare.js";
-import { DOTENV_VARS, DotenvLineError, parseDotenv, wranglerDotenv } from "../src/providers/wrangler-dotenv.js";
+import { DOTENV_VARS, parseDotenv, wranglerDotenv } from "../src/providers/wrangler-dotenv.js";
 import { tempDir } from "./tmp.js";
 
 const A = "0123456789abcdef0123456789abcdef";
@@ -64,25 +64,19 @@ describe("parseDotenv: the dotenv 16.3.1 format Wrangler reads", () => {
     expect(parse(`X=${A}\nX=${B}\n`)).toEqual({ X: B });
   });
 
+  // Expected values are what dotenv 16.3.1's own parse() returns for each text.
   it.each([
-    ["an unclosed quote", 'A=1\nB="never closed\nC=2', 2, "B"],
-    ["text after the closing quote", 'B="x" y', 1, "B"],
-    ["an escaped quote", 'B="a\\"b"', 1, "B"],
-    ["a backslash before the closing quote", "B='a\\'", 1, "B"],
-    ["the KEY: value form", "B: value", 1, undefined],
-    ["a line without =", "A=1\nJUST_A_WORD", 2, undefined],
-    ["a value on the line after KEY=", 'A=\n"value"', 2, undefined],
-    ["export on its own line", "export\nA=1", 1, undefined],
-  ])("refuses %s, naming the line (and the key) but never the value", (_what, text, line, key) => {
-    let error: unknown;
-    try {
-      parseDotenv(text);
-    } catch (err) {
-      error = err;
-    }
-    expect(error).toBeInstanceOf(DotenvLineError);
-    expect(error).toMatchObject({ line, key });
-    expect((error as Error).message).not.toMatch(/value"|never closed|JUST_A_WORD|a\\"b/);
+    ["an unclosed quote", 'A=1\nB="never closed\nC=2', { A: "1", B: '"never closed', C: "2" }],
+    ["text after the closing quote", 'B="x" y', { B: '"x" y' }],
+    ["an escaped quote", 'B="a\\"b"', { B: 'a\\"b' }],
+    ["a backslash before the closing quote", "B='a\\'", { B: "a\\" }],
+    ["the KEY: value form", "B: value", { B: "value" }],
+    ["a line without =", "A=1\nJUST_A_WORD", { A: "1" }],
+    ["a value on the line after KEY=", 'A=\n"value"', { A: "value" }],
+    ["export on its own line", "export\nA=1", { A: "1" }],
+    ["JSON with escaped quotes, a colon line and a stray line", 'G="{\\"type\\":\\"sa\\"}"\nDEBUG: true\nstray line\nX=1', { G: '{\\"type\\":\\"sa\\"}', DEBUG: "true", X: "1" }],
+  ])("reads %s as dotenv does", (_what, text, expected) => {
+    expect(parse(text)).toEqual(expected);
   });
 });
 
@@ -158,10 +152,12 @@ describe("wranglerDotenv: the environment Wrangler gives itself", () => {
     expect(load(root, { CLOUDFLARE_API_TOKEN: "t" })).toEqual({ env: { CLOUDFLARE_API_TOKEN: "t" }, from: {} });
   });
 
-  it("stops on a line it can't read, naming the file and line but not its text", () => {
-    const res = load(folder({ ".env.local": 'OK=1\nCLOUDFLARE_API_TOKEN="abc\\"secretpart"\n' }));
-    expect(res).toMatchObject({ error: expect.stringMatching(/line 2 of \.env\.local.*CLOUDFLARE_API_TOKEN/) });
-    expect(JSON.stringify(res)).not.toContain("secretpart");
+  it("reads every line as dotenv does, so lines for other tools never stop a command", () => {
+    const text = 'GOOGLE_CREDS="{\\"type\\":\\"service_account\\"}"\nDEBUG: true\nstray line\nCLOUDFLARE_API_TOKEN="abc\\"def"\nCF_ACCOUNT_ID=' + B + "\n";
+    expect(load(folder({ ".env.local": text }))).toEqual({
+      env: { CLOUDFLARE_API_TOKEN: 'abc\\"def', CF_ACCOUNT_ID: B },
+      from: { CLOUDFLARE_API_TOKEN: ".env.local", CF_ACCOUNT_ID: ".env.local" },
+    });
   });
 
   it("stops when DOTENV_KEY makes dotenv decrypt a .vault file instead of the plain one", () => {

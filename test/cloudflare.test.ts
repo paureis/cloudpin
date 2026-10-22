@@ -245,8 +245,11 @@ describe("cloudflare.resolve: the .env files Wrangler loads (#116)", () => {
     const expand = await resolve(["deploy"], folder({ ".env": "CLOUDFLARE_ACCOUNT_ID=${OTHER_ACCOUNT}\n" }));
     expect(expand).toMatchObject({ kind: "error", message: expect.stringMatching(/CLOUDFLARE_ACCOUNT_ID in \.env/) });
     expect(JSON.stringify(expand)).not.toContain("OTHER_ACCOUNT");
-    const line = await resolve(["deploy"], folder({ "wrangler.toml": `account_id = "${A}"\n`, ".env.local": 'CLOUDFLARE_API_TOKEN="a\\"b"\n' }));
-    expect(line).toMatchObject({ kind: "error", message: expect.stringMatching(/line 1 of \.env\.local \(it sets CLOUDFLARE_API_TOKEN\)/) });
+  });
+
+  it("is not stopped by .env lines for other tools that dotenv reads or skips", async () => {
+    const env = 'GOOGLE_CREDS="{\\"type\\":\\"service_account\\"}"\nDEBUG: true\nstray line\nDATABASE_URL=postgres://${HOST}/db\n';
+    expect(await resolve(["deploy"], folder({ "wrangler.toml": `account_id = "${A}"\n`, ".env": env }))).toMatchObject({ kind: "identity", identity: { account: A } });
   });
 });
 

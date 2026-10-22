@@ -35,61 +35,81 @@ export const DOTENV_VARS = [
   "CLOUDFLARE_AUTH_USE_KEYRING",
 ];
 
-/** A line cloudpin can't read exactly as dotenv would; it names the line and key, never the value. */
-export class DotenvLineError extends Error {
-  constructor(
-    readonly line: number,
-    readonly key?: string,
-  ) {
-    super(key === undefined ? "line " + line : "line " + line + " (" + key + ")");
+// --- Begin code from dotenv 16.3.1 -------------------------------------------
+// The LINE regex and parse() below are copied from dotenv 16.3.1,
+// https://github.com/motdotla/dotenv/blob/v16.3.1/lib/main.js (the version
+// Wrangler 4.151.3 bundles), changed only by type annotations and formatting,
+// so cloudpin reads every .env line exactly as Wrangler does. dotenv's license:
+//
+// Copyright (c) 2015, Scott Motte
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+//
+// * Redistributions of source code must retain the above copyright notice, this
+//   list of conditions and the following disclaimer.
+//
+// * Redistributions in binary form must reproduce the above copyright notice,
+//   this list of conditions and the following disclaimer in the documentation
+//   and/or other materials provided with the distribution.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+// DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+// FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+// DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+// SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+// CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+// OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+const LINE = /(?:^|^)\s*(?:export\s+)?([\w.-]+)(?:\s*=\s*?|:\s+?)(\s*'(?:\\'|[^'])*'|\s*"(?:\\"|[^"])*"|\s*`(?:\\`|[^`])*`|[^#\r\n]+)?\s*(?:#.*)?(?:$|$)/mg;
+
+// Parse src into an Object
+function parse(src: string): Record<string, string> {
+  const obj: Record<string, string> = {};
+
+  // Convert buffer to string
+  let lines = src.toString();
+
+  // Convert line breaks to same format
+  lines = lines.replace(/\r\n?/mg, "\n");
+
+  let match: RegExpExecArray | null;
+  while ((match = LINE.exec(lines)) != null) {
+    const key = match[1]!;
+
+    // Default undefined or null to empty string
+    let value = match[2] || "";
+
+    // Remove whitespace
+    value = value.trim();
+
+    // Check if double quoted
+    const maybeQuote = value[0];
+
+    // Remove surrounding quotes
+    value = value.replace(/^(['"`])([\s\S]*)\1$/mg, "$2");
+
+    // Expand newlines if double quoted
+    if (maybeQuote === '"') {
+      value = value.replace(/\\n/g, "\n");
+      value = value.replace(/\\r/g, "\r");
+    }
+
+    // Add to object
+    obj[key] = value;
   }
+
+  return obj;
 }
+// --- End code from dotenv 16.3.1 ---------------------------------------------
 
-const BLANK = /^\s*(#.*)?$/;
-const ASSIGNMENT = /^\s*(?:export\s+)?([\w.-]+)\s*=(.*)$/;
-const QUOTES = ["'", '"', "`"];
-
-/**
- * Parses the subset of the dotenv 16.3.1 format (lib/main.js, parse and its
- * LINE regex) whose result cloudpin can be sure of: KEY=value lines (with
- * `export`, comments and blank lines), unquoted values cut at #, and values in
- * '', "" or backticks, over several lines if need be, as long as no backslash
- * comes right before the closing quote. Anything else (an escaped quote, text
- * after the closing quote, KEY: value, a line that is not an assignment) throws
- * DotenvLineError, since dotenv's regex might then read lines differently.
- */
+/** The variables a .env text sets, read by dotenv 16.3.1's own parse(); it never fails. */
 export function parseDotenv(text: string): Map<string, string> {
-  const out = new Map<string, string>();
-  const lines = text.replace(/\r\n?/g, "\n").split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-    if (BLANK.test(line)) continue;
-    const m = ASSIGNMENT.exec(line);
-    if (!m) throw new DotenvLineError(i + 1);
-    const key = m[1]!;
-    const rest = m[2]!.replace(/^\s+/, "");
-    const quote = rest[0];
-    if (quote === undefined || !QUOTES.includes(quote)) {
-      const hash = rest.indexOf("#");
-      out.set(key, (hash === -1 ? rest : rest.slice(0, hash)).trim());
-      continue;
-    }
-    // A quoted value runs to the next quote of the same kind, on this line or a later one.
-    const first = i;
-    let body = rest.slice(1);
-    let value = "";
-    let end = body.indexOf(quote);
-    while (end === -1) {
-      if (++i >= lines.length) throw new DotenvLineError(first + 1, key);
-      value += `${body}\n`;
-      body = lines[i]!;
-      end = body.indexOf(quote);
-    }
-    value += body.slice(0, end);
-    if (value.endsWith("\\") || !BLANK.test(body.slice(end + 1))) throw new DotenvLineError(first + 1, key);
-    out.set(key, quote === '"' ? value.replace(/\\n/g, "\n").replace(/\\r/g, "\r") : value);
-  }
-  return out;
+  return new Map(Object.entries(parse(text)));
 }
 
 /**
@@ -169,19 +189,14 @@ export function wranglerDotenv(
         error: `DOTENV_KEY is set and ${vaultFile} exists, so Wrangler decrypts that file instead of ${file}, which cloudpin can't do: unset DOTENV_KEY for this command, or remove ${vaultFile}`,
       };
     }
-    let parsed: Map<string, string>;
+    let text: string | undefined;
     try {
-      const text = readEnvFile(path);
-      if (text === undefined) continue;
-      parsed = parseDotenv(text);
-    } catch (err) {
-      if (!(err instanceof DotenvLineError)) return { error: `cloudpin can't read ${file}, which Wrangler loads into its environment` };
-      const sets = err.key === undefined ? "" : ` (it sets ${err.key})`;
-      return {
-        error: `cloudpin can't read line ${err.line} of ${file}${sets} the way Wrangler would, and Wrangler loads that file into its environment: write it as NAME=value, the value unquoted or in plain quotes, or move it out of ${file}`,
-      };
+      text = readEnvFile(path);
+    } catch {
+      return { error: `cloudpin can't read ${file}, which Wrangler loads into its environment` };
     }
-    for (const [key, value] of parsed) {
+    if (text === undefined) continue;
+    for (const [key, value] of parseDotenv(text)) {
       const name = canonical.get(fold(key));
       if (name !== undefined) merged.set(name, { value, file });
     }

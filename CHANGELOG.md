@@ -66,9 +66,9 @@ All notable changes to cloudpin are listed here. The format follows
   the one from Wrangler's account cache or `wrangler whoami`, so a command could run on the wrong account; a
   `CLOUDFLARE_API_TOKEN` there replaced the login cloudpin checked. Both now count, as do `CLOUDFLARE_ENV` and the
   other account and credential variables, with Wrangler's precedence: a non-empty variable already set wins, and
-  `account_id` in the Wrangler config still beats them all. A `.env` file cloudpin can't read exactly as Wrangler
-  does (a value that refers to another variable, an escaped quote, a `.env.vault` that `DOTENV_KEY` would decrypt)
-  stops the command, naming the file and variable, never the value.
+  `account_id` in the Wrangler config still beats them all. cloudpin reads the files with the parser Wrangler uses
+  (dotenv's, BSD-2-Clause, copied with its notice). A value it can't work out (one that refers to another variable,
+  or a `.env.vault` that `DOTENV_KEY` would decrypt) stops the command, naming the file and variable, never the value.
 
 ## [1.1.2] - 2026-10-19
 

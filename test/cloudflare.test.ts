@@ -199,6 +199,17 @@ describe("cloudflare.resolve: the .env files Wrangler loads (#116)", () => {
     expect(await resolve(["deploy", "--config", join("app", "wrangler.toml")], root)).toMatchObject({ identity: { account: A } });
   });
 
+  it("treats an empty CLOUDFLARE_ACCOUNT_ID as unset without falling back to CF_ACCOUNT_ID, as Wrangler does", async () => {
+    // workers-utils getEnvironmentVariableFactory reads the deprecated name only
+    // when the main one is absent from process.env; workers-auth then treats "" as unset.
+    const cache = { "node_modules/.cache/wrangler/wrangler-account.json": JSON.stringify({ account: { id: A, name: "Acme" } }) };
+    const fromFile = folder({ ...cache, ".env": `CLOUDFLARE_ACCOUNT_ID=\nCF_ACCOUNT_ID=${B}\n` });
+    expect(await resolve(["deploy"], fromFile)).toMatchObject({ identity: { account: A }, source: expect.stringMatching(/cache/) });
+    const fromShell = folder({ ...cache, ".env": "CLOUDFLARE_ACCOUNT_ID=\n" });
+    expect(await resolve(["deploy"], fromShell, { CF_ACCOUNT_ID: B })).toMatchObject({ identity: { account: A } });
+    expect(await resolve(["deploy"], folder(cache), { CLOUDFLARE_ACCOUNT_ID: "", CF_ACCOUNT_ID: B })).toMatchObject({ identity: { account: A } });
+  });
+
   it("reads the account cache in a WRANGLER_CACHE_DIR set by .env", async () => {
     const root = folder({ "cache/wrangler-account.json": JSON.stringify({ account: { id: B, name: "Side" } }) });
     writeFileSync(join(root, ".env"), `WRANGLER_CACHE_DIR=${join(root, "cache")}\n`);

@@ -229,8 +229,15 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
       if (fromConfig.account !== undefined) return { kind: "identity", identity: { account: fromConfig.account }, source: fromConfig.where };
     }
 
+    // The first name present decides, even when empty: CF_ACCOUNT_ID is read only
+    // when CLOUDFLARE_ACCOUNT_ID is absent (workers-utils environment-variables/
+    // factory.ts getEnvironmentVariableFactory, `variableName in process.env`),
+    // and an empty value counts as unset (workers-auth env-vars.ts
+    // getCloudflareAccountIdFromEnv), so Wrangler goes on to its account cache.
     for (const name of ["CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"]) {
+      if (env[name] === undefined) continue;
       if (env[name]) return { kind: "identity", identity: { account: env[name]! }, source: name + inFile(name) };
+      break;
     }
     const cached = cachedAccount(start, env);
     if (cached) {

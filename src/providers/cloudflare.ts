@@ -144,7 +144,8 @@ function configAccount(path: string, envName: string | undefined): { account?: s
 function cachedAccount(start: string, env: NodeJS.ProcessEnv): { id: string; name?: string } | undefined {
   const modules = findUp("node_modules", start, true);
   const dirs = [
-    env.WRANGLER_CACHE_DIR,
+    // Used as given, after Wrangler's --cwd chdir (config-cache.ts getCacheFolder).
+    env.WRANGLER_CACHE_DIR && resolvePath(start, env.WRANGLER_CACHE_DIR),
     modules && join(modules, ".cache", "wrangler"),
     join(start, ".wrangler", "cache"),
   ].filter((d): d is string => Boolean(d));

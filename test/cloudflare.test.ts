@@ -210,6 +210,12 @@ describe("cloudflare.resolve: the .env files Wrangler loads (#116)", () => {
     expect(await resolve(["deploy"], folder(cache), { CLOUDFLARE_ACCOUNT_ID: "", CF_ACCOUNT_ID: B })).toMatchObject({ identity: { account: A } });
   });
 
+  it("reads a relative WRANGLER_CACHE_DIR from the folder Wrangler runs in (after --cwd)", async () => {
+    const root = folder({ "app/.env": "WRANGLER_CACHE_DIR=cache\n", "app/cache/wrangler-account.json": JSON.stringify({ account: { id: B, name: "Side" } }) });
+    expect(await resolve(["deploy", "--cwd", "app"], root)).toMatchObject({ identity: { account: B, label: "Side" } });
+    expect(await resolve(["deploy"], join(root, "app"), { WRANGLER_CACHE_DIR: "cache" })).toMatchObject({ identity: { account: B } });
+  });
+
   it("reads the account cache in a WRANGLER_CACHE_DIR set by .env", async () => {
     const root = folder({ "cache/wrangler-account.json": JSON.stringify({ account: { id: B, name: "Side" } }) });
     writeFileSync(join(root, ".env"), `WRANGLER_CACHE_DIR=${join(root, "cache")}\n`);

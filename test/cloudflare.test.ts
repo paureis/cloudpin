@@ -233,6 +233,19 @@ describe("cloudflare.resolve: the .env files Wrangler loads (#116)", () => {
     expect(JSON.stringify(res)).not.toContain("token-from-dotenv");
   });
 
+  it("runs whoami in the command's --cwd folder, so Wrangler tops it up from that folder's .env", async () => {
+    const root = folder({ "app/package.json": "{}" });
+    const spaced = fake();
+    await resolve(["deploy", "--cwd", "app"], root, {}, spaced.exec);
+    expect(spaced.calls).toEqual([["whoami", "--json", "--cwd", join(root, "app")]]);
+    const joined = fake();
+    await resolve(["deploy", "--cwd=app"], root, {}, joined.exec);
+    expect(joined.calls).toEqual([["whoami", "--json", "--cwd", join(root, "app")]]);
+    const none = fake();
+    await resolve(["deploy"], root, {}, none.exec);
+    expect(none.calls).toEqual([["whoami", "--json"]]);
+  });
+
   it("passes the command's own environment, the same object, when there is no .env file", async () => {
     const env = { PATH: "/bin", CLOUDFLARE_API_TOKEN: "t" };
     const { exec, envs } = recording();

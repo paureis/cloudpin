@@ -250,7 +250,12 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     }
 
     // `wrangler whoami --json` exits non-zero when not authenticated (whoami.ts).
-    const res = await exec("wrangler", ["whoami", "--json"], env);
+    // whoami runs in cloudpin's folder, where Wrangler tops its environment up
+    // from that folder's .env; when the command has --cwd (so its Wrangler takes
+    // the flag), whoami gets it too and reads the same folder. Without --cwd the
+    // call is unchanged. Draft PR #117 extends this for auth profiles.
+    const whoamiArgs = flagValue(args, ["--cwd"]) === undefined ? ["whoami", "--json"] : ["whoami", "--json", "--cwd", start];
+    const res = await exec("wrangler", whoamiArgs, env);
     let who: { loggedIn?: unknown; accounts?: { id?: unknown; name?: unknown }[] } | undefined;
     try {
       who = JSON.parse(res.stdout) as typeof who;

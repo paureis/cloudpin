@@ -3,6 +3,7 @@ import { basename, dirname, join, resolve as resolvePath } from "node:path";
 import { commandWords, flagValue, hasAnyFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef, Resolution } from "../types.js";
+import { wranglerDotenv } from "./wrangler-dotenv.js";
 
 // Sources: github.com/cloudflare/workers-sdk (packages/workers-auth/src/core/factory.ts
 // getActiveAccountId and getOrSelectAccountId; packages/workers-utils/src/config/
@@ -14,7 +15,8 @@ import type { ProviderDef, Resolution } from "../types.js";
 // then CLOUDFLARE_ACCOUNT_ID (or CF_ACCOUNT_ID), then the project's account
 // cache, then the only account the credentials can see; with several and none
 // set, Wrangler asks on a terminal or fails. The config file beats the env var
-// (a TODO in factory.ts says v5 may swap them).
+// (a TODO in factory.ts says v5 may swap them). Every variable here may also
+// come from the project's .env files (wrangler-dotenv.ts).
 
 export const VALUE_FLAGS = new Set(["--config", "-c", "--cwd", "--env", "-e", "--env-file"]);
 const EXEMPT_COMMANDS = new Set(["login", "logout", "whoami", "auth", "docs", "types", "help", "completions"]);
@@ -186,11 +188,17 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     return false;
   },
 
-  async resolve({ args, env, cwd }, exec): Promise<Resolution> {
+  async resolve({ args, env: commandEnv, cwd }, exec): Promise<Resolution> {
     if (hasAnyFlag(args, ["--temporary"])) {
       return { kind: "error", message: "deploy --temporary uploads to a temporary preview account, not a pinned one" };
     }
     const start = resolvePath(cwd, flagValue(args, ["--cwd"]) ?? ".");
+    // Wrangler adds what its .env files set to its own environment (#116); from
+    // here on, env is that environment, and whoami below is asked with it.
+    const dotenv = wranglerDotenv(args, commandEnv, start);
+    if ("error" in dotenv) return { kind: "error", message: dotenv.error };
+    const { env } = dotenv;
+    const inFile = (name: string) => (dotenv.from[name] ? ` in ${dotenv.from[name]}` : "");
     const given = flagValue(args, ["--config", "-c"]);
     const configPath = given !== undefined ? resolvePath(start, given) : CONFIG_NAMES.map((n) => findUp(n, start)).find(Boolean);
     const envName = flagValue(args, ["--env", "-e"]) ?? (env.CLOUDFLARE_ENV || undefined);
@@ -222,7 +230,7 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     }
 
     for (const name of ["CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"]) {
-      if (env[name]) return { kind: "identity", identity: { account: env[name]! }, source: name };
+      if (env[name]) return { kind: "identity", identity: { account: env[name]! }, source: name + inFile(name) };
     }
     const cached = cachedAccount(start, env);
     if (cached) {
@@ -245,7 +253,7 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     if (res.code !== 0 || !Array.isArray(who?.accounts)) {
       const reason = `${res.stderr}\n${res.stdout}`.split(/\r?\n/).map((l) => l.trim()).find(Boolean)?.slice(0, 300);
       const tokenVar = TOKEN_VARS.find((v) => env[v]);
-      const note = tokenVar ? `; note: ${tokenVar} is set and is used instead of your wrangler login` : "";
+      const note = tokenVar ? `; note: ${tokenVar} is set${inFile(tokenVar)} and is used instead of your wrangler login` : "";
       return { kind: "error", message: `${reason ?? `wrangler whoami failed (exit ${res.code})`}${note}` };
     }
     const accounts = who.accounts.filter((a): a is { id: string; name?: unknown } => typeof a.id === "string");

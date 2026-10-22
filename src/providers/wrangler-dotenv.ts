@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { relative, resolve as resolvePath } from "node:path";
 import { flagValue } from "../args.js";
 
@@ -154,9 +154,21 @@ export function wranglerDotenv(
 
   // The merged file values, later files winning, keyed by canonical name.
   const merged = new Map<string, { value: string; file: string }>();
+  // dotenv 16.3.1 config() (which Wrangler calls) decrypts <file>.vault instead
+  // of the file when DOTENV_KEY is non-empty and the vault exists (lib/main.js
+  // _dotenvKey, _vaultPath); cloudpin can't decrypt it, so it can't tell.
+  const keyName = Object.keys(env).find((k) => fold(k) === fold("DOTENV_KEY"));
+  const dotenvKey = keyName === undefined ? undefined : env[keyName];
   for (const name of names) {
     const path = resolvePath(start, name);
     const file = relative(start, path) || name;
+    const vault = path.endsWith(".vault") ? path : `${path}.vault`;
+    if (dotenvKey && existsSync(vault)) {
+      const vaultFile = relative(start, vault) || vault;
+      return {
+        error: `DOTENV_KEY is set and ${vaultFile} exists, so Wrangler decrypts that file instead of ${file}, which cloudpin can't do: unset DOTENV_KEY for this command, or remove ${vaultFile}`,
+      };
+    }
     let parsed: Map<string, string>;
     try {
       const text = readEnvFile(path);

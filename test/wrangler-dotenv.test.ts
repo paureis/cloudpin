@@ -164,6 +164,18 @@ describe("wranglerDotenv: the environment Wrangler gives itself", () => {
     expect(JSON.stringify(res)).not.toContain("secretpart");
   });
 
+  it("stops when DOTENV_KEY makes dotenv decrypt a .vault file instead of the plain one", () => {
+    const root = folder({ ".env": `CLOUDFLARE_ACCOUNT_ID=${A}\n`, ".env.local.vault": "DOTENV_VAULT_PRODUCTION=encrypted\n" });
+    const res = load(root, { DOTENV_KEY: "dotenv://:key_secretpart@dotenv.org/vault/.env.vault?environment=production" });
+    expect(res).toMatchObject({ error: expect.stringMatching(/\.env\.local\.vault.*DOTENV_KEY/) });
+    expect(JSON.stringify(res)).not.toContain("secretpart");
+    // No key, or an empty one: dotenv reads the plain files and ignores the vault.
+    expect(load(root)).toMatchObject({ env: { CLOUDFLARE_ACCOUNT_ID: A } });
+    expect(load(root, { DOTENV_KEY: "" })).toMatchObject({ env: { CLOUDFLARE_ACCOUNT_ID: A } });
+    // A key but no vault file: the plain files again.
+    expect(load(folder({ ".env": `CLOUDFLARE_ACCOUNT_ID=${A}\n` }), { DOTENV_KEY: "k" })).toMatchObject({ env: { CLOUDFLARE_ACCOUNT_ID: A } });
+  });
+
   it("treats variable names case-insensitively on Windows only, as Wrangler does there", () => {
     const root = folder({ ".env": `cloudflare_account_id=${B}\n` });
     expect(load(root, {}, ["deploy"], "win32")).toMatchObject({ env: { CLOUDFLARE_ACCOUNT_ID: B } });

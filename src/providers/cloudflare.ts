@@ -142,23 +142,25 @@ function configAccount(path: string, envName: string | undefined): { account?: s
 
 /** The project-local account cache Wrangler writes after picking an account (config-cache.ts). */
 function cachedAccount(start: string, env: NodeJS.ProcessEnv): { id: string; name?: string } | undefined {
+  // Wrangler chooses one folder (workers-utils config-cache.ts getCacheFolder)
+  // and reads only its file: WRANGLER_CACHE_DIR when non-empty, used as given
+  // after the --cwd chdir; else <nearest node_modules>/.cache/wrangler if that
+  // folder exists (empathic find.dir walks up from the working folder); else
+  // .wrangler/cache. A missing or broken file there means no cached account.
   const modules = findUp("node_modules", start, true);
-  const dirs = [
-    // Used as given, after Wrangler's --cwd chdir (config-cache.ts getCacheFolder).
-    env.WRANGLER_CACHE_DIR && resolvePath(start, env.WRANGLER_CACHE_DIR),
-    modules && join(modules, ".cache", "wrangler"),
-    join(start, ".wrangler", "cache"),
-  ].filter((d): d is string => Boolean(d));
-  for (const dir of dirs) {
-    const text = read(join(dir, "wrangler-account.json"));
-    if (text === undefined) continue;
-    try {
-      const account = (JSON.parse(text) as { account?: { id?: unknown; name?: unknown } }).account;
-      if (typeof account?.id === "string") return { id: account.id, ...(typeof account.name === "string" ? { name: account.name } : {}) };
-    } catch {
-      // a broken cache is no cache, as in Wrangler
-    }
-    return undefined;
+  const modulesCache = modules && join(modules, ".cache", "wrangler");
+  const dir = env.WRANGLER_CACHE_DIR
+    ? resolvePath(start, env.WRANGLER_CACHE_DIR)
+    : modulesCache && existsSync(modulesCache)
+      ? modulesCache
+      : join(start, ".wrangler", "cache");
+  const text = read(join(dir, "wrangler-account.json"));
+  if (text === undefined) return undefined;
+  try {
+    const account = (JSON.parse(text) as { account?: { id?: unknown; name?: unknown } }).account;
+    if (typeof account?.id === "string") return { id: account.id, ...(typeof account.name === "string" ? { name: account.name } : {}) };
+  } catch {
+    // a broken cache is no cache, as in Wrangler (getConfigCache)
   }
   return undefined;
 }

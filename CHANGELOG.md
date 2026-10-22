@@ -69,6 +69,9 @@ All notable changes to cloudpin are listed here. The format follows
   `account_id` in the Wrangler config still beats them all. cloudpin reads the files with the parser Wrangler uses
   (dotenv's, BSD-2-Clause, copied with its notice). A value it can't work out (one that refers to another variable,
   or a `.env.vault` that `DOTENV_KEY` would decrypt) stops the command, naming the file and variable, never the value.
+  Wrangler's account cache is now read from the one folder Wrangler reads it from (`WRANGLER_CACHE_DIR`, else
+  `node_modules/.cache/wrangler` if it exists, else `.wrangler/cache`); cloudpin went on to the next folder when that
+  one had no account, so an old account cached elsewhere could stand in for the one Wrangler would pick.
 
 ## [1.1.2] - 2026-10-19
 

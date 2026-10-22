@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { parse } from "yaml";
 
 // The official MCP Registry listing (#111). Sources, read 2026-10-21:
 // - server.json fields and limits: static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json, the
@@ -40,5 +41,54 @@ describe("server.json for the MCP Registry", () => {
 
   it("is claimed by package.json's mcpName, which the registry checks on npm", () => {
     expect(pkg.mcpName).toBe(NAME);
+  });
+});
+
+describe("the MCP Registry workflow", () => {
+  const workflow = parse(read(".github/workflows/mcp-registry.yml")) as Record<string, any>;
+  const steps: Record<string, any>[] = Object.values(workflow.jobs as Record<string, any>).flatMap((job) => job.steps ?? []);
+
+  it("only runs by hand, never on pull requests, pushes or tags (CI budget)", () => {
+    expect(Object.keys(workflow.on)).toEqual(["workflow_dispatch"]);
+    expect(workflow.on.workflow_dispatch.inputs.tag.required).toBe(true);
+  });
+
+  it("is one Linux job that may only read the repo and request an OIDC token", () => {
+    const jobs = Object.values(workflow.jobs as Record<string, any>);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]["runs-on"]).toBe("ubuntu-latest");
+    expect(workflow.permissions).toEqual({ contents: "read" });
+    expect(jobs[0].permissions).toEqual({ contents: "read", "id-token": "write" });
+  });
+
+  it("pins every action by full commit SHA", () => {
+    const uses = steps.map((s) => s.uses).filter(Boolean);
+    expect(uses.length).toBeGreaterThan(0);
+    for (const u of uses) expect(u).toMatch(/^[\w.-]+\/[\w.-]+@[0-9a-f]{40}$/);
+  });
+
+  it("installs a pinned mcp-publisher release, checked against its SHA-256", () => {
+    const text = read(".github/workflows/mcp-registry.yml");
+    expect(text).toMatch(/MCP_PUBLISHER_VERSION: \d+\.\d+\.\d+\n/);
+    expect(text).toMatch(/MCP_PUBLISHER_SHA256: [0-9a-f]{64}\n/);
+    expect(text).toContain("releases/download/v${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz");
+    expect(text).not.toContain("releases/latest");
+    expect(text).toContain("sha256sum --check --strict");
+  });
+
+  it("checks the live npm version before logging in, and publishes only outside a dry run", () => {
+    const at = (re: RegExp) => steps.findIndex((s) => re.test(String(s.run ?? "")));
+    const [agree, npm, validate, login, publish] = [
+      at(/jq -r \.version server\.json/),
+      at(/npm view /),
+      at(/mcp-publisher" validate /),
+      at(/mcp-publisher" login github-oidc/),
+      at(/mcp-publisher" publish /),
+    ];
+    expect([agree, npm, validate, login, publish].every((i) => i >= 0)).toBe(true);
+    expect(agree < npm && npm < validate && validate < login && login < publish).toBe(true);
+    expect(steps[login]!.if).toBe("${{ !inputs.dry_run }}");
+    expect(steps[publish]!.if).toBe("${{ !inputs.dry_run }}");
+    expect(steps[validate]!.if).toBeUndefined();
   });
 });

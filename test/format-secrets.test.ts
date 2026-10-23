@@ -58,6 +58,19 @@ describe("a credential flag's value is never repeated", () => {
   }
 });
 
+// Vercel parses flags with arg 5.0.0, which splits a short group (-dt is -d -t)
+// and gives the next word to its last letter when that one takes a value.
+describe("a credential flag at the end of a short group", () => {
+  for (const bin of BINS) {
+    it(`${bin} -dt VALUE deploy`, () => {
+      for (const text of messages([bin, "-dt", TOKEN, "deploy"])) {
+        expect(text).not.toContain(TOKEN);
+        expect(text).toContain(`${bin} -dt *** deploy`);
+      }
+    });
+  }
+});
+
 describe("other flags stay exactly as typed", () => {
   const asTyped: string[][] = [
     ["vercel", "deploy", "-T=team_a"], // Vercel's team flag, not the token
@@ -68,6 +81,9 @@ describe("other flags stay exactly as typed", () => {
     ["kubectl", "exec", "-t=true", "demo"],
     ["wrangler", "deploy", "-t", "demo"],
     ["vercel", "deploy", "-t"], // nothing to hide
+    ["vercel", "-dT", "team_a", "deploy"], // a group ending in the team flag
+    ["kubectl", "-it", "demo"], // a group ending in t, on a CLI where -t is no credential
+    ["vercel", "--debugt", "demo", "deploy"], // a long flag is not a group
   ];
   for (const argv of asTyped) {
     it(argv.join(" "), () => {

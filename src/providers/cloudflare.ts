@@ -187,9 +187,10 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     // Only `wrangler whoami` is cached. Its OAuth logins live in the global
     // Wrangler config folder (~/.wrangler if it exists, else the XDG one):
     // config/<profile>.toml or .enc, and the folder bindings that pick one.
-    // WRANGLER_API_ENVIRONMENT renames the default profile's file.
+    // WRANGLER_API_ENVIRONMENT renames the default profile's file. XDG_CONFIG_HOME
+    // and APPDATA move the folder, also when a .env file sets them.
     return {
-      env: [...TOKEN_VARS, "CLOUDFLARE_EMAIL", "CF_EMAIL", "CLOUDFLARE_AUTH_USE_KEYRING", "WRANGLER_API_ENVIRONMENT"],
+      env: [...TOKEN_VARS, "CLOUDFLARE_EMAIL", "CF_EMAIL", "CLOUDFLARE_AUTH_USE_KEYRING", "WRANGLER_API_ENVIRONMENT", "XDG_CONFIG_HOME", "APPDATA"],
       ...profileCacheInputs(env),
     };
   },

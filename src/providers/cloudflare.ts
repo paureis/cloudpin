@@ -3,7 +3,7 @@ import { basename, dirname, join, resolve as resolvePath } from "node:path";
 import { commandWords, flagValue, hasAnyFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef, Resolution } from "../types.js";
-import { envFileArgs, wranglerDotenv } from "./wrangler-dotenv.js";
+import { DOTENV_VARS, envFileArgs, wranglerDotenv } from "./wrangler-dotenv.js";
 
 // Sources: github.com/cloudflare/workers-sdk (packages/workers-auth/src/core/factory.ts
 // getActiveAccountId and getOrSelectAccountId; packages/workers-utils/src/config/
@@ -175,7 +175,11 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     // Wrangler config folder (~/.wrangler if it exists, else the XDG one).
     const dirs = [join(home(env), ".wrangler"), join(env.XDG_CONFIG_HOME ?? join(home(env), ".config"), ".wrangler")];
     return {
-      env: [...TOKEN_VARS, "CLOUDFLARE_EMAIL", "CF_EMAIL", "CLOUDFLARE_AUTH_USE_KEYRING"],
+      // Every variable that decides the account, not only whoami's credentials:
+      // guard blocks when a command line sets one to a value it can't know (#86,
+      // #119). DOTENV_KEY picks a .env.vault over .env (wrangler-dotenv.ts). Names
+      // whoami ignores can only make its cache miss, never hit wrongly.
+      env: [...DOTENV_VARS, "DOTENV_KEY"],
       files: dirs.map((d) => join(d, "config", "default.toml")),
       dirs: [],
     };

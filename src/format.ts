@@ -9,11 +9,16 @@ const SECRET_SHORT: Record<string, string[]> = { vercel: ["-t"], vc: ["-t"] };
 
 function displayCommand(argv: string[]): string {
   const bin = argv[0]?.replace(/\\/g, "/").split("/").pop()?.toLowerCase().replace(/\.(exe|cmd|bat|ps1)$/, "") ?? "";
-  const secret = [...SECRET_FLAGS, ...(SECRET_SHORT[bin] ?? [])];
+  const short = SECRET_SHORT[bin] ?? [];
+  const secret = [...SECRET_FLAGS, ...short];
   const shown = argv.map((a, i) => {
     if (i > 0 && secret.includes(argv[i - 1]!)) return "***";
     const inline = SECRET_FLAGS.find((f) => a.startsWith(`${f}=`));
-    return inline ? `${inline}=***` : a;
+    if (inline) return `${inline}=***`;
+    // A short flag can carry its value joined: -t=VALUE or -tVALUE (#123).
+    const joined = i > 0 ? short.find((f) => a.startsWith(f) && a.length > f.length) : undefined;
+    if (joined) return a[joined.length] === "=" ? `${joined}=***` : `${joined}***`;
+    return a;
   });
   return shown.map((a) => (/[\s"]/.test(a) ? JSON.stringify(a) : a)).join(" ");
 }

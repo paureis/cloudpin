@@ -200,7 +200,16 @@ export const kubernetes: ProviderDef<"kubernetes"> = {
 
   cacheInputs() {
     // Identity is read from the kubeconfig on every command; nothing is spawned or cached.
-    return { env: [], files: [], dirs: [] };
+    // The list still names every variable `resolve` reads, so guard stops a command that
+    // sets one from a value only known when it runs (#86, #133).
+    return {
+      env: [
+        "KUBECONFIG", "KUBERC", "KUBECTL_KUBERC", "HOME", "USERPROFILE",
+        "HELM_KUBECONTEXT", "HELM_KUBEAPISERVER", "HELM_NAMESPACE",
+      ],
+      files: [],
+      dirs: [],
+    };
   },
 
   isExempt(args, bin) {

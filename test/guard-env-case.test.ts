@@ -96,6 +96,12 @@ describe("guard: lowercase Cloudflare variables count on Windows only (#119)", (
     const v = await agentLine(`cloudflare_account_id=${B} wrangler deploy`, root, cfDeps("win32", whoamiSees(A)), { CLOUDFLARE_ACCOUNT_ID: A });
     expect(v).toMatchObject({ action: "block", uncertain: true, problems: [expect.stringMatching(/CLOUDFLARE_ACCOUNT_ID.*cloudflare_account_id/)] });
     expect(JSON.stringify(v)).not.toContain(B);
+    // When one spelling's value is unknown, that is the reason given.
+    expect(await agentLine("cloudflare_account_id=$(cat id) wrangler deploy", root, cfDeps("win32", whoamiSees(A)), { CLOUDFLARE_ACCOUNT_ID: A })).toMatchObject({
+      action: "block",
+      uncertain: true,
+      problems: [expect.stringContaining("CLOUDFLARE_ACCOUNT_ID is set by the command line")],
+    });
     // The same value twice is no conflict; on linux they are two variables anyway.
     expect(await agentLine(`cloudflare_account_id=${A} wrangler deploy`, root, cfDeps("win32", whoamiSees(B)), { CLOUDFLARE_ACCOUNT_ID: A })).toEqual(allowed);
     expect(await agentLine(`cloudflare_account_id=${B} wrangler deploy`, root, cfDeps("linux", whoamiSees(B)), { CLOUDFLARE_ACCOUNT_ID: A })).toEqual(allowed);

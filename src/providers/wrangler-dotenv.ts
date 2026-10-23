@@ -33,6 +33,8 @@ export const DOTENV_VARS = [
   "CLOUDFLARE_EMAIL",
   "CF_EMAIL",
   "CLOUDFLARE_AUTH_USE_KEYRING",
+  // Picks the default profile's login file and the API whoami asks (#103).
+  "WRANGLER_API_ENVIRONMENT",
 ];
 
 // --- Begin code from dotenv 16.3.1 -------------------------------------------

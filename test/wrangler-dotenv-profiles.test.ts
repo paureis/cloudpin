@@ -116,4 +116,14 @@ describe("Wrangler .env files and auth profiles together", () => {
     const env = { ...profileHome(bound(root, "work")), CLOUDFLARE_ACCOUNT_ID: "", CF_ACCOUNT_ID: A };
     expect(await resolve(["deploy"], root, env)).toMatchObject({ identity: { account: B }, source: expect.stringMatching(/profile "work"/) });
   });
+
+  it("passes WRANGLER_API_ENVIRONMENT from .env to whoami, so the identity cache keys on it", async () => {
+    // It picks the default profile's login file and the API whoami asks (workers-auth credential-store/
+    // file-store.ts getAuthConfigFilePath, env-vars.ts), and is read from process.env after the .env load.
+    const root = folder({ ".env": "WRANGLER_API_ENVIRONMENT=staging\n" });
+    const { exec, calls } = recording();
+    await resolve(["deploy"], root, profileHome(bound(root, "work")), exec);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.env.WRANGLER_API_ENVIRONMENT).toBe("staging");
+  });
 });

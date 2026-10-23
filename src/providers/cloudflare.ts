@@ -2,7 +2,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve as resolvePath } from "node:path";
 import { commandWords, flagValue, hasAnyFlag } from "../args.js";
 import type { ProviderDef, Resolution } from "../types.js";
-import { wranglerDotenv } from "./wrangler-dotenv.js";
+import { envFileArgs, wranglerDotenv } from "./wrangler-dotenv.js";
 import { accountCacheFile, bindingFolder, commandProfile, envCredentials, profileCacheInputs, profileNote } from "./wrangler-profiles.js";
 
 // Sources: github.com/cloudflare/workers-sdk (packages/workers-auth/src/core/factory.ts
@@ -303,6 +303,14 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
       // call is unchanged. --config doesn't move the .env folder.
       whoamiArgs.push("--cwd", start);
     }
+    // With --env-file, Wrangler reads only those files and not the default .env
+    // ones, for every command whoami included: workers-sdk wrangler@4.151.3,
+    // packages/wrangler/src/index.ts lines 626-632 (a global flag) and 702-710
+    // (a check run for every command, after the --cwd chdir), with no variable
+    // that turns it off. A default .env must not lend whoami a token the command
+    // won't have (#130), so whoami gets the same files, made absolute against the
+    // command's folder, with or without profiles.
+    for (const file of envFileArgs(args) ?? []) whoamiArgs.push("--env-file", resolvePath(start, file));
     // `wrangler whoami --json` exits non-zero when not authenticated (whoami.ts).
     const res = await exec("wrangler", whoamiArgs, env);
     let who: { loggedIn?: unknown; accounts?: { id?: unknown; name?: unknown }[] } | undefined;

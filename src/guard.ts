@@ -156,17 +156,17 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   // Track whether the CLI itself is missing: then the command would fail on
   // its own, so there is no account to protect (DESIGN.md, edge cases).
   let cliMissing = false;
-  const inner = deps.wrapExec ? deps.wrapExec(provider, req.env, deps.exec) : deps.exec;
+  // On Windows the provider reads names the way the CLI does, case-insensitively (#119).
+  const folded = foldEnvNames(req.env, deps.platform ?? process.platform);
+  const inner = deps.wrapExec ? deps.wrapExec(provider, folded.env, deps.exec) : deps.exec;
   const exec: Exec = async (bin, args, env) => {
     const result = await inner(bin, args, env);
     if (result.notFound) cliMissing = true;
     return result;
   };
-  // On Windows the provider reads names the way the CLI does, case-insensitively (#119).
-  const folded = foldEnvNames(req.env, deps.platform ?? process.platform);
   // A variable the line sets from something only known when it runs (#86): if it
   // decides this CLI's account, cloudpin can't tell which account will be used.
-  const identityVars = provider.cacheInputs(req.env).env;
+  const identityVars = provider.cacheInputs(folded.env).env;
   const unknown = Object.keys(folded.env).filter((k) => folded.env[k] === UNKNOWN_VALUE && envNameMatches(identityVars, k));
   if (unknown.length > 0) {
     return {

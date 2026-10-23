@@ -5,6 +5,7 @@ import { cachedExec } from "../src/cache.js";
 import type { FoundConfig } from "../src/config.js";
 import { guard, type GuardDeps, type Verdict } from "../src/guard.js";
 import { aws } from "../src/providers/aws.js";
+import { azure } from "../src/providers/azure.js";
 import { cloudflare } from "../src/providers/cloudflare.js";
 import { github } from "../src/providers/github.js";
 import { envFor, findInvocations } from "../src/shellwords.js";
@@ -160,6 +161,32 @@ describe("guard: lowercase variables of other providers on Windows (#119)", () =
     };
     expect(await run("win32")).toEqual([allowed, expect.objectContaining(mismatch("999999999999"))]);
     // On linux aws ignores aws_profile, so the cached identity is the right one.
+    expect(await run("linux")).toEqual([allowed, allowed]);
+  });
+
+  it("Azure: the identity cache watches the folder a lowercase azure_config_dir names, on win32", async () => {
+    const run = async (platform: NodeJS.Platform) => {
+      const cacheDir = tempDir("cloudpin-env-case-cache-");
+      const configDir = folder({ "azureProfile.json": "{}" });
+      let active = "11111111-1111-1111-1111-111111111111";
+      const exec: Exec = async () => ({ code: 0, stdout: JSON.stringify({ id: active, tenantId: "t" }), stderr: "" });
+      const deps: GuardDeps = {
+        providers: [azure],
+        exec,
+        findConfig: () => ({ path: "/repo/.cloudpin.yml", pins: { azure: { subscription: "11111111-1111-1111-1111-111111111111" } } }),
+        wrapExec: (p: ProviderDef, env, inner) => cachedExec(inner, p.cacheInputs(env), { cacheDir, env: {} }),
+        platform,
+      };
+      const env = { HOME: tempDir("cloudpin-env-case-home-"), azure_config_dir: configDir };
+      const first = await shell(env, "/repo", deps, "az", ["vm", "list"]);
+      // `az account set` in that folder rewrites azureProfile.json.
+      active = "22222222-2222-2222-2222-222222222222";
+      writeFileSync(join(configDir, "azureProfile.json"), '{"subscriptions": []}');
+      const second = await shell(env, "/repo", deps, "az", ["vm", "list"]);
+      return [first, second];
+    };
+    expect(await run("win32")).toEqual([allowed, expect.objectContaining(mismatch("22222222"))]);
+    // On linux az ignores azure_config_dir, and the default folder didn't change.
     expect(await run("linux")).toEqual([allowed, allowed]);
   });
 });

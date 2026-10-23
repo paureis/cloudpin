@@ -2,6 +2,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve as resolvePath } from "node:path";
 import { commandWords, flagValue, hasAnyFlag } from "../args.js";
 import type { ProviderDef, Resolution } from "../types.js";
+import { wranglerDotenv } from "./wrangler-dotenv.js";
 import { accountCacheFile, bindingFolder, commandProfile, envCredentials, profileCacheInputs, profileNote } from "./wrangler-profiles.js";
 
 // Sources: github.com/cloudflare/workers-sdk (packages/workers-auth/src/core/factory.ts
@@ -14,9 +15,20 @@ import { accountCacheFile, bindingFolder, commandProfile, envCredentials, profil
 // then CLOUDFLARE_ACCOUNT_ID (or CF_ACCOUNT_ID), then the project's account
 // cache, then the only account the credentials can see; with several and none
 // set, Wrangler asks on a terminal or fails. The config file beats the env var
-// (a TODO in factory.ts says v5 may swap them). An auth profile (#103,
-// wrangler-profiles.ts) picks the login, and with it the account cache and
-// the accounts the credentials can see.
+// (a TODO in factory.ts says v5 may swap them). Every variable here may also
+// come from the project's .env files (wrangler-dotenv.ts). An auth profile
+// (#103, wrangler-profiles.ts) picks the login, and with it the account cache
+// and the accounts the credentials can see.
+//
+// How the two meet (wrangler@4.151.3): Wrangler loads the .env files into
+// process.env in a global yargs check, after the --cwd chdir (packages/wrangler/
+// src/index.ts createCLIParser), and only then does the command handler pick
+// the profile (core/register-yargs-command.ts createHandler, setProfile). The
+// profile never reads the environment, and it holds only a login: an account
+// from the config file or CLOUDFLARE_ACCOUNT_ID, from the shell or a .env file,
+// still beats the profile's account cache (workers-auth core/factory.ts
+// getActiveAccountId), and an API token or key from either replaces the
+// profile's login (workers-auth credentials.ts getAPIToken, env first).
 
 export const VALUE_FLAGS = new Set(["--config", "-c", "--cwd", "--env", "-e", "--env-file", "--profile"]);
 const EXEMPT_COMMANDS = new Set(["login", "logout", "whoami", "auth", "docs", "types", "help", "completions"]);
@@ -142,22 +154,26 @@ function configAccount(path: string, envName: string | undefined): { account?: s
 
 /** The project-local account cache Wrangler writes after picking an account (config-cache.ts). */
 function cachedAccount(start: string, env: NodeJS.ProcessEnv, file: string): { id: string; name?: string } | undefined {
+  // Wrangler chooses one folder (workers-utils config-cache.ts getCacheFolder)
+  // and reads only its file: WRANGLER_CACHE_DIR when non-empty, used as given
+  // after the --cwd chdir; else <nearest node_modules>/.cache/wrangler if that
+  // folder exists (empathic find.dir walks up from the working folder); else
+  // .wrangler/cache. A missing or broken file there means no cached account.
+  // The file is the active profile's (accountCacheFile).
   const modules = findUp("node_modules", start, true);
-  const dirs = [
-    env.WRANGLER_CACHE_DIR,
-    modules && join(modules, ".cache", "wrangler"),
-    join(start, ".wrangler", "cache"),
-  ].filter((d): d is string => Boolean(d));
-  for (const dir of dirs) {
-    const text = read(join(dir, file));
-    if (text === undefined) continue;
-    try {
-      const account = (JSON.parse(text) as { account?: { id?: unknown; name?: unknown } }).account;
-      if (typeof account?.id === "string") return { id: account.id, ...(typeof account.name === "string" ? { name: account.name } : {}) };
-    } catch {
-      // a broken cache is no cache, as in Wrangler
-    }
-    return undefined;
+  const modulesCache = modules && join(modules, ".cache", "wrangler");
+  const dir = env.WRANGLER_CACHE_DIR
+    ? resolvePath(start, env.WRANGLER_CACHE_DIR)
+    : modulesCache && existsSync(modulesCache)
+      ? modulesCache
+      : join(start, ".wrangler", "cache");
+  const text = read(join(dir, file));
+  if (text === undefined) return undefined;
+  try {
+    const account = (JSON.parse(text) as { account?: { id?: unknown; name?: unknown } }).account;
+    if (typeof account?.id === "string") return { id: account.id, ...(typeof account.name === "string" ? { name: account.name } : {}) };
+  } catch {
+    // a broken cache is no cache, as in Wrangler (getConfigCache)
   }
   return undefined;
 }
@@ -188,11 +204,17 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     return false;
   },
 
-  async resolve({ args, env, cwd }, exec): Promise<Resolution> {
+  async resolve({ args, env: commandEnv, cwd }, exec): Promise<Resolution> {
     if (hasAnyFlag(args, ["--temporary"])) {
       return { kind: "error", message: "deploy --temporary uploads to a temporary preview account, not a pinned one" };
     }
     const start = resolvePath(cwd, flagValue(args, ["--cwd"]) ?? ".");
+    // Wrangler adds what its .env files set to its own environment (#116); from
+    // here on, env is that environment, and whoami below is asked with it.
+    const dotenv = wranglerDotenv(args, commandEnv, start);
+    if ("error" in dotenv) return { kind: "error", message: dotenv.error };
+    const { env } = dotenv;
+    const inFile = (name: string) => (dotenv.from[name] ? ` in ${dotenv.from[name]}` : "");
     const given = flagValue(args, ["--config", "-c"]);
     const configPath = given !== undefined ? resolvePath(start, given) : CONFIG_NAMES.map((n) => findUp(n, start)).find(Boolean);
     const envName = flagValue(args, ["--env", "-e"]) ?? (env.CLOUDFLARE_ENV || undefined);
@@ -231,8 +253,15 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
       }
     }
 
+    // The first name present decides, even when empty: CF_ACCOUNT_ID is read only
+    // when CLOUDFLARE_ACCOUNT_ID is absent (workers-utils environment-variables/
+    // factory.ts getEnvironmentVariableFactory, `variableName in process.env`),
+    // and an empty value counts as unset (workers-auth env-vars.ts
+    // getCloudflareAccountIdFromEnv), so Wrangler goes on to its account cache.
     for (const name of ["CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"]) {
-      if (env[name]) return { kind: "identity", identity: { account: env[name]! }, source: name + profileNote(profile()) };
+      if (env[name] === undefined) continue;
+      if (env[name]) return { kind: "identity", identity: { account: env[name]! }, source: name + inFile(name) + profileNote(profile()) };
+      break;
     }
     const p = profile();
     if ("error" in p) return { kind: "error", message: p.error };
@@ -249,7 +278,8 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     // whoami refuses --profile and answers for the profile of the folder it runs in
     // (commands.ts), so with profiles about it runs in the command's folder, and a
     // --profile that folder isn't bound to can't be asked about, unless credentials
-    // in the environment replace every profile's login.
+    // in the environment (the command's own or its .env files') replace every
+    // profile's login.
     const whoamiArgs = ["whoami", "--json"];
     if (p.inUse) {
       if (p.name !== p.folder && !envCredentials(env)) {
@@ -263,8 +293,15 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
       // string: createHandler (register-yargs-command.ts) takes the folder from
       // dirname(path.resolve(--config)) without resolving links, and --config is
       // a global flag (index.ts globalFlags), so whoami accepts it.
+      // --cwd also makes whoami read the command's .env files, as below.
       whoamiArgs.push("--cwd", folder);
       if (given !== undefined) whoamiArgs.push("--config", given);
+    } else if (flagValue(args, ["--cwd"]) !== undefined) {
+      // whoami runs in cloudpin's folder, where Wrangler tops its environment up
+      // from that folder's .env; when the command has --cwd (so its Wrangler takes
+      // the flag), whoami gets it too and reads the same folder. Without --cwd the
+      // call is unchanged. --config doesn't move the .env folder.
+      whoamiArgs.push("--cwd", start);
     }
     // `wrangler whoami --json` exits non-zero when not authenticated (whoami.ts).
     const res = await exec("wrangler", whoamiArgs, env);
@@ -278,7 +315,7 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     if (res.code !== 0 || !Array.isArray(who?.accounts)) {
       const reason = `${res.stderr}\n${res.stdout}`.split(/\r?\n/).map((l) => l.trim()).find(Boolean)?.slice(0, 300);
       const tokenVar = TOKEN_VARS.find((v) => env[v]);
-      const note = tokenVar ? `; note: ${tokenVar} is set and is used instead of your wrangler login` : "";
+      const note = tokenVar ? `; note: ${tokenVar} is set${inFile(tokenVar)} and is used instead of your wrangler login` : "";
       return { kind: "error", message: `${reason ?? `wrangler whoami failed (exit ${res.code})`}${note}` };
     }
     const accounts = who.accounts.filter((a): a is { id: string; name?: unknown } => typeof a.id === "string");

@@ -187,11 +187,11 @@ pointing anywhere but your own machine is stopped, because cloudpin can't tell w
 
 For Cloudflare, cloudpin follows Wrangler's order: `account_id` in the config file Wrangler would find, then
 `CLOUDFLARE_ACCOUNT_ID`, then the account Wrangler cached, then the only account the login sees
-(`wrangler whoami --json`), with the auth profile the command uses (`--profile` or `wrangler auth activate`). If it
-sees several and none is set, Wrangler would ask or fail, so cloudpin stops the command, as for a profile it can't
-ask about. Local commands (`dev`, and `d1`, `kv key` or `r2 object` without `--remote`) are never blocked; `dev`
-with `remote: true` bindings reaches your account unchecked. Built to Wrangler's source and docs, not yet run
-against a real Cloudflare login; reports welcome.
+(`wrangler whoami --json`), with the auth profile the command uses (`--profile` or `wrangler auth activate`).
+Variables Wrangler loads from the project's `.env` files count too. If it sees several and none is set, Wrangler
+would ask or fail, so cloudpin stops the command, as for a profile it can't ask about. Local commands (`dev`, and
+`d1`, `kv key` or `r2 object` without `--remote`) are never blocked; `dev` with `remote: true` bindings reaches your
+account unchecked. Built to Wrangler's source and docs, not yet run against a real Cloudflare login; reports welcome.
 
 - **Match:** the command runs as if cloudpin wasn't there.
 - **Mismatch:** the command is stopped, and you're told which account is active and how to switch.

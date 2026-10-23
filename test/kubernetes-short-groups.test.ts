@@ -106,6 +106,11 @@ describe("kubectl short flag groups (#133)", () => {
     }
   });
 
+  it("gives a value letter at the end of a group the next word, whatever it holds", async () => {
+    // pflag: `-fc -xn` is --follow and --container "-xn", not the flags -x -n.
+    expect(await target(["logs", "-fc", "-xn", "pod"])).toEqual({ server: PROD, namespace: "payments" });
+  });
+
   it("ignores groups after --, which belong to the command run in the pod", async () => {
     expect(await target(["exec", "pod", "--", "sh", "-itn", "other"])).toEqual({ server: PROD, namespace: "payments" });
   });
@@ -143,9 +148,9 @@ describe("helm short flag groups (#133)", () => {
     expect(await target(["install", "-fvalues-ns.yaml", "rel", "chart"], "helm")).toEqual({ server: PROD, namespace: "payments" });
   });
 
-  it("can't tell when a letter it doesn't know comes before -n", async () => {
-    const res = await resolve(["list", "-xn", "other"], "helm");
-    expect(res.kind).toBe("error");
+  it("can't tell when a letter it doesn't know comes before -n or -A", async () => {
+    expect((await resolve(["list", "-xn", "other"], "helm")).kind).toBe("error");
+    expect((await resolve(["list", "-xA"], "helm")).kind).toBe("error");
   });
 });
 

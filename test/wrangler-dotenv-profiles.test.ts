@@ -111,6 +111,25 @@ describe("Wrangler .env files and auth profiles together", () => {
     expect(calls[0]!.env.CLOUDFLARE_API_TOKEN).toBe("app-token");
   });
 
+  it("passes the command's --env-file files to whoami after the profile's --cwd and --config (#130)", async () => {
+    // With --env-file, Wrangler reads only those files (index.ts createCLIParser), whoami included, so the
+    // folder's .env token must not reach it; the files are resolved against the --cwd folder.
+    const root = folder({
+      "app/.env": "CLOUDFLARE_API_TOKEN=default-token\n",
+      "app/staging.env": "CLOUDFLARE_EMAIL=dev@example.com\n",
+      "app/sub/wrangler.toml": 'name = "w"\n',
+    });
+    const env = profileHome(bound(join(root, "app", "sub"), "work"));
+    const { exec, calls } = recording();
+    const args = ["deploy", "--cwd", "app", "--config", "sub/wrangler.toml", "--env-file", "staging.env"];
+    expect(await resolve(args, root, env, exec)).toMatchObject({ identity: { account: A }, source: expect.stringMatching(/profile "work"/) });
+    expect(calls.map((c) => c.args)).toEqual([
+      ["whoami", "--json", "--cwd", physical(join(root, "app")), "--config", "sub/wrangler.toml", "--env-file", join(root, "app", "staging.env")],
+    ]);
+    expect(calls[0]!.env.CLOUDFLARE_API_TOKEN).toBeUndefined();
+    expect(calls[0]!.env.CLOUDFLARE_EMAIL).toBe("dev@example.com");
+  });
+
   it("goes past an empty CLOUDFLARE_ACCOUNT_ID, and ignores CF_ACCOUNT_ID, to the profile's account cache", async () => {
     const root = folder(cacheFile("wrangler-account-work.json", B));
     const env = { ...profileHome(bound(root, "work")), CLOUDFLARE_ACCOUNT_ID: "", CF_ACCOUNT_ID: A };

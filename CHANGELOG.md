@@ -8,8 +8,16 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-29
+
+Run it everywhere: a GitHub Action, Homebrew and Scoop, the MCP server for every agent, and sharper Vercel and
+Wrangler account checks.
+
 ### Added
 
+- A GitHub Action, [paureis/cloudpin-action](https://github.com/paureis/cloudpin-action) (#10): `uses:
+  paureis/cloudpin-action@v1` after a job's cloud logins fails the job before it deploys to an account other than the
+  pinned one, with a job summary and an annotation per failing cloud.
 - `cloudpin check --only <clouds>` and `--json` (#10): `--only azure,aws` checks just those clouds and fails one
   that isn't pinned, installed or logged in, so a CI job checks what it deploys to; `--json` prints the result
   (`match`, `mismatch`, `unpinned` or `error`) and each cloud's status, reason and fix, so tools never parse text.

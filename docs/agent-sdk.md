@@ -43,8 +43,9 @@ cloudpin and returns cloudpin's answer: a deny with the reason, or nothing, whic
 `"allow"`, so the SDK's own permission rules still decide everything cloudpin doesn't object to.
 
 The callback has to fail closed itself. With Claude Code 2.1.310, a callback that raised an exception let the command
-run (the timeout case is under Timeouts). So every way the check can fail (cloudpin not found, a non-zero exit, output
-that isn't JSON, no answer in time) becomes a deny in the snippets below.
+run (the timeout case is under Timeouts). So in the snippets below, every way the check can fail becomes a deny:
+cloudpin not found, a non-zero exit, output that isn't a JSON object, no answer in time, and any other error, caught
+around the whole callback.
 
 ### Python
 
@@ -69,19 +70,19 @@ def deny(reason: str) -> HookJSONOutput:
                                    "permissionDecisionReason": f"{reason}, so the command is blocked."}}
 
 async def cloudpin_check(input_data: HookInput, tool_use_id: str | None, context: HookContext) -> HookJSONOutput:
-    try:
+    try:  # every failure must deny: a callback that raises lets the command run
         with anyio.fail_after(55):  # cloudpin answers within 45 s; the SDK's hook timeout is 60 s
             done = await anyio.run_process(CLOUDPIN, input=json.dumps(input_data).encode(), check=False,
                                            env={**os.environ, "NoDefaultCurrentDirectoryInExePath": "1"})
-    except (OSError, TimeoutError) as err:
-        return deny(f"cloudpin could not check the command ({type(err).__name__})")
-    if done.returncode != 0:
-        return deny(f"cloudpin could not check the command (exit {done.returncode})")
-    out = done.stdout.decode().strip()
-    try:
-        return json.loads(out) if out else {}  # {}: no objection, the agent's own permissions decide
+        if done.returncode != 0:
+            return deny(f"cloudpin could not check the command (exit {done.returncode})")
+        out = done.stdout.decode().strip()
+        answer = json.loads(out) if out else {}  # {}: no objection, the agent's own permissions decide
+        return answer if isinstance(answer, dict) else deny("cloudpin's answer was not a JSON object")
     except json.JSONDecodeError:
         return deny("cloudpin's answer was not JSON")
+    except Exception as err:  # not found, too slow, output that isn't UTF-8, ...
+        return deny(f"cloudpin could not check the command ({type(err).__name__})")
 
 options = ClaudeAgentOptions(
     setting_sources=[],  # no settings files load, so no settings hook either: this callback is the guard
@@ -113,21 +114,23 @@ const deny = (reason: string): HookJSONOutput => ({
 
 export const cloudpinCheck: HookCallback = (input, _toolUseID, { signal }) =>
   new Promise((resolve) => {
-    const env = { ...process.env, NoDefaultCurrentDirectoryInExePath: "1" };
-    // cloudpin answers within 45 s; the SDK's hook timeout is 60 s.
-    const child = execFile(file, args, { env, signal, timeout: 55_000 }, (err, stdout) => {
-      if (err) {
-        const why = typeof err.code === "number" ? `exit ${err.code}` : (err.code ?? err.signal ?? err.name);
-        return resolve(deny(`cloudpin could not check the command (${why})`));
-      }
-      try {
-        resolve(stdout.trim() ? JSON.parse(stdout) : {}); // {}: no objection, the agent's own permissions decide
-      } catch {
-        resolve(deny("cloudpin's answer was not JSON"));
-      }
-    });
-    child.stdin?.on("error", () => {}); // a cloudpin that failed to start is reported by the callback above
-    child.stdin?.end(JSON.stringify(input));
+    try { // every failure must deny: a callback that throws or rejects lets the command run
+      const stdin = JSON.stringify(input);
+      const env = { ...process.env, NoDefaultCurrentDirectoryInExePath: "1" };
+      const child = execFile(file, args, { env, signal, timeout: 55_000 }, (err, stdout) => {
+        if (err) {
+          const why = typeof err.code === "number" ? `exit ${err.code}` : (err.code ?? err.signal ?? err.name);
+          return resolve(deny(`cloudpin could not check the command (${why})`));
+        }
+        try {
+          const answer = stdout.trim() ? JSON.parse(stdout) : {}; // {}: no objection, the agent's permissions decide
+          const isObject = answer && typeof answer === "object" && !Array.isArray(answer);
+          resolve(isObject ? answer : deny("cloudpin's answer was not a JSON object"));
+        } catch { resolve(deny("cloudpin's answer was not JSON")); }
+      });
+      child.stdin?.on("error", () => {}); // a cloudpin that failed to start is reported by the callback above
+      child.stdin?.end(stdin);
+    } catch (err) { resolve(deny(`cloudpin could not check the command (${(err as Error)?.name ?? "error"})`)); }
   });
 
 export const options: Options = {
@@ -143,7 +146,9 @@ Spread `options` into the options you pass to `query()`.
 In real sessions with `setting_sources=[]`, each callback denied `gh repo view` against a made-up GitHub pin, with
 cloudpin's reason in the tool result, and let it run (`{"name":"cli"}`) with the active login pinned. Called directly,
 outside a session, each one denied when cloudpin wasn't on PATH, exited 3 with no output, printed text that wasn't
-JSON, or didn't answer before its deadline, and the TypeScript one also denied when the SDK aborted the call.
+JSON or JSON that wasn't an object, or didn't answer before its deadline. The Python one also denied output that
+wasn't valid UTF-8; the TypeScript one also denied when the SDK aborted the call, and when the call threw before
+cloudpin started (an input `JSON.stringify` can't serialize).
 
 ## Windows
 

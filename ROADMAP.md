@@ -56,7 +56,7 @@ An idea gets a version when work on it starts.
 
 ## Shipped
 
-- **1.2.0** (2026-11-05): run it everywhere. The GitHub Action ([#10](https://github.com/paureis/cloudpin/issues/10)),
+- **1.2.0** (2026-10-29): run it everywhere. The GitHub Action ([#10](https://github.com/paureis/cloudpin/issues/10)),
   Homebrew and Scoop ([#16](https://github.com/paureis/cloudpin/issues/16),
   [#17](https://github.com/paureis/cloudpin/issues/17)), upgrade advice per package manager
   ([#98](https://github.com/paureis/cloudpin/issues/98)), Windows agent hooks under PowerShell's execution policy

@@ -8,7 +8,7 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
 
 ## [Unreleased]
 
-## [1.2.0] - 2026-11-05
+## [1.2.0] - 2026-10-29
 
 Run it everywhere: a GitHub Action, Homebrew and Scoop, the MCP server for every agent, and sharper Vercel and
 Wrangler account checks.

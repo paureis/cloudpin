@@ -33,9 +33,8 @@ PreToolUse:Bash hook error: cloudpin: blocked `gh repo view cli/cli --json name`
   Do not work around this; ask the user to switch accounts or confirm.
 ```
 
-The same goes for a hook installed with `--user` (the `"user"` source) and for the Claude Code plugin, if those
-settings load. If your app passes `setting_sources=[]`, or a list without the source that holds the hook, no settings
-hook runs, and you need the callback below.
+A hook installed with `--user` loads with the `"user"` source in the same way. If your app passes `setting_sources=[]`,
+or a list without the source that holds the hook, no settings hook runs, and you need the callback below.
 
 ## When your app loads no settings: a callback
 

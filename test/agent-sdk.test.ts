@@ -84,7 +84,7 @@ describe.each(["python", "ts"])("docs/agent-sdk.md, the %s callback", (lang) => 
   const code = snippet(lang);
 
   it("stays under 40 lines", () => {
-    expect(code.split("\n").length).toBeLessThanOrEqual(40);
+    expect(code.trimEnd().split("\n").length).toBeLessThanOrEqual(40);
   });
 
   it("starts cloudpin on Windows through cmd.exe, with a fixed line and no current-folder search", () => {
@@ -105,5 +105,15 @@ describe.each(["python", "ts"])("docs/agent-sdk.md, the %s callback", (lang) => 
     expect(code).toMatch(/could not check the command/);
     expect(code).toMatch(/answer was not JSON/);
     expect(code).toMatch(lang === "python" ? /setting_sources=\[\]/ : /settingSources: \[\]/);
+  });
+
+  // A callback that raises (or rejects) lets the command run, so any error,
+  // and any answer that isn't a JSON object, must become a deny.
+  it("turns any error, and an answer that isn't an object, into a deny", () => {
+    const guards = {
+      python: ["except Exception as err:", "isinstance(answer, dict)"],
+      ts: ["} catch (err) { resolve(deny(", "!Array.isArray(answer)"],
+    }[lang]!;
+    for (const part of guards) expect(code).toContain(part);
   });
 });

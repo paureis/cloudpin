@@ -195,7 +195,8 @@ Cloudflare login; reports welcome.
 - **Can't tell** (an expired login, a broken token, no network): the command is stopped too, and cloudpin says so
   plainly, with the CLI's own reason and the command that shows what's wrong.
 
-Logging in, logging out, switching accounts, `--help` and `--version` are never blocked. A folder without a
+Logging in, logging out, switching accounts, `--help` and `--version` are never blocked (where a CLI would still
+run the command, as `vercel deploy -v` does, the command is checked). A folder without a
 `.cloudpin.yml` is never affected. Monorepos work: the nearest `.cloudpin.yml` above the current folder wins.
 
 ## Environments

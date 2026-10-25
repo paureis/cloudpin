@@ -54,6 +54,10 @@ Wrangler account checks.
 
 ### Fixed
 
+- A help or version flag no longer exempts a command the CLI still runs (#146): `vercel deploy --prod -v`, a deploy
+  flag before an exempt word (`vercel --prod --name whoami`), `vercel promote <id> --help`, `wrangler deploy -v`,
+  `gcloud app deploy --version v2`, `az keyvault secret set-attributes --version x` and `gh repo create x -h <url>`
+  are checked, and so is any CLI's `--help` after `--` or written `--help=false`.
 - kubectl and helm: `-itn other-ns`, `-is <server>` and `-Aw` are checked against the namespace and server they pick (#133), and
   `KUBECONFIG=$(...)`, `HELM_NAMESPACE=$(...)` or Supabase's `SUPABASE_PROJECT_ID=$(...)` stop the command as "can't tell".
 - Windows: Codex and Copilot CLI hooks work under PowerShell's `Restricted` and `AllSigned` execution policies (#108).

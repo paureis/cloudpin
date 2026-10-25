@@ -83,6 +83,7 @@ describe("guard: deploying a folder checks that folder's link (#147)", () => {
     "deploy -- sub",
     "deploy sub other",
     "deploy init sub",
+    "deploy init --prod -e A=1 sub",
     "-d deploy sub",
   ])("blocks %s when sub is linked to another team", async (cmd) => {
     expect(await check(split(cmd), tree("team_side"))).toMatchObject({ action: "block" });
@@ -162,9 +163,12 @@ describe("guard: a path Vercel would refuse falls back to the folder it runs in 
     expect(await check(["deploy", "missing"], wrong)).toMatchObject({ action: "block" });
   });
 
-  it("an unknown deploy flag is a Vercel parse error; the folder's own link is read", async () => {
-    expect(await check(["deploy", "--bogus", "sub"], tree("team_side", "team_main"))).toEqual(ALLOW);
-  });
+  it.each(["deploy --bogus sub", "deploy sub --bogus", "deploy init --name x sub"])(
+    "%s is a Vercel parse error; the folder's own link is read",
+    async (cmd) => {
+      expect(await check(split(cmd), tree("team_side", "team_main"))).toEqual(ALLOW);
+    },
+  );
 });
 
 describe("guard: pull and dev read the folder they are given (#147)", () => {
@@ -174,6 +178,7 @@ describe("guard: pull and dev read the folder they are given (#147)", () => {
     "pull --git-branch main --yes sub",
     "dev sub",
     "develop sub",
+    "dev dev sub",
     "dev -l 3000 sub",
     "dev --listen=3000 -L sub",
   ])("blocks %s when sub is linked to another team", async (cmd) => {
@@ -187,7 +192,10 @@ describe("guard: pull and dev read the folder they are given (#147)", () => {
   });
 
   it.each(["pull", "pull --prod", "dev", "dev dev"])("control: %s reads the folder it runs in", async (cmd) => {
-    expect(await check(split(cmd), tree("team_side", "team_main"))).toEqual(ALLOW);
+    // A second "dev" is the command's own name (getSubcommand), not a folder called dev.
+    const root = tree("team_side", "team_main");
+    link(join(root, "dev"), "team_side");
+    expect(await check(split(cmd), root)).toEqual(ALLOW);
   });
 });
 

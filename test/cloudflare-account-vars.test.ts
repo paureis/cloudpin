@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { FoundConfig } from "../src/config.js";
 import { guard, type Verdict } from "../src/guard.js";
 import { cloudflare } from "../src/providers/cloudflare.js";
-import { envFor, findInvocations } from "../src/shellwords.js";
+import { findInvocations } from "../src/shellwords.js";
+import { envFor } from "../src/user-env.js";
 import type { Exec } from "../src/types.js";
 import { tempDir } from "./tmp.js";
 

@@ -2,7 +2,8 @@ import type { ActiveEnvironment } from "./config.js";
 import { commandName, guard, type GuardDeps, type Trace, type Verdict } from "./guard.js";
 import { AGENTS, type AgentName } from "./hooks/agents.js";
 import { home } from "./paths.js";
-import { envFor, findInvocations, type Invocation } from "./shellwords.js";
+import { findInvocations, type Invocation } from "./shellwords.js";
+import { envFor } from "./user-env.js";
 import { describe } from "./status.js";
 import type { Identity } from "./types.js";
 
@@ -111,7 +112,7 @@ export async function explain(command: string | string[], opts: ExplainOptions, 
     }
     const cwd = call.cwd ?? opts.cwd;
     const trace: Trace = {};
-    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent" }), cwd, mode: opts.mode }, deps, trace);
+    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent", platform: deps.platform }), cwd, mode: opts.mode }, deps, trace);
     const res = trace.resolution;
     out.push({
       argv: [call.bin, ...call.args],

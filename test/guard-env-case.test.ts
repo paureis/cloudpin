@@ -8,7 +8,8 @@ import { aws } from "../src/providers/aws.js";
 import { azure } from "../src/providers/azure.js";
 import { cloudflare } from "../src/providers/cloudflare.js";
 import { github } from "../src/providers/github.js";
-import { envFor, findInvocations } from "../src/shellwords.js";
+import { findInvocations } from "../src/shellwords.js";
+import { envFor } from "../src/user-env.js";
 import type { Exec, ProviderDef } from "../src/types.js";
 import { tempDir } from "./tmp.js";
 

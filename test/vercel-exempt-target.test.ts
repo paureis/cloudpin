@@ -51,6 +51,11 @@ describe("vercel.isExempt: the command is the one Vercel runs (#146)", () => {
     expect(vercel.isExempt(["", "whoami"])).toBe(false);
   });
 
+  // arg throws when a value flag is not last in its group or has no value; nothing runs then.
+  it.each(["-Tv x", "-Th x", "--scope -v", "-t"])("checks vercel %s, a parse error", (cmd) => {
+    expect(vercel.isExempt(split(cmd))).toBe(false);
+  });
+
   it.each([
     "-d whoami",
     "--debug whoami",

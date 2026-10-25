@@ -22,10 +22,17 @@ export const HELP_COMMANDS = new Set([
   "team", "upgrade", "usage", "webhooks", "webhook",
 ]);
 
+/** The options a parse knows: the globals, plus a command's own (getFlagsSpecification). */
+interface Spec {
+  booleans: ReadonlySet<string>;
+  values: ReadonlySet<string>;
+}
+const GLOBALS: Spec = { booleans: new Set(Object.keys(GLOBAL_BOOLEAN_FLAGS)), values: GLOBAL_VALUE_FLAGS };
+
 interface MainParse {
-  /** Positionals, with the flags Vercel doesn't know globally; the first is the command. */
+  /** Positionals, with the flags the spec doesn't know when permissive; the first is the command. */
   positionals: string[];
-  /** The global boolean flags seen, by long name. */
+  /** The boolean flags seen; the global ones by long name. */
   flags: Set<string>;
 }
 
@@ -37,7 +44,13 @@ interface MainParse {
  * Vercel deploys. Every word after "--" is a positional. Undefined when arg would throw (a value
  * flag not last in its group, or without a value), which stops Vercel before any command runs.
  */
-export function mainParse(args: string[]): MainParse | undefined {
+export const mainParse = (args: string[]) => argParse(args, GLOBALS, true);
+
+/**
+ * The arguments as arg 5.0.0 parses them with `spec` (src/util/get-args.ts parseArguments).
+ * Not permissive, as commands parse, an unknown flag is an error: undefined.
+ */
+function argParse(args: string[], spec: Spec, permissive: boolean): MainParse | undefined {
   const positionals: string[] = [];
   const flags = new Set<string>();
   for (let i = 0; i < args.length; i++) {
@@ -55,10 +68,10 @@ export function mainParse(args: string[]): MainParse | undefined {
       const part = parts[j]!;
       const eq = part.startsWith("--") ? part.indexOf("=") : -1;
       const name = eq === -1 ? part : part.slice(0, eq);
-      const boolean = GLOBAL_BOOLEAN_FLAGS[name];
-      if (boolean) {
-        flags.add(boolean);
-      } else if (!GLOBAL_VALUE_FLAGS.has(name)) {
+      if (spec.booleans.has(name)) {
+        flags.add(GLOBAL_BOOLEAN_FLAGS[name] ?? name);
+      } else if (!spec.values.has(name)) {
+        if (!permissive) return undefined;
         positionals.push(part);
       } else if (eq === -1) {
         const value = args[i + 1];

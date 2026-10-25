@@ -98,7 +98,8 @@ describe("kuberc alias arguments with a short flag group (#140)", () => {
     expect(message).toMatch(/alias "al"/);
     expect(message).toMatch(/can't tell/);
     // The word may hold a value, so only the letter is named.
-    expect(message).not.toContain("-xn");
+    expect(message).toContain("-x,");
+    expect(message).not.toContain("xnsecret");
     expect(message).not.toContain("secret-ns");
   });
 

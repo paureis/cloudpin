@@ -205,16 +205,34 @@ function selectors(bin: string | undefined, args: string[], env: NodeJS.ProcessE
 // Options that pick the cluster or namespace, as kuberc names them (flag names without dashes).
 const TARGET_OPTIONS = new Set(["namespace", "n", "context", "cluster", "server", "s", "kubeconfig", "user", "all-namespaces", "A"]);
 
-function setsTarget(options: unknown, extraArgs: unknown[]): string | undefined {
+function setsTarget(options: unknown): string | undefined {
   for (const option of Array.isArray(options) ? options : []) {
     const name = str(map(option).name);
     if (name && TARGET_OPTIONS.has(name)) return name;
   }
-  for (const arg of extraArgs) {
-    if (typeof arg !== "string" || !arg.startsWith("-")) continue;
-    // "--context=prod" -> "context"; "-nweb" or "-n" -> "n".
-    const name = arg.startsWith("--") ? arg.slice(2).split("=")[0]! : arg.slice(1, 2);
-    if (TARGET_OPTIONS.has(name)) return name;
+  return undefined;
+}
+
+const words = (v: unknown): string[] => (Array.isArray(v) ? v.filter((w): w is string => typeof w === "string") : []);
+
+/**
+ * The target option an alias's own arguments set, or why cloudpin can't tell. kubectl puts
+ * prependArgs right after the alias name and appendArgs at the end, with the user's words
+ * between them (kubernetes.io/docs/reference/kubectl/kuberc/; kubectl pkg/kuberc applyAliases),
+ * so each list is split on its own, with the letters of the alias's command (#140).
+ */
+function aliasArgsTarget(command: string | undefined, prepend: string[], append: string[]): string | { error: string } | undefined {
+  for (const list of [prepend, append]) {
+    const split = splitShortGroups(list, "kubectl", command);
+    if (!Array.isArray(split)) return split;
+    for (const arg of split) {
+      // After `--` the words are arguments, and so is everything kubectl appends after it.
+      if (arg === "--") return undefined;
+      if (!arg.startsWith("-") || arg === "-") continue;
+      // "--context=prod" -> "context"; "-n=web", "-nweb" or "-A" -> the letter.
+      const name = arg.startsWith("--") ? arg.slice(2).split("=")[0]! : arg.slice(1, 2);
+      if (TARGET_OPTIONS.has(name)) return name;
+    }
   }
   return undefined;
 }
@@ -224,34 +242,39 @@ function setsTarget(options: unknown, extraArgs: unknown[]): string | undefined 
  * aliases (kubernetes.io/docs/reference/kubectl/kuberc/). If the ones this
  * command uses set the context, namespace or server, cloudpin cannot be sure
  * of the target, so it says so (and the command is stopped). Aliases cannot
- * reuse a built-in command name. Returns the problem, or undefined.
+ * reuse a built-in command name. Returns the problem, or, for an alias, the
+ * command it runs (its `command` field's first word), whose letters the user's
+ * short flags follow.
  */
-function kubercProblem(args: string[], env: NodeJS.ProcessEnv): string | undefined {
-  if (env.KUBERC === "off" || env.KUBECTL_KUBERC === "false") return undefined;
+function readKuberc(args: string[], env: NodeJS.ProcessEnv): { problem?: string; aliasOf?: string } {
+  if (env.KUBERC === "off" || env.KUBECTL_KUBERC === "false") return {};
   const path = flag(args, ["--kuberc"]) ?? str(env.KUBERC) ?? join(home(env), ".kube", "kuberc");
-  if (!existsSync(path)) return undefined;
+  if (!existsSync(path)) return {};
   let doc: unknown;
   try {
     doc = parse(readFileSync(path, "utf8"), { schema: "failsafe" });
   } catch {
-    return `kuberc ${path} is not valid YAML`;
+    return { problem: `kuberc ${path} is not valid YAML` };
   }
   const [command] = commandWords(args);
-  if (!command) return undefined;
+  if (!command) return {};
   const top = map(doc);
   for (const entry of Array.isArray(top.defaults) ? top.defaults : []) {
     const forCommand = (str(map(entry).command) ?? str(map(entry).name))?.split(/\s+/)[0];
-    const option = forCommand === command ? setsTarget(map(entry).options, []) : undefined;
-    if (option) return `kuberc ${path} sets "${option}" for "${command}"; cloudpin can't tell which cluster or namespace that picks (set KUBERC=off to check without it)`;
+    const option = forCommand === command ? setsTarget(map(entry).options) : undefined;
+    if (option) return { problem: `kuberc ${path} sets "${option}" for "${command}"; cloudpin can't tell which cluster or namespace that picks (set KUBERC=off to check without it)` };
   }
   for (const entry of Array.isArray(top.aliases) ? top.aliases : []) {
     const e = map(entry);
     if (str(e.name) !== command) continue;
-    const extra = [...(Array.isArray(e.prependArgs) ? e.prependArgs : []), ...(Array.isArray(e.appendArgs) ? e.appendArgs : [])];
-    const option = setsTarget(e.options, extra);
-    if (option) return `kuberc ${path} alias "${command}" sets "${option}"; cloudpin can't tell which cluster or namespace that picks`;
+    // `command` is the built-in command the alias runs, subcommands included ("create role").
+    const aliasOf = str(e.command)?.trim().split(/\s+/)[0];
+    const option = setsTarget(e.options) ?? aliasArgsTarget(aliasOf, words(e.prependArgs), words(e.appendArgs));
+    if (typeof option === "object") return { problem: `kuberc ${path} alias "${command}": ${option.error}` };
+    if (option) return { problem: `kuberc ${path} alias "${command}" sets "${option}"; cloudpin can't tell which cluster or namespace that picks` };
+    return { aliasOf };
   }
-  return undefined;
+  return {};
 }
 
 function allNamespaces(args: string[]): boolean {
@@ -310,8 +333,8 @@ export const kubernetes: ProviderDef<"kubernetes"> = {
 
   async resolve({ args, env, bin }) {
     if (bin !== "helm") {
-      const problem = kubercProblem(args, env);
-      if (problem) return { kind: "error", message: problem };
+      const kuberc = readKuberc(args, env);
+      if (kuberc.problem) return { kind: "error", message: kuberc.problem };
     }
     const split = splitShortGroups(args, bin);
     if (!Array.isArray(split)) return { kind: "error", message: split.error };

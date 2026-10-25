@@ -124,10 +124,15 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   const provider = deps.providers.find((p) => p.bins.includes(name));
   if (!provider) return { action: "allow", reason: "not-guarded" };
   trace.provider = provider.name;
+  // On Windows the provider reads names the way the CLI does, case-insensitively
+  // (#119), and so does cloudpin for its own variables, CLOUDPIN_ENV included
+  // (#136; envFor keeps an agent from setting those in any spelling).
+  const platform = deps.platform ?? process.platform;
+  const folded = foldEnvNames(req.env, platform);
 
   let config: FoundConfig | null;
   try {
-    config = deps.findConfig(req.cwd, req.env);
+    config = deps.findConfig(req.cwd, folded.env);
   } catch (err) {
     // A broken pin file must not silently switch protection off. Exempt
     // commands (login, whoami, help, ...) never act on an account, and are
@@ -145,10 +150,6 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   if (!pin) return { action: "allow", reason: "not-pinned" };
   trace.pin = pin as Record<string, string>;
   if (provider.isExempt(req.args, name)) return { action: "allow", reason: "exempt" };
-  // On Windows the provider reads names the way the CLI does, case-insensitively
-  // (#119), and so does cloudpin for its own variables (#136).
-  const platform = deps.platform ?? process.platform;
-  const folded = foldEnvNames(req.env, platform);
   if (req.mode === "shell" && folded.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
 
   const base = {

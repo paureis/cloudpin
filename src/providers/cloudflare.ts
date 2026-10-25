@@ -182,8 +182,11 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
   },
 
   isExempt(args) {
-    if (hasBareFlag(args, ["--help", "-h", "--version", "-v"])) return true;
+    if (hasBareFlag(args, ["--help", "-h"])) return true;
     const words = commandWords(args, VALUE_FLAGS);
+    // Wrangler prints its version only when no command is given (packages/wrangler/src/index.ts,
+    // the default "*" command); every command accepts -v and ignores it (#146).
+    if (words.length === 0) return hasBareFlag(args, ["--version", "-v"]);
     if (EXEMPT_COMMANDS.has(words[0] ?? "")) return true;
     if (words[0] === "dev") return !hasAnyFlag(args, ["--remote"]);
     if (words[0] === "deploy" && hasBareFlag(args, ["--dry-run"])) return true;

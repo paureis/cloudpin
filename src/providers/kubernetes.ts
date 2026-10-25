@@ -332,11 +332,14 @@ export const kubernetes: ProviderDef<"kubernetes"> = {
   },
 
   async resolve({ args, env, bin }) {
+    let aliasOf: string | undefined;
     if (bin !== "helm") {
       const kuberc = readKuberc(args, env);
       if (kuberc.problem) return { kind: "error", message: kuberc.problem };
+      aliasOf = kuberc.aliasOf;
     }
-    const split = splitShortGroups(args, bin);
+    // An alias runs a copy of its command, flags included (kubectl pkg/kuberc applyAliases).
+    const split = splitShortGroups(args, bin, aliasOf ?? commandWords(args)[0]);
     if (!Array.isArray(split)) return { kind: "error", message: split.error };
     args = split;
     const sel = selectors(bin, args, env);

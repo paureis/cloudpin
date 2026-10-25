@@ -145,7 +145,11 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   if (!pin) return { action: "allow", reason: "not-pinned" };
   trace.pin = pin as Record<string, string>;
   if (provider.isExempt(req.args, name)) return { action: "allow", reason: "exempt" };
-  if (req.mode === "shell" && req.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
+  // On Windows the provider reads names the way the CLI does, case-insensitively
+  // (#119), and so does cloudpin for its own variables (#136).
+  const platform = deps.platform ?? process.platform;
+  const folded = foldEnvNames(req.env, platform);
+  if (req.mode === "shell" && folded.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
 
   const base = {
     action: "block" as const,
@@ -156,8 +160,6 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   // Track whether the CLI itself is missing: then the command would fail on
   // its own, so there is no account to protect (DESIGN.md, edge cases).
   let cliMissing = false;
-  // On Windows the provider reads names the way the CLI does, case-insensitively (#119).
-  const folded = foldEnvNames(req.env, deps.platform ?? process.platform);
   const inner = deps.wrapExec ? deps.wrapExec(provider, folded.env, deps.exec) : deps.exec;
   const exec: Exec = async (bin, args, env) => {
     const result = await inner(bin, args, env);
@@ -206,7 +208,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
       const p = provider as ProviderDef<typeof provider.name>;
       const problems = p.compare(pin as never, res.identity);
       if (problems.length > 0) return { ...base, problems, fix: p.switchHint(pin as never) };
-      return protectedEnvironment(req, provider.name, config, trace);
+      return protectedEnvironment(req, folded.env, provider.name, config, trace);
     }
   }
 }
@@ -214,14 +216,15 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
 /**
  * The account is right; on a protected environment a command that may change
  * something still needs the user's yes (issue #12). Only a human can give it
- * ahead of time, with CLOUDPIN_CONFIRM=<environment>.
+ * ahead of time, with CLOUDPIN_CONFIRM=<environment>. `env` is the command's
+ * environment with Windows names folded (#136).
  */
-function protectedEnvironment(req: GuardRequest, provider: Provider, config: FoundConfig, trace: Trace): Verdict {
+function protectedEnvironment(req: GuardRequest, env: NodeJS.ProcessEnv, provider: Provider, config: FoundConfig, trace: Trace): Verdict {
   const environment = config.environment;
   if (!environment?.protected) return { action: "allow", reason: "match" };
   trace.readOnly = isReadOnly(provider, req.args, req.env, config.readOnly ?? {}, commandName(req.bin));
   if (trace.readOnly) return { action: "allow", reason: "match" };
-  if (req.mode === "shell" && req.env.CLOUDPIN_CONFIRM === environment.name) {
+  if (req.mode === "shell" && env.CLOUDPIN_CONFIRM === environment.name) {
     return { action: "allow", reason: "confirmed" };
   }
   return { action: "confirm", provider, configPath: config.path, environment };

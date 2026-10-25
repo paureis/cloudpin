@@ -1,4 +1,6 @@
 // How the Vercel CLI parses its arguments, read by vercel.ts (#147 moved this here).
+import { lstatSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
 
 // Global options (vercel/vercel packages/cli/src/util/arg-common.ts globalCommandOptions; 50.35).
 const GLOBAL_BOOLEAN_FLAGS: Readonly<Record<string, string>> = {
@@ -21,6 +23,14 @@ export const HELP_COMMANDS = new Set([
   "pull", "redeploy", "redirects", "redirect", "remove", "rm", "routes", "skills", "target", "targets", "teams",
   "team", "upgrade", "usage", "webhooks", "webhook",
 ]);
+// Every built-in command and alias (src/commands/index.ts `commands`; 50.35). Any other first
+// word runs an extension vercel-<word> if one is installed, else deploys that word as a path.
+// `guidance` and `metrics` join only with FF_GUIDANCE_MODE / FF_METRICS set; read as a deploy
+// path they add a folder's link to the check, never remove one.
+const COMMANDS = new Set([
+  ...HELP_COMMANDS, "help", "login", "logout", "promote", "rollback", "rolling-release", "rr", "switch",
+  "telemetry", "whoami",
+]);
 
 /** The options a parse knows: the globals, plus a command's own (getFlagsSpecification). */
 interface Spec {
@@ -28,6 +38,22 @@ interface Spec {
   values: ReadonlySet<string>;
 }
 const GLOBALS: Spec = { booleans: new Set(Object.keys(GLOBAL_BOOLEAN_FLAGS)), values: GLOBAL_VALUE_FLAGS };
+const commandSpec = (booleans: string, values: string): Spec => ({
+  booleans: new Set([...GLOBALS.booleans, ...booleans.split(" ")]),
+  values: new Set([...GLOBALS.values, ...values.split(" ")]),
+});
+// The commands that link a path argument (50.35: src/commands/deploy/command.ts deployCommand
+// and initSubcommand, pull/command.ts, dev/command.ts; shared options from arg-common.ts).
+const DEPLOY = commandSpec(
+  "-f --force --with-cache -p --public --prebuilt --prod --no-wait --skip-domain -y --yes -l --logs --guidance --no-logs --no-clipboard --json -c --confirm",
+  "-e --env -b --build-env -m --meta --regions --archive -n --name --target -F --format",
+);
+const DEPLOY_INIT = commandSpec(
+  "-f --force --with-cache -p --public --prod --skip-domain -y --yes --json -c --confirm",
+  "-e --env -b --build-env -m --meta --regions --archive --target -F --format",
+);
+const PULL = commandSpec("--prod -y --yes", "--environment --git-branch");
+const DEV = commandSpec("-L --local -y --yes -c --confirm", "-l --listen -p --port");
 
 interface MainParse {
   /** Positionals, with the flags the spec doesn't know when permissive; the first is the command. */
@@ -100,4 +126,47 @@ export function splitShortGroups(args: string[]): string[] {
     else out.push(arg);
   }
   return out;
+}
+
+const isDirectory = (path: string) => {
+  try {
+    return lstatSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The folders whose link a command acts on (#147), given `base`, the folder after --cwd (which
+ * Vercel chdirs into: Client `set cwd`). Most commands link `base`; these link the folder their
+ * path argument names (vercel 50.35):
+ * - deploy (src/commands/deploy/index.ts): deploy_default picks the subcommand from a permissive
+ *   parse; `continue` links `base` (its required --id already fails the default parse); else
+ *   the positionals after "deploy" (and "init") are paths resolved against `base`,
+ *   validatePaths (src/util/validate-paths.ts) stops unless the first is a directory (lstat),
+ *   and ensureLink links it. A path Vercel refuses deploys nothing, so `base` is read.
+ * - a first word that is no command (src/index.ts main): Vercel runs vercel-<word> in `base`
+ *   if it finds one (src/util/extension/exec.ts), else deploys the word. cloudpin can't tell
+ *   which, so both folders count: a wrong link in either blocks.
+ * - pull (src/commands/pull/index.ts): `parsedArgs.args[1] || client.cwd`, used unchecked.
+ * - dev (src/commands/dev/index.ts): the first argument after "dev" (Vercel refuses a second;
+ *   reading the first anyway only adds a check).
+ */
+export function linkDirs(args: string[], base: string): string[] {
+  const command = mainParse(args)?.positionals[0];
+  const at = (path: string | undefined) => (path ? resolvePath(base, path) : base);
+  if (command === "pull") return [at(argParse(args, PULL, false)?.positionals[1])];
+  if (command === "dev" || command === "develop") {
+    const words = argParse(args, DEV, false)?.positionals.slice(1) ?? [];
+    return [at(words[0] === "dev" ? words[1] : words[0])];
+  }
+  if (!command || (command !== "deploy" && COMMANDS.has(command))) return [base];
+
+  const strip = (words: string[], word: string) => (words[0] === word ? words.slice(1) : words);
+  const sub = strip(argParse(args, DEPLOY, true)?.positionals ?? [], "deploy")[0];
+  let paths: string[] = [];
+  if (sub === "init") paths = strip(strip(argParse(args, DEPLOY_INIT, false)?.positionals ?? [], "deploy"), "init");
+  else if (sub !== "continue") paths = strip(argParse(args, DEPLOY, false)?.positionals ?? [], "deploy");
+  const target = paths.length > 0 && isDirectory(at(paths[0])) ? at(paths[0]) : base;
+  return command === "deploy" || target === base ? [target] : [base, target];
 }

@@ -4,7 +4,7 @@ import { dirname, join, relative, resolve as resolvePath, sep } from "node:path"
 import { flagValue } from "../args.js";
 import { home } from "../paths.js";
 import type { Exec, ProviderDef, Resolution } from "../types.js";
-import { HELP_COMMANDS, mainParse, splitShortGroups } from "./vercel-args.js";
+import { HELP_COMMANDS, linkDirs, mainParse, splitShortGroups } from "./vercel-args.js";
 
 // Behaviour below was observed on vercel 50.35 through `--debug` request URLs,
 // running read-only commands:
@@ -238,15 +238,17 @@ export const vercel: ProviderDef<"vercel"> = {
     }
 
     const identity: Record<string, string> = { team, label: slugOf(team) };
-    // The team project-level requests use.
-    const projectDir = resolvePath(cwd, flagValue(args, ["--cwd"]) ?? ".");
-    let projectTeams: string[];
+    // The team project-level requests use, from the folder after --cwd or the one the command
+    // names (#147); the scope above stays with the folder it runs in.
+    let projectTeams: string[] = [];
     if (env.VERCEL_ORG_ID) {
       projectTeams = [env.VERCEL_ORG_ID];
     } else {
-      const linked = linkedTeams(projectDir, flagValue(args, ["--project"]), home(env));
-      if ("error" in linked) return { kind: "error", message: linked.error };
-      projectTeams = linked;
+      for (const dir of linkDirs(typed, resolvePath(cwd, flagValue(args, ["--cwd"]) ?? "."))) {
+        const linked = linkedTeams(dir, flagValue(args, ["--project"]), home(env));
+        if ("error" in linked) return { kind: "error", message: linked.error };
+        projectTeams.push(...linked);
+      }
     }
     // Several when a repository link leaves the project open; each must be the pinned team.
     if (projectTeams.length > 0) identity.projectTeam = [...new Set(projectTeams.map(toId))].join(",");

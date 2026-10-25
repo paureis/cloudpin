@@ -21,6 +21,8 @@ export interface CommandContext {
   cwd: string;
   /** The command name, e.g. "kubectl" or "helm", for providers that guard several CLIs. */
   bin?: string;
+  /** The platform the command runs on; providers read it, never process.platform, so tests can set it (#136). */
+  platform?: NodeJS.Platform;
 }
 
 /** The identity a command will act as, keyed like the provider's pin section. */

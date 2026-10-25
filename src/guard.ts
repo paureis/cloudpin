@@ -193,7 +193,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   }
   // Other unknown values don't decide the account; the CLI's identity check runs without them.
   const env = Object.fromEntries(Object.entries(folded.env).filter(([, v]) => v !== UNKNOWN_VALUE));
-  const res = await provider.resolve({ args: req.args, env, cwd: req.cwd, bin: name }, exec);
+  const res = await provider.resolve({ args: req.args, env, cwd: req.cwd, bin: name, platform }, exec);
   trace.resolution = res;
   if (res.kind === "error" && cliMissing) return { action: "allow", reason: "not-installed" };
   switch (res.kind) {

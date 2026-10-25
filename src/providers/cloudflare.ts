@@ -195,14 +195,14 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     return false;
   },
 
-  async resolve({ args, env: commandEnv, cwd }, exec): Promise<Resolution> {
+  async resolve({ args, env: commandEnv, cwd, platform }, exec): Promise<Resolution> {
     if (hasAnyFlag(args, ["--temporary"])) {
       return { kind: "error", message: "deploy --temporary uploads to a temporary preview account, not a pinned one" };
     }
     const start = resolvePath(cwd, flagValue(args, ["--cwd"]) ?? ".");
     // Wrangler adds what its .env files set to its own environment (#116); from
     // here on, env is that environment, and whoami below is asked with it.
-    const dotenv = wranglerDotenv(args, commandEnv, start);
+    const dotenv = wranglerDotenv(args, commandEnv, start, platform);
     if ("error" in dotenv) return { kind: "error", message: dotenv.error };
     const { env } = dotenv;
     const inFile = (name: string) => (dotenv.from[name] ? ` in ${dotenv.from[name]}` : "");

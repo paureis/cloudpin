@@ -168,7 +168,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   };
   // A variable the line sets from something only known when it runs (#86): if it
   // decides this CLI's account, cloudpin can't tell which account will be used.
-  const identityVars = provider.cacheInputs(folded.env).env;
+  const identityVars = provider.cacheInputs(folded.env, platform).env;
   const unknown = Object.keys(folded.env).filter((k) => folded.env[k] === UNKNOWN_VALUE && envNameMatches(identityVars, k));
   if (unknown.length > 0) {
     return {

@@ -170,10 +170,22 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
   bins: ["wrangler", "wrangler2", "cf-wrangler"],
   statusCommand: "wrangler whoami",
 
-  cacheInputs(env) {
+  cacheInputs(env, platform = process.platform) {
     // Only `wrangler whoami` is cached. Its OAuth login lives in the global
-    // Wrangler config folder (~/.wrangler if it exists, else the XDG one).
-    const dirs = [join(home(env), ".wrangler"), join(env.XDG_CONFIG_HOME ?? join(home(env), ".config"), ".wrangler")];
+    // Wrangler config folder: ~/.wrangler if it exists, else the XDG one, which is
+    // XDG_CONFIG_HOME when non-empty, else %APPDATA%\xdg.config on Windows,
+    // ~/Library/Preferences on macOS and ~/.config elsewhere (#136; workers-sdk
+    // wrangler@4.151.3, packages/workers-utils/src/global-wrangler-config-path.ts
+    // getGlobalConfigPath and xdg-app-paths.ts xdgConfig and windowsAppData).
+    const h = home(env);
+    const xdg =
+      env.XDG_CONFIG_HOME ||
+      (platform === "win32"
+        ? join(env.APPDATA || join(h, "AppData", "Roaming"), "xdg.config")
+        : platform === "darwin"
+          ? join(h, "Library", "Preferences")
+          : join(h, ".config"));
+    const dirs = [join(h, ".wrangler"), join(xdg, ".wrangler")];
     return {
       // Every variable that decides the account, not only whoami's credentials:
       // guard blocks when a command line sets one to a value it can't know (#86,

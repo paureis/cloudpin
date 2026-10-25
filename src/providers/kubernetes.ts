@@ -78,17 +78,31 @@ function shortLetters(bin: string | undefined, command: string | undefined) {
 
 /**
  * The arguments with each short flag group split as pflag reads it, so `-itn prod` becomes
- * `-i -t -n prod` and `flag` and `allNamespaces` see its namespace. A group whose letters
- * cloudpin doesn't all know, when a letter after the unknown one could pick the target, is
- * returned as a reason instead. Only the letter is named: a word may hold a value.
+ * `-i -t -n=prod` and `flag` and `allNamespaces` see its namespace. A value taken from the next
+ * word is joined to its flag with `=`, because pflag gives it that word whatever it holds:
+ * `-c -n x` is the container "-n" (`-c=-n`), and `-c --` doesn't end the flags. The same goes for
+ * the global long flags in VALUE_FLAGS (`--namespace -n` is `--namespace=-n`); other long flags
+ * are kubectl's per-command ones, too many to list, so their value is left as it is. A group
+ * whose letters cloudpin doesn't all know, when a letter after the unknown one could pick the
+ * target, is returned as a reason instead. Only the letter is named: a word may hold a value.
+ * `command` picks the letter table; it is the alias's command for a kuberc alias.
  */
-function splitShortGroups(args: string[], bin: string | undefined): string[] | { error: string } {
-  const { targets, bool, value } = shortLetters(bin, commandWords(args)[0]);
+function splitShortGroups(
+  args: string[],
+  bin: string | undefined,
+  command = commandWords(args)[0],
+): string[] | { error: string } {
+  const { targets, bool, value } = shortLetters(bin, command);
   const out: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
     if (arg === "--") return [...out, ...args.slice(i)];
-    if (arg.length <= 2 || arg[0] !== "-" || arg[1] === "-") {
+    if (arg.startsWith("--")) {
+      out.push(VALUE_FLAGS.has(arg) && i + 1 < args.length ? `${arg}=${args[++i]}` : arg);
+      continue;
+    }
+    // pflag reads a lone `-` as an argument (parseArgs).
+    if (arg.length < 2 || arg[0] !== "-") {
       out.push(arg);
       continue;
     }
@@ -104,9 +118,10 @@ function splitShortGroups(args: string[], bin: string | undefined): string[] | {
           error: `cloudpin doesn't know ${bin ?? "kubectl"}'s flag -${letter}, so it can't tell whether the letters after it in the same word pick the namespace or server`,
         };
       }
-      // A value letter (or a boolean given `=value`) takes the rest of the word.
-      out.push(`-${letter}${rest}`);
-      if (rest === "" && value.includes(letter) && i + 1 < args.length) out.push(args[++i]!);
+      // A value letter (or a boolean given `=value`) takes the rest of the word, or the next
+      // word when it is the last letter. With no next word pflag fails ("flag needs an argument").
+      if (rest === "" && value.includes(letter) && i + 1 < args.length) out.push(`-${letter}=${args[++i]}`);
+      else out.push(`-${letter}${rest}`);
       break;
     }
   }

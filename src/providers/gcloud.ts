@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { commandWords, flagValue, hasAnyFlag } from "../args.js";
+import { commandWords, flagValue, hasBareFlag } from "../args.js";
 import { appData, home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
@@ -33,7 +33,7 @@ export const gcloud: ProviderDef<"gcloud"> = {
   },
 
   isExempt(args) {
-    if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;
+    if (hasBareFlag(args, ["--version", "--help", "-h"])) return true;
     const [first] = commandWords(args, GLOBAL_VALUE_FLAGS);
     return first !== undefined && EXEMPT_COMMANDS.has(first);
   },

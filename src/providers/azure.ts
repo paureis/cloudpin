@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { commandWords, flagValue, hasAnyFlag } from "../args.js";
+import { commandWords, flagValue, hasBareFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
@@ -27,7 +27,7 @@ export const azure: ProviderDef<"azure"> = {
   },
 
   isExempt(args) {
-    if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;
+    if (hasBareFlag(args, ["--version", "--help", "-h"])) return true;
     const [first, second] = commandWords(args, GLOBAL_VALUE_FLAGS);
     if (first === undefined) return false;
     if (EXEMPT_COMMANDS.has(first)) return true;

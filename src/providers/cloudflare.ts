@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve as resolvePath } from "node:path";
-import { commandWords, flagValue, hasAnyFlag } from "../args.js";
+import { commandWords, flagValue, hasAnyFlag, hasBareFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef, Resolution } from "../types.js";
 import { envFileArgs, wranglerDotenv } from "./wrangler-dotenv.js";
@@ -182,11 +182,11 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
   },
 
   isExempt(args) {
-    if (hasAnyFlag(args, ["--help", "-h", "--version", "-v"])) return true;
+    if (hasBareFlag(args, ["--help", "-h", "--version", "-v"])) return true;
     const words = commandWords(args, VALUE_FLAGS);
     if (EXEMPT_COMMANDS.has(words[0] ?? "")) return true;
     if (words[0] === "dev") return !hasAnyFlag(args, ["--remote"]);
-    if (words[0] === "deploy" && hasAnyFlag(args, ["--dry-run"])) return true;
+    if (words[0] === "deploy" && hasBareFlag(args, ["--dry-run"])) return true;
     if (LOCAL_BY_DEFAULT.has(words.slice(0, 2).join(" "))) return !hasAnyFlag(args, ["--remote", "--preview"]);
     return false;
   },

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { flagValue, hasAnyFlag, leadingWords } from "../args.js";
+import { flagValue, hasBareFlag, leadingWords } from "../args.js";
 import { appData, home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
@@ -26,7 +26,7 @@ export const github: ProviderDef<"github"> = {
   },
 
   isExempt(args) {
-    if (hasAnyFlag(args, ["--version", "--help", "-h"])) return true;
+    if (hasBareFlag(args, ["--version", "--help", "-h"])) return true;
     const [first] = leadingWords(args);
     return first !== undefined && EXEMPT_COMMANDS.has(first);
   },

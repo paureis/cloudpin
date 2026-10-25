@@ -52,6 +52,9 @@ describe("help and version flags that do not stop the command are checked (#146)
     ["github", "extension exec my-extension --help"],
     ["github", "copilot --help"],
     ["github", "workflow run deploy.yml -- --help"],
+    // cobra finds the command past a leading flag (stripFlags), so -h is still --homepage.
+    ["github", "-R o/r repo create x -h https://example.com"],
+    ["github", "repo --foo create x -h https://example.com"],
     ["supabase", "db push --help=false"],
     ["supabase", "db push --version=false"],
     ["supabase", "db push -- --help"],
@@ -93,6 +96,8 @@ describe("help and version flags that stop the command stay exempt (#146)", () =
     ["github", "repo view -h"],
     ["github", "pr merge 1 -h"],
     ["github", "extension list --help"],
+    ["github", "repo --help"],
+    ["github", "config -h"],
     ["supabase", "--version"],
     ["supabase", "db push --help"],
     ["supabase", "db push --version"],

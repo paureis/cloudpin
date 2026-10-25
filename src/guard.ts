@@ -222,7 +222,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
 function protectedEnvironment(req: GuardRequest, env: NodeJS.ProcessEnv, provider: Provider, config: FoundConfig, trace: Trace): Verdict {
   const environment = config.environment;
   if (!environment?.protected) return { action: "allow", reason: "match" };
-  trace.readOnly = isReadOnly(provider, req.args, req.env, config.readOnly ?? {}, commandName(req.bin));
+  trace.readOnly = isReadOnly(provider, req.args, env, config.readOnly ?? {}, commandName(req.bin));
   if (trace.readOnly) return { action: "allow", reason: "match" };
   if (req.mode === "shell" && env.CLOUDPIN_CONFIRM === environment.name) {
     return { action: "allow", reason: "confirmed" };

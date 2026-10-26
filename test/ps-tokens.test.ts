@@ -106,6 +106,10 @@ describe("PowerShell: rules checked against Windows PowerShell 5.1 (#159)", () =
     ["az --% a | Out-Null; az b", [az("a"), az("b")]],
     [`az --% a${CRLF}az b`, [az("a"), az("b")]],
     ["az --% a %FOO% b", [az("a", DYNAMIC_WORDS, "b")]],
+    // Any bare word that reads --% stops parsing; a quoted '--%' is only dropped.
+    [`az a ${BT}--% b ; c # d`, [az("a", "b", ";", "c", "#", "d")]],
+    ["az a -'-%' b ; c", [az("a", "b", ";", "c")]],
+    ["az a '--%' b ; az c", [az("a", "b"), az("c")]],
     // Separators, pipelines, PowerShell 7's && and ||, and the call operators.
     ["az a;az b", [az("a"), az("b")]],
     ["az a|az b", [az("a"), az("b")]],

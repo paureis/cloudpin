@@ -41,6 +41,7 @@ const SHAPES = [
   `$m = @"${CRLF}say "hi${CRLF}"@${CRLF}az group list --subscription SUB`,
   "az group list <# note #> --subscription SUB",
   "az --% group list ; --subscription SUB",
+  `az ${BT}--% group list ; --subscription SUB`,
   "& { az group list --subscription SUB }",
   ". az group list --subscription SUB",
   "az group list --query 'x \"y --subscription SUB\"'",

@@ -13,9 +13,13 @@ const calls = (cmd: string, env?: NodeJS.ProcessEnv) =>
 
 describe("findInvocations: words known only when the command runs (#160)", () => {
   it.each([
-    // Unquoted, bash splits the output, so it may be several words.
-    ["az group list --subscription $(cat sub.txt)", ["group", "list", "--subscription", DYNAMIC_WORDS]],
-    ["az group list --subscription `cat sub.txt`", ["group", "list", "--subscription", DYNAMIC_WORDS]],
+    // An unquoted $( ) or backticks is read as one word that is not a flag (owner decision); the flag
+    // before it still reads it.
+    ["az group list --subscription $(cat sub.txt)", ["group", "list", "--subscription", DYNAMIC_WORD]],
+    ["az group list --subscription `cat sub.txt`", ["group", "list", "--subscription", DYNAMIC_WORD]],
+    ["az group list x$(cat a)y", ["group", "list", DYNAMIC_WORD]],
+    ["az group list -x$(cat a)", ["group", "list", `-x${DYNAMIC_WORD}`]],
+    // An unquoted variable bash may split into several words, flags included.
     ["az group list --subscription $SUB", ["group", "list", "--subscription", DYNAMIC_WORDS]],
     ["az group list $1", ["group", "list", DYNAMIC_WORDS]],
     // Quoted, it is one word.
@@ -24,11 +28,12 @@ describe("findInvocations: words known only when the command runs (#160)", () =>
     ['az group list --subscription "${SUB}"', ["group", "list", "--subscription", DYNAMIC_WORD]],
     // A known flag name before `=` is kept.
     ['kubectl --context="$(cat ctx)" get pods', [`--context=${DYNAMIC_WORD}`, "get", "pods"]],
-    ["kubectl --context=$(cat ctx) get pods", [`--context=${DYNAMIC_WORDS}`, "get", "pods"]],
+    ["kubectl --context=$(cat ctx) get pods", [`--context=${DYNAMIC_WORD}`, "get", "pods"]],
     // "$@" and "${a[@]}" are any number of words, even quoted.
     ['az group list "$@"', ["group", "list", DYNAMIC_WORDS]],
     ['az group list "${args[@]}"', ["group", "list", DYNAMIC_WORDS]],
     ["az group list $@", ["group", "list", DYNAMIC_WORDS]],
+    ["az group list $*", ["group", "list", DYNAMIC_WORDS]],
     // "$*" and "${a[*]}" are one word when quoted.
     ['az group list "$*"', ["group", "list", DYNAMIC_WORD]],
     // A process substitution is one path, and $(( )) one number.

@@ -87,6 +87,8 @@ async function decision(command: string, tool: "Bash" | "PowerShell" = "Bash"): 
 describe("agent hook: an account flag whose value is known only when the command runs (#160)", () => {
   it.each([
     ["az group list --subscription $(cat sub.txt)", "--subscription"],
+    ["az group list --subscription=$(cat sub.txt)", "--subscription"],
+    ["vercel deploy --scope `cat team`", "--scope"],
     ['az group list --subscription "$(cat sub.txt)"', "--subscription"],
     ['az group list --subscription="$(cat sub.txt)"', "--subscription"],
     ["az group list --subscription `cat sub.txt`", "--subscription"],
@@ -110,8 +112,9 @@ describe("agent hook: an account flag whose value is known only when the command
     'az group list "$@"',
     "az group list $@",
     'az group list "${args[@]}"',
-    "az $(cat cmd.txt)",
-    "kubectl delete pod $(cat pods.txt)",
+    "az group list $*",
+    "az group list ${EXTRA:-}",
+    "az group list -x$(cat a)",
     'az group list "--sub$(echo scription)" other',
     // A function's "$@" (#163 lists the shape; the call inside it is found).
     'run() { az "$@" -o table; }; run group list --subscription other',
@@ -154,6 +157,12 @@ describe("agent hook: an account flag whose value is known only when the command
     'kubectl delete pod "$(cat pod.txt)"',
     'gh pr create --body "$(cat <<\'EOF\'\nIt\'s done\nEOF\n)" && vercel deploy --scope acme',
     'vercel deploy --scope acme -m "$MSG"',
+    // An unquoted $( ) or backticks is one word that is not a flag (owner decision).
+    "kubectl logs $(kubectl get pod -l app=x -o name)",
+    "az resource delete --ids $(az resource list --query [].id -o tsv)",
+    "kubectl delete pod `cat pods.txt`",
+    "az group show -n rg-$(date +%s)",
+    "az $(cat cmd.txt)",
     // A $(( )) number and a <( ) path are one word each.
     "az group list --top $(( 2 + 3 ))",
     // Exempt commands stay exempt.

@@ -4,15 +4,14 @@ import type { GuardDeps } from "../src/guard.js";
 import { AGENTS, runHook } from "../src/hooks/agents.js";
 import { azure } from "../src/providers/azure.js";
 import { findInvocations } from "../src/shellwords.js";
-import { DYNAMIC_WORD, DYNAMIC_WORDS, type Exec, type ProviderDef } from "../src/types.js";
+import { DYNAMIC_WORD, type Exec, type ProviderDef } from "../src/types.js";
 import { tempDir } from "./tmp.js";
 
 // #156. bash(1), Process Substitution: an unquoted `<(list)` or `>(list)` runs the list and is replaced by
 // one argument, a /dev/fd/N path, joined with any text next to it (`a<(true)b` passes `a/dev/fd/63b`), and
 // the command keeps reading its words. Checked in bash: `p <(true) --x y` passes [/dev/fd/63] [--x] [y].
 // So it is read like `$(...)`: part of a word whose value is only known when it runs, and the commands
-// inside are still found. In double quotes it is plain text. Unlike `$(...)` it is one word, so it is
-// DYNAMIC_WORD (#160).
+// inside are still found. In double quotes it is plain text. Like `$(...)` it is one word, DYNAMIC_WORD (#160).
 
 const GUARDED = ["az", "aws", "gcloud", "vercel", "gh"];
 const calls = (cmd: string) => findInvocations(cmd, GUARDED).map((i) => [i.bin, i.args]);
@@ -54,9 +53,7 @@ describe("findInvocations: a process substitution is one argument and does not e
     "az group list x<(true)y --subscription other",
     "az group list --subscription other >(cat)",
   ])("reads %j the same way as the line with $( ) in its place", (cmd) => {
-    // Except that $( ) may be several words (#160).
-    const one = (c: string) => calls(c).map(([bin, args]) => [bin, (args as string[]).map((a) => (a === DYNAMIC_WORDS ? DYNAMIC_WORD : a))]);
-    expect(calls(cmd)).toEqual(one(cmd.replace(/[<>]\(/, "$(")));
+    expect(calls(cmd)).toEqual(calls(cmd.replace(/[<>]\(/, "$(")));
   });
 
   it("finds the calls inside it, and the command around it keeps its flags", () => {
@@ -81,7 +78,7 @@ describe("findInvocations: a process substitution is one argument and does not e
     ]);
     expect(calls("az group list $(cat >(gh api user)) --subscription other")).toEqual([
       ["gh", ["api", "user"]],
-      ["az", ["group", "list", DYNAMIC_WORDS, "--subscription", "other"]],
+      ["az", ["group", "list", DYNAMIC_WORD, "--subscription", "other"]],
     ]);
     expect(calls('az group list <(echo ")"; gh api user) --subscription other')).toEqual([
       ["gh", ["api", "user"]],

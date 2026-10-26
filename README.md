@@ -362,7 +362,7 @@ switch protection off. The message names your version and says to update in case
 cloudpin only reads which account is active, using each CLI's own identity command (`az account show`,
 `aws sts get-caller-identity`, `gcloud config list`, `vercel teams ls`, `gh api user`). It never logs in or
 switches accounts, never reads a credential file other than the kubeconfig (taking only the server and namespace from
-it), and never prints or stores a token: error messages name a variable
+it) and the `.env` files Wrangler loads (taking the account variables), and never prints or stores a token: error messages name a variable
 such as `GH_TOKEN` but never its value, and the cache stores salted hashes of anything sensitive. It runs CLIs
 directly, never through a shell. cloudpin has no telemetry and sends nothing about you or your accounts; the
 identity commands above talk only to their own provider, as they would if you ran them. Its one request of its own

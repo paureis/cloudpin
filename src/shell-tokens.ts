@@ -18,7 +18,9 @@ export type Token =
  * substitutions and heredoc bodies, in the order they appear.
  */
 export function tokenize(input: string): Token[] {
-  return scan(input, 0, false).tokens;
+  // Git Bash drops every carriage return it reads, inside quotes too, so `\` + CRLF continues the line;
+  // only a decoded $'\r' keeps one (#161).
+  return scan(input.replace(/\r/g, ""), 0, false).tokens;
 }
 
 /**

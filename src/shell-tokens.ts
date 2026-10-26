@@ -13,6 +13,13 @@ export type Token =
   /** A heredoc or here-string: text the command reads on its standard input. */
   | { kind: "stdin"; body: string };
 
+// The one-letter escapes of $'...', and its \xHH and \NNN codes (bash(1), QUOTING).
+const ANSI_C_ESCAPES: Record<string, string> = {
+  a: "\x07", b: "\b", e: "\x1b", E: "\x1b", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v",
+  "\\": "\\", "'": "'", '"': '"', "?": "?",
+};
+const ANSI_C_CODE = /x([0-9A-Fa-f]{1,2})|([0-7]{1,3})/y;
+
 /**
  * Splits a POSIX-shell command line into words, control operators, command
  * substitutions and heredoc bodies, in the order they appear.
@@ -87,6 +94,35 @@ function scan(input: string, from: number, nested: boolean): { tokens: Token[]; 
     }
     tokens.length = mark;
     return -1;
+  };
+  // Reads $'...' starting after the "'", decoding escapes as bash does (bash(1), QUOTING). \u, \U, \c,
+  // a NUL (where bash ends the word) or a byte past ASCII make the word known only when it runs.
+  const readAnsiC = (start: number): number => {
+    let i = start;
+    while (i < input.length && input[i] !== "'") {
+      const c = input[i]!;
+      const e = input[i + 1] ?? "";
+      ANSI_C_CODE.lastIndex = i + 1;
+      const code = c === "\\" ? ANSI_C_CODE.exec(input) : null;
+      if (c !== "\\") {
+        word += c;
+        i++;
+      } else if (e in ANSI_C_ESCAPES) {
+        word += ANSI_C_ESCAPES[e];
+        i += 2;
+      } else if (code) {
+        const value = parseInt(code[1] ?? code[2]!, code[1] ? 16 : 8);
+        if (value === 0 || value > 0x7f) dynamic = true;
+        else word += String.fromCharCode(value);
+        i = ANSI_C_CODE.lastIndex;
+      } else {
+        // bash keeps the backslash of an escape it does not know.
+        if (e && "uUc".includes(e)) dynamic = true;
+        word += c + e;
+        i += 2;
+      }
+    }
+    return i + 1;
   };
   // Reads $( ... ) or $(( ... )) starting at the "$".
   const readDollarParen = (at: number): number => {
@@ -164,6 +200,13 @@ function scan(input: string, from: number, nested: boolean): { tokens: Token[]; 
           i++;
         }
       }
+      i++;
+    } else if (c === "$" && input[i + 1] === "'") {
+      inWord = true;
+      quoted = true;
+      i = readAnsiC(i + 2);
+    } else if (c === "$" && input[i + 1] === '"') {
+      // A locale string, $"...", reads like "..." (#161).
       i++;
     } else if (c === "\\") {
       if (i + 1 < input.length && input[i + 1] !== "\n") {

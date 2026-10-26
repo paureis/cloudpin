@@ -3,8 +3,9 @@ import { isStream, redirection } from "./redirections.js";
 /**
  * A part of a word known only when it runs (#160): `length` characters of the word's value from `at` are
  * the expansion as typed, none for `$( )`, backticks, `<( )` and `$(( ))`, whose text is left out. `name`
- * is set for `$NAME` and `${NAME}`, which a line can set earlier; `spread` when bash may make it several
- * words (unquoted, or "$@" and "${a[@]}").
+ * is set for `$NAME` and `${NAME}`, which a line can set earlier; `spread` when it may be several words,
+ * flags included: an unquoted variable, "$@" or "${a[@]}". A `$( )` or backticks is read as one word
+ * that is not a flag, even unquoted (owner decision).
  */
 export interface Expansion {
   at: number;
@@ -278,16 +279,18 @@ function scan(input: string, from: number, nested: boolean, seen: Map<number, Sc
     } else if ("$<>".includes(c) && input[i + 1] === "(") {
       // $(...), or a process substitution <(...) >(...): one argument, joined with any text around it (#156).
       inWord = true;
-      // Unquoted, bash splits the output of $( ); $(( )) is a number and <( ) a path, one word each.
+      // One word: $(( )) is a number, <( ) a path, and an unquoted $( ) is read as one value that is not a
+      // flag (owner decision, #160), though bash would split its output.
       const arithmetic = c === "$" && input[i + 2] === "(" ? readArithmetic(i + 3) : -1;
-      mark(0, c === "$" && arithmetic === -1);
+      mark(0, false);
       i = arithmetic !== -1 ? arithmetic : readParen(i + 2);
     } else if (c === "(" && input[i + 1] === "(" && !inWord && (n = readArithmetic(i + 2)) !== -1) {
       // An arithmetic command, (( ... )), or a C-style `for ((...))`.
       i = n;
     } else if (c === "`") {
       inWord = true;
-      mark(0, true);
+      // One value that is not a flag, like an unquoted $( ) (#160).
+      mark(0, false);
       i = readBacktick(i + 1);
     } else if (c === "#" && !inWord) {
       // A comment runs to the end of the line.

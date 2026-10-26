@@ -71,9 +71,10 @@ export interface ProviderDef<P extends Provider = Provider> {
 export const UNKNOWN_VALUE = "<cloudpin: set by the command line, unknown in advance>";
 
 /**
- * An argument known only when the command runs, as findInvocations passes it on (#160): a quoted
- * `"$(...)"` or `"$VAR"` is one word. A flag name written before it is kept, as in `--context=<this>`.
+ * An argument known only when the command runs, as findInvocations passes it on (#160): a `$(...)` or
+ * backticks, quoted or not, or a quoted `"$VAR"`, read as one word that is not a flag. A flag name
+ * written before it is kept, as in `--context=<this>`.
  */
 export const DYNAMIC_WORD = "<cloudpin: a word known only when the command runs>";
-/** An unquoted `$(...)` or `$VAR`, or `"$@"`: bash may split it into several words, flags included. */
+/** An unquoted `$VAR` or `${...}`, `$*`, or `"$@"`: bash may split it into several words, flags included. */
 export const DYNAMIC_WORDS = "<cloudpin: words known only when the command runs>";

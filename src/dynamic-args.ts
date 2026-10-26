@@ -7,8 +7,8 @@ const CANT_TELL = "so cloudpin can't tell which account this command would use";
  * undefined when none could pick it. Each reason names a flag, never a value:
  * - the value of one of `targetFlags` (`--context <x>`, `--context=<x>`, `-itn <x>`);
  * - a flag name completed at run time (`"--sub$(...)"`);
- * - an unquoted expansion, or "$@", that bash may split into several words, flags included.
- * A quoted one anywhere else is a value cloudpin doesn't need. Words after "--" are operands.
+ * - an unquoted variable, or "$@", that bash may split into several words, flags included.
+ * A `$(...)` or quoted value anywhere else is a value cloudpin doesn't need. Words after "--" are operands.
  */
 export function dynamicTarget(args: readonly string[], targetFlags: readonly string[]): { problem: string; fix: string } | undefined {
   const value = (flag: string) => ({
@@ -20,7 +20,7 @@ export function dynamicTarget(args: readonly string[], targetFlags: readonly str
     if (arg === "--") break;
     if (arg.includes(DYNAMIC_WORDS)) {
       return {
-        problem: `the command has an unquoted $(...), backticks, "$@" or a variable not set earlier in the line, which could expand to flags that pick the account, ${CANT_TELL}`,
+        problem: `the command has an unquoted variable not set earlier in the line, or "$@", which could expand to flags that pick the account, ${CANT_TELL}`,
         fix: "quote it if it is one value, give it a literal value, or run the command yourself",
       };
     }

@@ -54,6 +54,10 @@ Wrangler account checks.
 
 ### Fixed
 
+- Agent hooks and `cloudpin explain` read shell redirections and process substitutions as the shell does (#154, #156):
+  `az 2>&1 group list --subscription other` and `az group list <(true) --subscription other` were read as ending at
+  `2>` or `<`, which hid the `--subscription` after them and checked the default account instead. Redirection words
+  (`> out.txt`, `2>/dev/null`) are no longer taken as arguments.
 - A help or version flag no longer exempts a command the CLI still runs (#146): `vercel deploy --prod -v`, a deploy
   flag before an exempt word (`vercel --prod --name whoami`), `vercel promote <id> --help`, `wrangler deploy -v`,
   `gcloud app deploy --version v2`, `az keyvault secret set-attributes --version x` and `gh repo create x -h <url>`

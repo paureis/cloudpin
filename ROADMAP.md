@@ -66,7 +66,8 @@ An idea gets a version when work on it starts.
   ([#116](https://github.com/paureis/cloudpin/issues/116), [#123](https://github.com/paureis/cloudpin/issues/123),
   [#125](https://github.com/paureis/cloudpin/issues/125), [#127](https://github.com/paureis/cloudpin/issues/127),
   [#130](https://github.com/paureis/cloudpin/issues/130), [#133](https://github.com/paureis/cloudpin/issues/133),
-  [#146](https://github.com/paureis/cloudpin/issues/146)).
+  [#146](https://github.com/paureis/cloudpin/issues/146), [#154](https://github.com/paureis/cloudpin/issues/154),
+  [#156](https://github.com/paureis/cloudpin/issues/156)).
 - **1.1.2** (2026-10-19): completes the Windows security fix: nothing cloudpin starts looks in the current folder,
   including the `node` that npm-installed CLIs run (GHSA-3cf7-5v5w-q5vr).
 - **1.1.1** (2026-10-18): security fix for Windows: CLIs run by their full path from PATH, never from the

@@ -25,9 +25,9 @@ cloudpin is a seatbelt, not a sandbox.
 | Actor | Trust | What follows |
 |---|---|---|
 | The person at the terminal | Trusted | `CLOUDPIN_SKIP=1` and `CLOUDPIN_CONFIRM` let them override a check on purpose (`src/guard.ts`, shell mode). |
-| An AI agent running commands through a hook | Trusted to mean well, not to check | The agent can't skip, confirm or pick an environment from inside its own command: hook mode drops `CLOUDPIN_SKIP`, `CLOUDPIN_CONFIRM` and `CLOUDPIN_ENV` set there (`withoutUserOnlyVars` in `src/hooks/agents.ts`), and `cloudpin use` needs the user's OK. |
+| An AI agent running commands through a hook | Trusted to mean well, not to check | The agent can't skip, confirm or pick an environment from inside its own command: hook mode ignores `CLOUDPIN_SKIP`, `CLOUDPIN_CONFIRM`, `CLOUDPIN_ENV` and `CLOUDPIN_BRANCH` set or unset there (`USER_ONLY_VARS` and `envFor` in `src/user-env.ts`), and `cloudpin use` needs the user's OK. |
 | The project's `.cloudpin.yml` | Trusted as the project's own policy | Whoever controls the repository decides the pins, the protected environments and extra `read_only` commands. Cloning a repository means accepting its pin file, as with any other project configuration. |
-| Each cloud CLI and its config files | Trusted to report its own identity | cloudpin asks the CLI who it is (or reads its config, for kubeconfig and linked-project files) and never second-guesses the answer. |
+| Each cloud CLI and its config files | Trusted to report its own identity | cloudpin asks the CLI who it is (or reads its config, for kubeconfig, linked-project files and the `.env` files Wrangler loads) and never second-guesses the answer. |
 
 ## Controls
 
@@ -37,7 +37,8 @@ cloudpin is a seatbelt, not a sandbox.
   Several Azure subscriptions can share the name "Azure subscription 1".
 - **Fail closed, and explain**: when cloudpin can't tell which account a command would use (an expired login, a
   broken token, no network), it blocks the command and says why (`src/guard.ts`, `uncertain`). A pin file it can't
-  parse also blocks every guarded command except login, logout, switch, whoami, help and version (#62, #67).
+  parse also blocks every guarded command except login, logout, switch, whoami, help and version (#62, #67). Help and
+  version count only where the CLI really stops on them, so `vercel deploy --prod -v` is checked (#146).
 - **Agent hooks fail closed once cloudpin is running**: an error inside the hook, or a check slower than 45 seconds,
   becomes an explicit deny (`runHook` in `src/hooks/agents.ts`), because some agents (Claude Code and Codex among
   them) run the command when a hook crashes or times out. If cloudpin can't start at all (uninstalled, or not on the
@@ -47,12 +48,20 @@ cloudpin is a seatbelt, not a sandbox.
   apply. This was measured inside Cursor and Antigravity (#2, #80).
 - **Whole command lines, not just the first word**: pipes, `&&`, subshells, `bash -c`, `eval`, `xargs`, `find -exec`,
   `npx` and heredocs are searched for guarded CLIs (`src/shellwords.ts`, with fuzz tests in
-  `test/shellwords-fuzz.test.ts`). Variables the line sets before a call count (`export AWS_PROFILE=other;`,
-  PowerShell `$env:`), and a call whose account depends on a value only known when it runs (`GH_TOKEN=$(cat f) gh`)
-  is blocked as "can't tell" (#86).
+  `test/shellwords-fuzz.test.ts`), and redirections such as `2>&1` are not arguments (#154). Variables the line sets
+  before a call count (`export AWS_PROFILE=other;`, PowerShell `$env:`), and a call whose account depends on a value
+  only known when it runs (`GH_TOKEN=$(cat f) gh`) is blocked as "can't tell" (#86).
+- **The parser is the weak point, and it is meant to fail closed.** An agent hook gets the whole command line as text,
+  so cloudpin has to read it the way the agent's shell will. An audit against real Git Bash and Windows PowerShell
+  (2026-10-26) found shapes it read differently, some of which hid a flag that picks the account. Each is tracked
+  in a public issue with its repro line (#159 to #163, #165, #168). Where cloudpin can't follow a line, the aim is
+  "can't tell", never a silent allow; a shape that still slips through is a security bug to report (see
+  [SECURITY.md](SECURITY.md)).
 - **Never touch credentials**: cloudpin only runs each CLI's read-only identity command, never prints, logs or caches
   a token, and never runs commands that print secrets (`aws configure list`, `--show-token`, `--reveal`). Error
-  messages name environment variables, never their values.
+  messages name environment variables, never their values. Two files it reads can hold credentials: the kubeconfig
+  (it takes only the server and namespace) and the `.env` files Wrangler loads, which can hold `CLOUDFLARE_API_TOKEN`
+  (it takes the account variables, and keys its cache on a salted hash of the credential variables).
 - **No shell when spawning**: every process starts through `realExec` with arguments as a list
   (`src/exec.ts`, cross-spawn), so a command line is never re-interpreted by a shell.
 - **A short cache that can't go stale on a switch**: a successful identity is reused for at most 5 minutes, keyed by a

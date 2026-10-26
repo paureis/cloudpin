@@ -119,6 +119,7 @@ describe("yargs boolean values turn help off in wrangler (#153 item 3)", () => {
     "deploy -h --no-h",
     "deploy --help true --help false",
     "deploy --help --help=false",
+    "deploy --help -h=false",
   ])("checks wrangler %s", (cmd) => {
     expect(cloudflare.isExempt(cmd.split(" "))).toBe(false);
   });

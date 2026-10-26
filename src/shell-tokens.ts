@@ -18,7 +18,17 @@ export type Token =
  * substitutions and heredoc bodies, in the order they appear.
  */
 export function tokenize(input: string): Token[] {
+  return scan(input, 0, false).tokens;
+}
+
+/**
+ * Reads from `from` to the end of the input or, when `nested` in a `$( )`, to the `)` that closes it;
+ * `end` is the index after that `)`.
+ */
+function scan(input: string, from: number, nested: boolean): { tokens: Token[]; end: number; closed: boolean } {
   const tokens: Token[] = [];
+  // Subshells opened by ( and not closed yet, inside this $( ).
+  let depth = 0;
   let word = "";
   let inWord = false;
   let quoted = false;
@@ -40,23 +50,12 @@ export function tokenize(input: string): Token[] {
   // `$NAME` or `${NAME}` (not `$` alone or `$1`): an expansion outside single quotes.
   const expands = (at: number) => /[A-Za-z_{]/.test(input[at + 1] ?? "");
 
-  // Reads $( ... ), <( ... ) or >( ... ) starting after the "(", honouring nesting and quotes.
+  // Reads $( ... ), <( ... ) or >( ... ) starting after the "(", with this same tokenizer, so quotes,
+  // comments and heredoc bodies inside it are read as on the outer line (#161).
   const readParen = (start: number): number => {
-    let depth = 1;
-    let i = start;
-    let quote: string | null = null;
-    for (; i < input.length && depth > 0; i++) {
-      const c = input[i]!;
-      if (quote) {
-        if (c === "\\" && quote === '"') i++;
-        else if (c === quote) quote = null;
-      } else if (c === "'" || c === '"') quote = c;
-      else if (c === "\\") i++;
-      else if (c === "(") depth++;
-      else if (c === ")") depth--;
-    }
-    tokens.push({ kind: "subst", inner: input.slice(start, i - 1) });
-    return i;
+    const { end, closed } = scan(input, start, true);
+    tokens.push({ kind: "subst", inner: input.slice(start, closed ? end - 1 : end) });
+    return end;
   };
   const readBacktick = (start: number): number => {
     let i = start;
@@ -103,7 +102,7 @@ export function tokenize(input: string): Token[] {
     return i;
   };
 
-  let i = 0;
+  let i = from;
   let n = 0;
   while (i < input.length) {
     const c = input[i]!;
@@ -177,9 +176,14 @@ export function tokenize(input: string): Token[] {
     } else if (" \t\r".includes(c)) {
       flush();
       i++;
+    } else if (nested && c === ")" && depth === 0) {
+      flush();
+      return { tokens, end: i + 1, closed: true };
     } else if (";&|()\n".includes(c)) {
       flush();
       tokens.push({ kind: "op", op: c });
+      if (c === "(") depth++;
+      if (c === ")") depth--;
       i++;
       if (c === "\n" && pending.length > 0) i = readBodies(i);
     } else {
@@ -190,5 +194,5 @@ export function tokenize(input: string): Token[] {
     }
   }
   flush();
-  return tokens;
+  return { tokens, end: i, closed: false };
 }

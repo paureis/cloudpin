@@ -52,6 +52,12 @@ describe("a heredoc inside $( ) is read as bash reads it (#161)", () => {
     ]);
   });
 
+  it("counts the subshells inside $( ), so their ) does not close it", () => {
+    expect(calls(`echo "$( (true) ; az group list --subscription other )"`)).toEqual([
+      ["az", ["group", "list", "--subscription", "other"]],
+    ]);
+  });
+
   it("does not cut the last character of an unterminated $(", () => {
     expect(calls("echo $(az group list --subscription other")).toEqual([["az", ["group", "list", "--subscription", "other"]]]);
   });
@@ -93,6 +99,9 @@ describe("arithmetic (( )) and $(( )) is not a heredoc (#161)", () => {
     `echo $(( 1 << 3 ))${NL}az group list --subscription other`,
     `echo "$(( 1 << 3 ))"${NL}az group list --subscription other`,
     `(( x = "1" + 2 )); az group list --subscription other`,
+    // A newline after << would start a heredoc body that swallows the call.
+    `total=$(( a << 2${NL}  + b ))${NL}az group list --subscription other`,
+    `(( n = a << 2${NL}  + 1 ))${NL}az group list --subscription other`,
   ])("finds the call in %j", (line) => {
     expect(calls(line)).toEqual([["az", ["group", "list", "--subscription", "other"]]]);
   });

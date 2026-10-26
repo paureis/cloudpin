@@ -198,7 +198,7 @@ describe("Start-Process (#162)", () => {
     "Start-Process az -Verb RunAs -ArgumentList 'group','list'",
     "Start-Process az -UseNewEnvironment -ArgumentList 'group','list'",
     "Start-Process az -Frob x -ArgumentList 'group','list'",
-    "Start-Process az -Wa -ArgumentList 'group','list'",
+    "Start-Process az -W -ArgumentList 'group','list'",
   ])("can't tell: %j", (line) => {
     expect(calls(line)).toEqual(cantTell);
   });

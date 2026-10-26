@@ -33,7 +33,10 @@ describe("a heredoc inside $( ) is read as bash reads it (#161)", () => {
 
   it("finds the call after gh pr create --body with the same idiom", () => {
     const line = `gh pr create --title t --body "$(cat <<'EOF'${NL}Don't merge yet${NL}EOF${NL})" && az group delete -n x --subscription other`;
-    expect(calls(line)).toEqual([["gh", ["pr", "create", "--title", "t", "--body"]], AZ_OTHER]);
+    // The --body value is the substitution's output; #160 decides how it is read.
+    const found = calls(line);
+    expect(found.map(([bin]) => bin)).toEqual(["gh", "az"]);
+    expect(found[1]).toEqual(AZ_OTHER);
   });
 
   it("still reads the heredoc body as data, and the commands after it inside $( ) as commands", () => {

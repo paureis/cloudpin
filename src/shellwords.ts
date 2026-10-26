@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { commandName } from "./guard.js";
+import { isStream, redirection } from "./redirections.js";
 import { UNKNOWN_VALUE } from "./types.js";
 
 export interface Invocation {
@@ -47,11 +48,13 @@ function tokenize(input: string): Token[] {
   let dynamic = false;
   // The next word is a here-string (`<<< word`), not an argument.
   let hereString = false;
+  // The next word is a redirection's target (#154).
+  let target = false;
   // Heredocs whose bodies start after the next newline.
   const pending: { token: { kind: "stdin"; body: string }; delimiter: string; stripTabs: boolean }[] = [];
   const flush = () => {
-    if (inWord) tokens.push(hereString ? { kind: "stdin", body: word } : { kind: "word", value: word, quoted, dynamic });
-    if (inWord) hereString = false;
+    if (inWord && !target) tokens.push(hereString ? { kind: "stdin", body: word } : { kind: "word", value: word, quoted, dynamic });
+    if (inWord) hereString = target = false;
     word = "";
     inWord = false;
     quoted = false;
@@ -124,6 +127,7 @@ function tokenize(input: string): Token[] {
   };
 
   let i = 0;
+  let n = 0;
   while (i < input.length) {
     const c = input[i]!;
     if (c === "'") {
@@ -187,6 +191,11 @@ function tokenize(input: string): Token[] {
       tokens.push(token);
       pending.push({ token, delimiter, stripTabs });
       i = next;
+    } else if ((n = redirection(input, i))) {
+      if (!quoted && !dynamic && isStream(input, i, word)) inWord = false;
+      flush();
+      target = true;
+      i += n;
     } else if (" \t\r".includes(c)) {
       flush();
       i++;

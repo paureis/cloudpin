@@ -140,7 +140,6 @@ function configAccount(path: string, envName: string | undefined): { account?: s
   return { account: ids.top, where };
 }
 
-/** The project-local account cache Wrangler writes after picking an account (config-cache.ts). */
 /**
  * Whether yargs turns help on (#153). Wrangler declares `.help("help").alias("h", "help")`, a boolean
  * (packages/wrangler/src/index.ts). yargs-parser 21.1.1 (yargs 17.7.2) takes a "true" or "false" right
@@ -163,6 +162,7 @@ function yargsHelp(args: string[]): boolean {
   return on;
 }
 
+/** The project-local account cache Wrangler writes after picking an account (config-cache.ts). */
 function cachedAccount(start: string, env: NodeJS.ProcessEnv): { id: string; name?: string } | undefined {
   // Wrangler chooses one folder (workers-utils config-cache.ts getCacheFolder)
   // and reads only its file: WRANGLER_CACHE_DIR when non-empty, used as given

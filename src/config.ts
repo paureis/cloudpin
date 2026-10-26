@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { parse, YAMLParseError } from "yaml";
 import { chooseEnvironment, currentBranch, findGitDir } from "./git.js";
+import { runningInstallMethod, upgradeCommand } from "./install-method.js";
 
 export const CONFIG_FILE = ".cloudpin.yml";
 
@@ -49,9 +50,9 @@ const VERSION = (createRequire(import.meta.url)("../package.json") as { version:
  * typo switch protection off), but says how to get the version that knows it (#67).
  */
 function unknownName(message: string): ConfigError {
-  return new ConfigError(
-    `${message}. If this file was written for a newer cloudpin than this one (${VERSION}), update it: npm install --global cloudpin@latest`,
-  );
+  const method = runningInstallMethod();
+  const command = method === "npm" ? "npm install --global cloudpin@latest" : upgradeCommand(method);
+  return new ConfigError(`${message}. If this file was written for a newer cloudpin than this one (${VERSION}), update it: ${command}`);
 }
 
 // Allowed keys per section; the first `required` entries must be present.
@@ -224,9 +225,10 @@ function globToRegExp(pattern: string): RegExp {
 
 /**
  * Picks the environment that applies (owner decision, issue #12): CLOUDPIN_ENV,
- * then `cloudpin use`, then the branch mapping (an exact name before patterns),
- * then the first environment listed. Null for the flat format. An unknown name
- * is an error, never a guess.
+ * then `cloudpin use`, then the branch mapping (an exact name before patterns)
+ * for CLOUDPIN_BRANCH if set (CI on a detached checkout, #10), else the
+ * checked-out branch, then the first environment listed. Null for the flat
+ * format. An unknown name is an error, never a guess.
  */
 export function selectEnvironment(
   project: ProjectConfig,
@@ -245,12 +247,13 @@ export function selectEnvironment(
   };
   if (sel.env.CLOUDPIN_ENV) return pick(sel.env.CLOUDPIN_ENV, "CLOUDPIN_ENV", "CLOUDPIN_ENV");
   if (sel.chosen) return pick(sel.chosen, "cloudpin use", "the environment chosen with `cloudpin use`");
-  if (sel.branch) {
-    const branch = sel.branch;
+  const fromVar = Boolean(sel.env.CLOUDPIN_BRANCH);
+  const branch = sel.env.CLOUDPIN_BRANCH || sel.branch;
+  if (branch) {
     const rule =
       project.branches.find((b) => !b.pattern.includes("*") && b.pattern === branch) ??
       project.branches.find((b) => b.pattern.includes("*") && globToRegExp(b.pattern).test(branch));
-    if (rule) return pick(rule.environment, `branch "${branch}"`, "branches");
+    if (rule) return pick(rule.environment, `branch "${branch}"${fromVar ? " (CLOUDPIN_BRANCH)" : ""}`, "branches");
   }
   const first = envs[0]!;
   return { name: first.name, protected: first.protected, source: "first listed", pins: first.pins };

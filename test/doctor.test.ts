@@ -2,7 +2,9 @@ import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { FoundConfig } from "../src/config.js";
 import { doctorJson, formatDoctor, runDoctor, type Check, type DoctorDeps } from "../src/doctor.js";
-import { planInstall } from "../src/install.js";
+import type { AgentName } from "../src/hooks/agents.js";
+import { hookFile, planInstall } from "../src/install.js";
+import type { InstallMethod } from "../src/install-method.js";
 import { findOnPath } from "../src/paths.js";
 import type { Exec, ProviderDef, Resolution } from "../src/types.js";
 
@@ -44,6 +46,8 @@ interface Setup {
   writable?: boolean;
   platform?: NodeJS.Platform;
   latest?: string | null;
+  install?: InstallMethod;
+  realpath?: (path: string) => string;
 }
 
 function deps(s: Setup = {}): DoctorDeps {
@@ -69,6 +73,8 @@ function deps(s: Setup = {}): DoctorDeps {
     version: "0.3.0",
     node: s.node ?? "22.17.0",
     self: "/usr/lib/node_modules/cloudpin/dist/cli.js",
+    install: s.install ?? "npm",
+    realpath: s.realpath ?? ((path) => path),
     read: (path) => files[path] ?? null,
     writable: () => s.writable ?? true,
     onPath: () => (s.onPath === undefined ? "/usr/bin/cloudpin" : s.onPath),
@@ -108,6 +114,88 @@ describe("runDoctor: cloudpin itself", () => {
     const path = one(await runDoctor(deps({ pathVersion: "0.2.1" })), "path");
     expect(path.level).toBe("warn");
     expect(path.title).toContain("0.2.1");
+    expect(path.fix).toBe("npm install --global cloudpin");
+  });
+
+  it("with no cloudpin on PATH, names the fix for how this one was installed", async () => {
+    const missing = async (install: InstallMethod) => one(await runDoctor(deps({ onPath: null, install })), "path").fix;
+    expect(await missing("npm")).toBe("npm install --global cloudpin");
+    expect(await missing("brew")).toMatch(/^brew link cloudpin/);
+    expect(await missing("scoop")).toMatch(/^scoop reset cloudpin/);
+  });
+
+  // The fix is for the cloudpin on PATH, so it names how that one was installed, not this one.
+  const BREW_LINK = "/opt/homebrew/bin/cloudpin";
+  const BREW_KEG = "/opt/homebrew/Cellar/cloudpin/0.2.1/libexec/lib/node_modules/cloudpin/dist/cli.js";
+  const brewLink = (path: string) => (path === BREW_LINK ? BREW_KEG : path);
+
+  it("names brew's commands for a brew cloudpin on PATH when this one came from npm (npx cloudpin@latest doctor)", async () => {
+    const at = (pathVersion: string) => deps({ install: "npm", onPath: BREW_LINK, realpath: brewLink, pathVersion, platform: "darwin" });
+    expect(one(await runDoctor(at("0.2.1")), "path").fix).toBe("brew upgrade cloudpin");
+    expect(one(await runDoctor(at("")), "path").fix).toBe("brew reinstall cloudpin");
+    // Control: the update check is about this cloudpin, so it keeps this one's command.
+    const update = one(await runDoctor({ ...at("0.2.1"), latest: async () => "0.4.0" }), "update");
+    expect(update.fix).toBe("npm install --global cloudpin");
+  });
+
+  it("names npm's commands for an npm cloudpin on PATH when this one came from brew", async () => {
+    const at = (pathVersion: string) =>
+      deps({ install: "brew", onPath: "/usr/local/bin/cloudpin", realpath: brewLink, pathVersion, platform: "darwin" });
+    expect(one(await runDoctor(at("0.2.1")), "path").fix).toBe("npm install --global cloudpin");
+    expect(one(await runDoctor(at("")), "path").fix).toBe("npm install --global cloudpin");
+  });
+
+  it("names Scoop's commands for a Scoop shim on PATH", async () => {
+    const at = (pathVersion: string) =>
+      deps({
+        install: "npm",
+        onPath: "C:\\Users\\me\\scoop\\shims\\cloudpin.cmd",
+        env: { USERPROFILE: "C:\\Users\\me" },
+        pathVersion,
+        platform: "win32",
+      });
+    expect(one(await runDoctor(at("0.2.1")), "path").fix).toBe("scoop update cloudpin");
+    expect(one(await runDoctor(at("")), "path").fix).toBe("scoop uninstall cloudpin, then scoop install cloudpin");
+  });
+
+  // #98: each package manager's launcher on PATH, as each one writes it (src/install-method.ts cites the layouts).
+  const WIN_HOME = { USERPROFILE: "C:\\Users\\me", LOCALAPPDATA: "C:\\Users\\me\\AppData\\Local" };
+  it.each<[InstallMethod, NodeJS.Platform, string, Record<string, string>, string]>([
+    ["pnpm", "win32", "C:\\Users\\me\\AppData\\Local\\pnpm\\bin\\cloudpin.CMD", {}, "pnpm add --global cloudpin"],
+    ["pnpm", "linux", "/home/me/.local/share/pnpm/cloudpin", {}, "pnpm add --global cloudpin"],
+    ["volta", "win32", "C:\\Users\\me\\AppData\\Local\\Volta\\bin\\cloudpin.cmd", {}, "volta install cloudpin"],
+    ["volta", "darwin", "/Users/me/.volta/bin/cloudpin", { "/Users/me/.volta/bin/cloudpin": "/Users/me/.volta/bin/volta-shim" }, "volta install cloudpin"],
+    ["yarn", "win32", "C:\\Users\\me\\AppData\\Local\\Yarn\\bin\\cloudpin.cmd", {}, "yarn global add cloudpin"],
+    ["yarn", "linux", "/usr/local/bin/cloudpin", { "/usr/local/bin/cloudpin": "/home/me/.config/yarn/global/node_modules/cloudpin/dist/cli.js" }, "yarn global add cloudpin"],
+    ["bun", "win32", "C:\\Users\\me\\.bun\\bin\\cloudpin.exe", {}, "bun add --global cloudpin@latest"],
+    ["bun", "linux", "/home/me/.bun/bin/cloudpin", { "/home/me/.bun/bin/cloudpin": "/home/me/.bun/install/global/node_modules/cloudpin/dist/cli.js" }, "bun add --global cloudpin@latest"],
+  ])("names %s's command for its launcher on PATH (%s: %s)", async (_method, platform, onPath, links, command) => {
+    const env = platform === "win32" ? WIN_HOME : { HOME: platform === "darwin" ? "/Users/me" : "/home/me" };
+    const realpath = (path: string) => links[path] ?? path;
+    const at = (pathVersion: string) => deps({ install: "npm", onPath, env, realpath, pathVersion, platform });
+    expect(one(await runDoctor(at("0.2.1")), "path").fix).toBe(command);
+    expect(one(await runDoctor(at("")), "path").fix).toBe(command);
+    // Control: the update check is about this cloudpin, an npm one.
+    expect(one(await runDoctor({ ...at("0.2.1"), latest: async () => "0.4.0" }), "update").fix).toBe("npm install --global cloudpin");
+  });
+
+  it.each<[InstallMethod, string]>([
+    ["pnpm", "pnpm add --global cloudpin"],
+    ["volta", "volta install cloudpin"],
+    ["yarn", "yarn global add cloudpin"],
+    ["bun", "bun add --global cloudpin@latest"],
+  ])("names %s's commands for the update and a missing PATH copy when this cloudpin came from it", async (install, command) => {
+    expect(one(await runDoctor(deps({ install, latest: "0.4.0" })), "update").fix).toBe(command);
+    const missing = one(await runDoctor(deps({ install, onPath: null })), "path").fix!;
+    expect(missing.startsWith(`${command}, and check that`)).toBe(true);
+    expect(missing).toContain("on PATH");
+    expect(missing).not.toMatch(/\bnpm\b/);
+  });
+
+  it("keeps the fix text in --json", async () => {
+    const d = deps({ latest: "0.4.0", install: "brew" });
+    const json = doctorJson(await runDoctor(d), d);
+    expect(json.checks.find((c) => c.id === "update")).toMatchObject({ fix: "brew upgrade cloudpin" });
   });
 });
 
@@ -117,6 +205,14 @@ describe("runDoctor: newer version", () => {
     const update = one(await runDoctor(deps({ latest: "0.4.0" })), "update");
     expect(update).toMatchObject({ level: "warn", fix: "npm install --global cloudpin" });
     expect(update.title).toContain("0.4.0");
+  });
+
+  it.each([
+    ["brew", "brew upgrade cloudpin"],
+    ["scoop", "scoop update cloudpin"],
+  ] as const)("names the upgrade command for a %s install", async (install, command) => {
+    const update = one(await runDoctor(deps({ latest: "0.4.0", install })), "update");
+    expect(update).toMatchObject({ level: "warn", fix: command });
   });
 
   it("notes when npm can't be reached, and asks nothing when the check is turned off", async () => {
@@ -326,13 +422,211 @@ describe("formatDoctor and doctorJson", () => {
 
 describe("findOnPath", () => {
   it("finds a command in PATH order, with PATHEXT on Windows", () => {
-    const a = join("/", "a");
-    const b = join("/", "b");
-    const files = new Set([join(b, "cloudpin.CMD"), join(b, "cloudpin"), join(a, "other")]);
+    const files = new Set(["C:\\b\\cloudpin.CMD", "/b/cloudpin", "/a/other"]);
     const exists = (p: string) => files.has(p);
-    expect(findOnPath("cloudpin", { PATH: [a, b].join(";"), PATHEXT: ".EXE;.CMD" }, "win32", exists)).toBe(join(b, "cloudpin.CMD"));
-    expect(findOnPath("cloudpin", { PATH: [a, b].join(":") }, "linux", exists)).toBe(join(b, "cloudpin"));
-    expect(findOnPath("missing", { PATH: [a, b].join(":") }, "linux", exists)).toBeNull();
+    expect(findOnPath("cloudpin", { PATH: "C:\\a;C:\\b", PATHEXT: ".EXE;.CMD" }, "win32", exists)).toBe("C:\\b\\cloudpin.CMD");
+    expect(findOnPath("cloudpin", { PATH: "/a:/b" }, "linux", exists)).toBe("/b/cloudpin");
+    expect(findOnPath("missing", { PATH: "/a:/b" }, "linux", exists)).toBeNull();
     expect(findOnPath("cloudpin", {}, "linux", exists)).toBeNull();
+  });
+});
+
+describe("runDoctor: the Claude Code plugin", () => {
+  const enabled = JSON.stringify({ enabledPlugins: { "cloudpin@cloudpin": true } });
+  const userSettings = join(HOME, ".claude", "settings.json");
+
+  it("is ok on its own", async () => {
+    const hooks = byId(await runDoctor(deps({ files: { [userSettings]: enabled } })), "hook");
+    expect(hooks).toEqual([expect.objectContaining({ level: "ok", title: expect.stringMatching(/claude plugin/) })]);
+  });
+
+  it("warns when a settings hook also guards Claude Code, since both would run", async () => {
+    const settings = JSON.parse(planInstall("claude", null).content);
+    const files = { [userSettings]: JSON.stringify({ ...settings, enabledPlugins: { "cloudpin@cloudpin": true } }) };
+    const twice = one(await runDoctor(deps({ files })), "hook-twice");
+    expect(twice.level).toBe("warn");
+    expect(twice.fix).toBe("cloudpin uninstall-hook claude --user");
+  });
+});
+
+describe("runDoctor: Windows hook shells (#108)", () => {
+  const ROOT = "C:\\Windows";
+  const NPM = "C:\\npm";
+  const USER = "C:\\Users\\me";
+  const settings = (agent: AgentName) => hookFile(agent, "user", REPO, { USERPROFILE: USER });
+
+  interface Win {
+    files?: Record<string, string>;
+    env?: NodeJS.ProcessEnv;
+    policy?: string;
+    claude?: string;
+    pwsh?: boolean;
+    ps1?: boolean;
+    platform?: NodeJS.Platform;
+  }
+  function win(w: Win = {}) {
+    const files: Record<string, string> = { ...w.files };
+    if (w.ps1 !== false) files[`${NPM}\\cloudpin.ps1`] = "#!/usr/bin/env pwsh\n";
+    const d = deps({
+      platform: w.platform ?? "win32",
+      env: { HOME: undefined, USERPROFILE: USER, SystemRoot: ROOT, Path: `${ROOT}\\System32;${NPM}`, ...w.env },
+      files,
+    });
+    const calls: { bin: string; args: string[] }[] = [];
+    const base = d.guard.exec;
+    d.guard.exec = async (bin, args, env) => {
+      calls.push({ bin, args });
+      if ((bin === "powershell" || bin === "pwsh") && args.at(-1) === "Get-ExecutionPolicy") {
+        return { code: 0, stdout: `${w.policy ?? "RemoteSigned"}\r\n`, stderr: "" };
+      }
+      if (bin === "claude" && args[0] === "--version") {
+        return w.claude === undefined
+          ? { code: 127, stdout: "", stderr: "", notFound: true }
+          : { code: 0, stdout: `${w.claude} (Claude Code)\n`, stderr: "" };
+      }
+      return base(bin, args, env);
+    };
+    d.onPath = (name) => (name === "cloudpin" ? `${NPM}\\cloudpin.cmd` : name === "pwsh" && w.pwsh ? "C:\\pwsh\\pwsh.exe" : null);
+    return { d, calls };
+  }
+  const askedPolicy = (calls: { args: string[] }[]) => calls.some((c) => c.args.at(-1) === "Get-ExecutionPolicy");
+
+  describe("the PowerShell execution policy", () => {
+    it.each(["codex", "copilot"] as const)("warns when it blocks a bare %s hook, and the fix writes the Windows form", async (agent) => {
+      const { d } = win({ policy: "Restricted", files: { [settings(agent)]: planInstall(agent, null).content } });
+      const check = one(await runDoctor(d), "exec-policy");
+      expect(check.level).toBe("warn");
+      expect(check.title).toContain(`${agent} hook (personal)`);
+      expect(check.title).toContain("Restricted");
+      expect(check.fix).toBe(`cloudpin install-hook ${agent} --user`);
+    });
+
+    it("warns for Gemini CLI, which has no Windows-only command field, naming the policy as the fix", async () => {
+      const { d } = win({ policy: "AllSigned", files: { [settings("gemini")]: planInstall("gemini", null).content } });
+      const check = one(await runDoctor(d), "exec-policy");
+      expect(check.level).toBe("warn");
+      expect(check.title).toContain("AllSigned");
+      expect(check.fix).toContain("Set-ExecutionPolicy -Scope CurrentUser RemoteSigned");
+    });
+
+    it.each(["RemoteSigned", "Unrestricted", "Bypass"])("says nothing under %s", async (policy) => {
+      const { d } = win({ policy, files: { [settings("codex")]: planInstall("codex", null).content } });
+      expect(byId(await runDoctor(d), "exec-policy")).toEqual([]);
+    });
+
+    it("says nothing for hooks in the Windows form, or for agents that don't run hooks through PowerShell", async () => {
+      const files = {
+        [settings("codex")]: planInstall("codex", null, ROOT).content,
+        [settings("copilot")]: planInstall("copilot", null, ROOT).content,
+        [settings("cursor")]: planInstall("cursor", null).content,
+        [settings("claude")]: planInstall("claude", null).content,
+      };
+      const { d, calls } = win({ policy: "Restricted", files, claude: "2.1.304" });
+      expect(byId(await runDoctor(d), "exec-policy")).toEqual([]);
+      expect(askedPolicy(calls)).toBe(false);
+      // Control: the same files with one bare Codex hook warn.
+      const bare = win({ policy: "Restricted", files: { ...files, [settings("codex")]: planInstall("codex", null).content } });
+      expect(byId(await runDoctor(bare.d), "exec-policy")).toHaveLength(1);
+    });
+
+    it("asks pwsh when it is on PATH, as the agents do, else Windows PowerShell, without a profile", async () => {
+      for (const pwsh of [true, false]) {
+        const { d, calls } = win({ pwsh, files: { [settings("codex")]: planInstall("codex", null).content } });
+        await runDoctor(d);
+        expect(calls.filter((c) => c.args.at(-1) === "Get-ExecutionPolicy")).toEqual([
+          { bin: pwsh ? "pwsh" : "powershell", args: ["-NoProfile", "-NonInteractive", "-Command", "Get-ExecutionPolicy"] },
+        ]);
+      }
+    });
+
+    it("says nothing when the cloudpin on PATH has no cloudpin.ps1 beside it (Scoop's exe shim)", async () => {
+      const { d, calls } = win({ policy: "Restricted", ps1: false, files: { [settings("codex")]: planInstall("codex", null).content } });
+      expect(byId(await runDoctor(d), "exec-policy")).toEqual([]);
+      expect(askedPolicy(calls)).toBe(false);
+    });
+
+    it("is not checked off Windows", async () => {
+      const { d, calls } = win({ platform: "linux", policy: "Restricted", files: { [settings("codex")]: planInstall("codex", null).content } });
+      expect(byId(await runDoctor(d), "exec-policy")).toEqual([]);
+      expect(askedPolicy(calls)).toBe(false);
+    });
+  });
+
+  describe("PATH", () => {
+    it("warns about . and relative entries, which make every shell look in the current folder", async () => {
+      const Path = `${ROOT}\\System32;.;"C:\\Program Files\\Git\\cmd";;node_modules\\.bin;%USERPROFILE%\\bin;${NPM}`;
+      const check = one(await runDoctor(win({ env: { Path } }).d), "path-relative");
+      expect(check.level).toBe("warn");
+      expect(check.detail?.join("\n")).toContain('".", "node_modules\\.bin", "%USERPROFILE%\\bin"');
+    });
+
+    it("says nothing for absolute, quoted or empty entries, or off Windows", async () => {
+      const Path = `${ROOT}\\System32;"C:\\Program Files\\Git\\cmd";;${NPM};`;
+      expect(byId(await runDoctor(win({ env: { Path } }).d), "path-relative")).toEqual([]);
+      expect(byId(await runDoctor(win({ platform: "linux", env: { Path: ".;x" } }).d), "path-relative")).toEqual([]);
+    });
+  });
+
+  describe("Claude Code's version", () => {
+    const hook = { [settings("claude")]: planInstall("claude", null).content };
+
+    it("warns when Claude Code is older than 2.1.47, which ran hooks through cmd.exe", async () => {
+      const check = one(await runDoctor(win({ files: hook, claude: "2.1.46" }).d), "claude-version");
+      expect(check.level).toBe("warn");
+      expect(check.title).toContain("2.1.46");
+      expect(check.fix).toContain("claude update");
+    });
+
+    it.each(["2.1.47", "2.1.304", "2.10.0", "3.0.0"])("says nothing for %s", async (claude) => {
+      expect(byId(await runDoctor(win({ files: hook, claude }).d), "claude-version")).toEqual([]);
+    });
+
+    it("counts the plugin as a hook, and asks nothing when no Claude Code hook is installed", async () => {
+      const plugin = { [settings("claude")]: JSON.stringify({ enabledPlugins: { "cloudpin@cloudpin": true } }) };
+      expect(byId(await runDoctor(win({ files: plugin, claude: "2.0.0" }).d), "claude-version")).toHaveLength(1);
+      const { d, calls } = win({ claude: "2.0.0" });
+      expect(byId(await runDoctor(d), "claude-version")).toEqual([]);
+      expect(calls.some((c) => c.bin === "claude")).toBe(false);
+    });
+
+    it("says nothing when claude is not on PATH, or off Windows", async () => {
+      expect(byId(await runDoctor(win({ files: hook }).d), "claude-version")).toEqual([]);
+      expect(byId(await runDoctor(win({ files: hook, claude: "2.1.0", platform: "linux" }).d), "claude-version")).toEqual([]);
+    });
+  });
+
+  describe("SystemRoot", () => {
+    it("warns when it is not a plain folder path, since install-hook then writes the bare command", async () => {
+      const check = one(await runDoctor(win({ env: { SystemRoot: "C:\\My Windows" } }).d), "hook-shell");
+      expect(check.level).toBe("warn");
+      expect(JSON.stringify(check)).not.toContain("My Windows"); // names the variable, not its value
+      expect(byId(await runDoctor(win().d), "hook-shell")).toEqual([]);
+      expect(byId(await runDoctor(win({ platform: "linux", env: { SystemRoot: undefined } }).d), "hook-shell")).toEqual([]);
+    });
+  });
+
+  describe("hooks written before 1.2.0", () => {
+    it("calls a bare Codex or Copilot hook out of date on Windows, and current elsewhere", async () => {
+      for (const agent of ["codex", "copilot"] as const) {
+        const files = { [settings(agent)]: planInstall(agent, null).content };
+        const hook = one(await runDoctor(win({ files }).d), "hook");
+        expect(hook.level).toBe("warn");
+        expect(hook.fix).toBe(`cloudpin install-hook ${agent} --user`);
+        expect(hook.detail?.join("\n")).toMatch(/Windows/);
+        expect(one(await runDoctor(win({ files, platform: "linux" }).d), "hook").level).toBe("ok");
+        const upgraded = { [settings(agent)]: planInstall(agent, null, ROOT).content };
+        expect(one(await runDoctor(win({ files: upgraded }).d), "hook").level).toBe("ok");
+      }
+    });
+
+    it("calls a hook written where SystemRoot is C:\\WINDOWS current on a machine with C:\\Windows", async () => {
+      for (const agent of ["codex", "copilot"] as const) {
+        const files = { [settings(agent)]: planInstall(agent, null, "C:\\WINDOWS").content };
+        expect(one(await runDoctor(win({ files }).d), "hook").level).toBe("ok");
+        // Control: another drive is really another cmd.exe, so it is out of date.
+        const other = { [settings(agent)]: planInstall(agent, null, "D:\\Windows").content };
+        expect(one(await runDoctor(win({ files: other }).d), "hook").level).toBe("warn");
+      }
+    });
   });
 });

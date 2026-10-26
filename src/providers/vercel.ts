@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
-import { commandWords, flagValue, hasAnyFlag } from "../args.js";
+import { flagValue } from "../args.js";
 import { home } from "../paths.js";
 import type { Exec, ProviderDef, Resolution } from "../types.js";
 
@@ -14,10 +14,94 @@ import type { Exec, ProviderDef, Resolution } from "../types.js";
 
 const EXEMPT_COMMANDS = new Set(["login", "logout", "switch", "whoami", "help", "telemetry"]);
 const EXEMPT_TEAMS_SUBCOMMANDS = new Set(["ls", "list", "switch"]);
-// Global options that take a value (`vercel <command> --help`, Global Options; 50.35).
+// Global options (vercel/vercel packages/cli/src/util/arg-common.ts globalCommandOptions; 50.35).
+const GLOBAL_BOOLEAN_FLAGS: Readonly<Record<string, string>> = {
+  "--help": "--help", "-h": "--help", "--version": "--version", "-v": "--version",
+  "--debug": "--debug", "-d": "--debug", "--no-color": "--no-color", "--non-interactive": "--non-interactive",
+};
 const GLOBAL_VALUE_FLAGS = new Set([
-  "--cwd", "--global-config", "-Q", "--local-config", "-A", "--scope", "-S", "--team", "-T", "--token", "-t",
+  "--cwd", "--global-config", "-Q", "--local-config", "-A", "--scope", "-S", "--team", "-T", "--token", "-t", "--api",
 ]);
+// Built-in commands and aliases (src/commands/index.ts; 50.35) that print their help and stop
+// on --help or -h. Left out because they can run anyway: `promote <id>` and `rollback <id>`
+// show help only without a deployment, and `rolling-release`/`rr` look for a literal --help or
+// -h word, so `-dh` runs them. Any other word may be an extension (vercel-<word>), which Vercel
+// runs without the --help it parsed itself (src/util/extension/exec.ts).
+const HELP_COMMANDS = new Set([
+  "activity", "agent", "alerts", "alias", "aliases", "ln", "api", "bisect", "blob", "build", "buy", "cache",
+  "certs", "cert", "contract", "crons", "cron", "curl", "deploy", "dev", "develop", "dns", "domains", "domain",
+  "env", "flags", "git", "httpstat", "init", "inspect", "install", "i", "integration", "integration-resource",
+  "ir", "link", "list", "ls", "logs", "log", "mcp", "microfrontends", "mf", "open", "project", "projects",
+  "pull", "redeploy", "redirects", "redirect", "remove", "rm", "routes", "skills", "target", "targets", "teams",
+  "team", "upgrade", "usage", "webhooks", "webhook",
+]);
+
+interface MainParse {
+  /** Positionals, with the flags Vercel doesn't know globally; the first is the command. */
+  positionals: string[];
+  /** The global boolean flags seen, by long name. */
+  flags: Set<string>;
+}
+
+/**
+ * The arguments as Vercel's main() parses them (packages/cli/src/index.ts, src/util/get-args.ts):
+ * arg 5.0.0 with the global options and `{ permissive: true }`. A flag it doesn't know, or an
+ * unknown letter of a short group, is kept as a positional and the rest of the group is still
+ * read, so `-dy whoami` has the command `-y`: no command and no extension has that name, so
+ * Vercel deploys. Every word after "--" is a positional. Undefined when arg would throw (a value
+ * flag not last in its group, or without a value), which stops Vercel before any command runs.
+ */
+function mainParse(args: string[]): MainParse | undefined {
+  const positionals: string[] = [];
+  const flags = new Set<string>();
+  for (let i = 0; i < args.length; i++) {
+    const word = args[i]!;
+    if (word === "--") {
+      positionals.push(...args.slice(i + 1));
+      break;
+    }
+    if (word.length < 2 || word[0] !== "-") {
+      positionals.push(word);
+      continue;
+    }
+    const parts = word[1] === "-" || word.length === 2 ? [word] : word.slice(1).split("").map((c) => `-${c}`);
+    for (let j = 0; j < parts.length; j++) {
+      const part = parts[j]!;
+      const eq = part.startsWith("--") ? part.indexOf("=") : -1;
+      const name = eq === -1 ? part : part.slice(0, eq);
+      const boolean = GLOBAL_BOOLEAN_FLAGS[name];
+      if (boolean) {
+        flags.add(boolean);
+      } else if (!GLOBAL_VALUE_FLAGS.has(name)) {
+        positionals.push(part);
+      } else if (eq === -1) {
+        const value = args[i + 1];
+        if (j < parts.length - 1 || value === undefined || (value.length > 1 && value[0] === "-")) return undefined;
+        i++;
+      }
+    }
+  }
+  return { positionals, flags };
+}
+
+/**
+ * The arguments as Vercel's parser sees them, so a short group's flags and value are read
+ * (#125). Vercel parses with arg 5.0.0 (vercel/vercel packages/cli/package.json;
+ * github.com/vercel/arg index.js, tag 5.0.0), which splits a single-dash word longer than two
+ * characters into one flag per letter (`-dT` is `-d -T`); a last letter that takes a value
+ * reads the next word, and a value letter anywhere else is an error. A value never starts
+ * with "-", so splitting every such word before "--" is exact.
+ */
+function splitShortGroups(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--") return [...out, ...args.slice(i)];
+    if (arg.length > 2 && arg[0] === "-" && arg[1] !== "-") out.push(...arg.slice(1).split("").map((c) => `-${c}`));
+    else out.push(arg);
+  }
+  return out;
+}
 
 interface Team {
   id: string;
@@ -50,6 +134,30 @@ const readJson = (path: string): Record<string, unknown> | undefined => {
   }
 };
 const nonEmpty = (v: unknown): v is string => typeof v === "string" && v !== "";
+
+/**
+ * The `scope` of the local config Vercel reads at startup (vercel/vercel packages/cli/src/
+ * util/get-config.ts, called in src/index.ts before `--cwd` changes folder): the `-A` file,
+ * resolved against the folder the command runs in, else vercel.json there, else now.json
+ * (read up to vercel 50; later versions refuse it and exit). A file Vercel would fail on, or
+ * that cloudpin cannot read, is an error: the command's team can't be told.
+ */
+function localScope(cwd: string, file: string | undefined): string | undefined | { error: string } {
+  const paths = file !== undefined ? [resolvePath(cwd, file)] : [join(cwd, "vercel.json"), join(cwd, "now.json")];
+  const found: unknown[] = [];
+  for (const path of paths) {
+    if (file === undefined && !existsSync(path)) continue;
+    try {
+      found.push(JSON.parse(readFileSync(path, "utf8")));
+    } catch {
+      return { error: `could not read ${path} as JSON, so the scope Vercel would use is unknown` };
+    }
+  }
+  const config = found[0];
+  return config && typeof config === "object" && nonEmpty((config as { scope?: unknown }).scope)
+    ? (config as { scope: string }).scope
+    : undefined;
+}
 
 interface RepoProject {
   id?: unknown;
@@ -156,14 +264,20 @@ export const vercel: ProviderDef<"vercel"> = {
   },
 
   isExempt(args) {
-    if (hasAnyFlag(args, ["--version", "-v", "--help", "-h"])) return true;
-    const [first, second] = commandWords(args, GLOBAL_VALUE_FLAGS);
-    if (first === undefined) return false;
-    if (EXEMPT_COMMANDS.has(first)) return true;
-    return first === "teams" && second !== undefined && EXEMPT_TEAMS_SUBCOMMANDS.has(second);
+    const parsed = mainParse(args);
+    if (parsed === undefined) return false;
+    const [command, sub] = parsed.positionals;
+    // main() prints the version or its help only when there is no command; an empty word counts
+    // as none. Every command accepts -v and ignores it (#146).
+    if (!command) return parsed.flags.has("--version") || parsed.flags.has("--help");
+    // A flag here (`--prod --name whoami`) is a deploy, which is in no list below.
+    if (EXEMPT_COMMANDS.has(command)) return true;
+    if (command === "teams" && sub !== undefined && EXEMPT_TEAMS_SUBCOMMANDS.has(sub)) return true;
+    return parsed.flags.has("--help") && HELP_COMMANDS.has(command);
   },
 
-  async resolve({ args, env, cwd }, exec) {
+  async resolve({ args: typed, env, cwd }, exec) {
+    const args = splitShortGroups(typed);
     const token = flagValue(args, ["--token", "-t"]);
     const globalConfig = flagValue(args, ["--global-config", "-Q"]);
 
@@ -173,6 +287,12 @@ export const vercel: ProviderDef<"vercel"> = {
     if (!token && !env.VERCEL_TOKEN && !dirs.some((d) => existsSync(join(d, "auth.json")))) {
       return { kind: "logged-out", hint: "vercel login" };
     }
+
+    // Vercel's order (packages/cli/src/index.ts): --scope || --team || the local config's
+    // scope; arg keeps the last occurrence of each flag.
+    const local = localScope(cwd, flagValue(args, ["--local-config", "-A"]));
+    if (typeof local === "object") return { kind: "error", message: local.error };
+    const explicit = flagValue(args, ["--scope", "-S"]) || flagValue(args, ["--team", "-T"]) || local;
 
     const common = ["--non-interactive"];
     if (token) common.push("--token", token);
@@ -186,8 +306,7 @@ export const vercel: ProviderDef<"vercel"> = {
 
     // The team account-level requests use.
     let team: string;
-    const explicit = flagValue(args, ["--team", "-T", "--scope", "-S"]);
-    if (explicit !== undefined) {
+    if (explicit) {
       team = toId(explicit);
     } else {
       const current = teams.find((t) => t.current);

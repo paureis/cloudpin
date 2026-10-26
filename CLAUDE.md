@@ -17,6 +17,7 @@ owner's explicit yes.
 | Typecheck | `npm run typecheck` |
 | Build to `dist/` | `npm run build` |
 | Real-account smoke test | `npm run build` then `node scripts/smoke.mjs [provider...]` |
+| Cursor demo folder (#113; storyboard in its README) | `npm run build` then `node scripts/demo-folder.mjs --dir <neutral path>` |
 
 Run typecheck and tests as separate calls, and read each exit code; a pipe (`| grep`) hides it.
 
@@ -61,6 +62,19 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
   idea gets a version when work on it starts. New work found mid-session gets a version before it is started.
 - Targets are aims, not promises: a fix may ship in an unplanned patch release (x.y.z+1), and an item that slips moves
   to the next version with the reason written in its issue.
+- **Release rhythm** (owner decision, 2026-10-16; ROADMAP "How releases work"): minor releases on a Thursday, at
+  least three weeks apart, each a themed milestone; the dates are checkpoints, and work runs ahead of them every day.
+  In the week before a release only its items merge to `main` (refresh the owner's copy with `dogfood.mjs install`);
+  next-version PRs stay open and green and merge after the tag. Patch releases only for must-fix bugs.
+
+## How work runs (owner decision, 2026-10-15)
+
+- The session is the orchestrator. Work that changes code or tests, or more than about three files, goes to one
+  subagent at a time (Agent tool, `model: "opus"`) with a complete brief: the issue, the files, what done means and
+  the rules here that apply. It commits on the issue branch, never pushes, and returns a question when blocked.
+- The orchestrator keeps trivial edits, every GitHub write (push, PR, merge, tag), releases and owner questions.
+- Verify with evidence, never the report: read the diff, re-run typecheck and tests, run the controls the rules ask for.
+- Sort findings by CONTRIBUTING.md "Reviewing a change": one review round and one fix round, then stop.
 
 ## Commits
 
@@ -81,13 +95,17 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
   gitignored `HANDOFF.md`. A local pre-commit hook blocks staged personal strings; never bypass it (`--no-verify`).
 - Switching branches never changes the owner's installed cloudpin; only `node scripts/dogfood.mjs install` does.
 - Before any `gh` call that writes, confirm `gh auth status --active` shows `paureis`.
-- **Releasing needs the owner:** in one `release/x.y.z` PR, bump the version and update the docs (owner rule): the
-  CHANGELOG entry, README's `**Latest release: x.y.z**` line, ROADMAP's Shipped list, the bug-report form's example
-  version, and any README/DESIGN/AGENTS text the release changes; `test/release-docs.test.ts` fails until the
-  first four match `package.json`. Run Nightly on the branch, merge, then push the `vX.Y.Z` tag: `release.yml`
-  stages the version on npm with provenance (trusted publishing, no token); the owner waits for "Validating" to end,
-  then approves under npmjs.com > Staged Packages. Fallback if the workflow can't publish: start `npm publish
-  --access public --auth-type=web` in the Terminal panel (`npm login --auth-type=web` first if npm says 404).
+- **Releasing needs the owner:** in one `release/x.y.z` PR, bump the version
+  (`package.json`, `plugin/.claude-plugin/plugin.json` and both `version` fields in `server.json`; `test/plugin.test.ts`
+  and `test/release-docs.test.ts` fail until they match) and update
+  the docs (owner rule): the CHANGELOG entry, README's `**Latest release: x.y.z**` line, ROADMAP's Shipped list, the
+  bug-report form's example version, and any README/DESIGN/AGENTS text the release changes;
+  `test/release-docs.test.ts` fails until the first four match `package.json`. Run Nightly on the branch, merge, then
+  push the `vX.Y.Z` tag: `release.yml` stages the version on npm with provenance (trusted publishing, no token); the
+  owner waits for "Validating" to end, then approves under npmjs.com > Staged Packages. Fallback if the workflow
+  can't publish: start `npm publish --access public --auth-type=web` in the Terminal panel (`npm login
+  --auth-type=web` first if npm says 404). Once npm serves the approved version, run
+  `gh workflow run mcp-registry.yml -f tag=vX.Y.Z` to list it in the MCP Registry (`-f dry_run=true` validates only).
 
 ## Editing
 

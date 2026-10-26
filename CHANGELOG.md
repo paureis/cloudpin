@@ -4,10 +4,137 @@ All notable changes to cloudpin are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md](docs/changelog-0.x.md).
+
 ## [Unreleased]
+
+### Added
+
+- `cloudpin check --only <clouds>` and `--json` (#10): `--only azure,aws` checks just those clouds and fails one
+  that isn't pinned, installed or logged in, so a CI job checks what it deploys to; `--json` prints the result
+  (`match`, `mismatch`, `unpinned` or `error`) and each cloud's status, reason and fix, so tools never parse text.
+  Plain `cloudpin check` prints and exits as before.
+- `CLOUDPIN_BRANCH=<name>` (#10) picks the environment through the `branches` mapping when the checkout has no
+  branch, as in CI on pull requests and tags. `CLOUDPIN_ENV` and `cloudpin use` still win, and an agent can't set it
+  inside its own command.
+- A Homebrew tap (#16): `brew install paureis/tap/cloudpin` on macOS and Linux, from
+  [paureis/homebrew-tap](https://github.com/paureis/homebrew-tap). The formula installs the npm tarball, whose sha256
+  is the one in each GitHub Release's attested `SHA256SUMS`; like every install, it edits no shell profile and
+  installs no agent hook.
+- A Scoop bucket (#17): `scoop bucket add paureis https://github.com/paureis/scoop-bucket`, then
+  `scoop install paureis/cloudpin` on Windows. It runs on Scoop's own `nodejs-lts` through Scoop's exe shim, so
+  arguments reach cloudpin exactly as with npm's shims (a `.cmd` launcher would let cmd.exe re-read `&`, `|`, `%`
+  and `^`). Like every install, it edits no shell profile and installs no agent hook.
+- Each GitHub Release also has `cloudpin-X.Y.Z-windows.zip` (#17), the file the Scoop bucket installs: the package's
+  files plus their production `node_modules`, listed in `SHA256SUMS` and covered by the same signed attestation.
+- The MCP server for every agent (#111): `cloudpin mcp` now hands an agent short instructions when it connects (call
+  `cloudpin_status` before cloud work and `cloudpin_check` before a cloud CLI command; on a block, stop and tell the
+  user the reason and the fix; never work around it), which Codex and Gemini CLI add to the model's instructions.
+  [docs/mcp.md](docs/mcp.md) shows how to add the server to Codex, Cursor, VS Code, Gemini CLI, Windsurf, Claude
+  Desktop or any stdio client. The server stays read-only. Each release is also listed in the official MCP Registry
+  as `io.github.paureis/cloudpin` (`server.json`), by a manual workflow run once its npm version is live.
+
+### Changed
+
+- The update notice and `cloudpin doctor` name the upgrade command for the way cloudpin was installed (#16, #98):
+  `brew upgrade cloudpin`, `scoop update cloudpin`, `pnpm add --global cloudpin`, `volta install cloudpin`,
+  `yarn global add cloudpin` (Yarn classic) or `bun add --global cloudpin@latest`, otherwise
+  `npm install --global cloudpin` as before; so does the error for a `.cloudpin.yml` written for a newer cloudpin.
+  Global folders are found at each package manager's defaults and where its folder variables move them
+  (`PNPM_HOME`, `PNPM_CONFIG_GLOBAL_DIR`, `VOLTA_HOME`, `BUN_INSTALL` and the like); one moved any other way, such
+  as in a config file, still reads as npm.
 
 ### Fixed
 
+- kubectl and helm: `-itn other-ns`, `-is <server>` and `-Aw` are checked against the namespace and server they pick (#133), and
+  `KUBECONFIG=$(...)`, `HELM_NAMESPACE=$(...)` or Supabase's `SUPABASE_PROJECT_ID=$(...)` stop the command as "can't tell".
+- Windows: Codex and Copilot CLI hooks work under PowerShell's `Restricted` and `AllSigned` execution policies (#108).
+  Both agents run hooks through PowerShell, which starts npm's `cloudpin.ps1` for `cloudpin`, and those policies
+  block that script, so the hook failed: Codex then ran commands unchecked and Copilot CLI denied every tool.
+  `cloudpin install-hook codex` and `install-hook copilot` now also write a Windows command that starts cloudpin
+  through cmd.exe, which no execution policy stops, into the agent's Windows-only field: Codex's `commandWindows`
+  (Codex 0.131.0 and later; older versions ignore it) and Copilot CLI's `powershell` key. It also hardens how the hook
+  finds cloudpin and Node on Windows. The fields macOS and Linux read are unchanged, so a committed hook file keeps
+  working there. Re-run `cloudpin install-hook <agent>` (with `--user` if that is where it is) to update a hook
+  installed before; it keeps your other hooks, and Codex runs the changed hook once you review it in `/hooks`.
+  Gemini CLI has no Windows-only field, so its hook stays as it was.
+- `cloudpin mcp` answered `initialize` for an unknown protocol version with 2026-07-28, a revision that has no
+  `initialize`. It now answers with 2025-11-25, the newest revision that has one, and no longer lists 2026-07-28
+  (#111).
+- Wrangler with `--env-file`: cloudpin's `wrangler whoami` now reads the same files, so a token in the folder's
+  default `.env` can no longer make it vouch for an account the command won't use (#130).
+- `cloudpin doctor` on Windows warns when PowerShell's execution policy would stop an installed agent hook, when
+  PATH has `.` or another entry that is not a full path, and when Claude Code is older than 2.1.47, which ran hooks
+  through cmd.exe (#108).
+- Wrangler: cloudpin now reads the `.env` files Wrangler loads into its own environment before every command
+  (`.env` and `.env.local`, plus `.env.<name>` and `.env.<name>.local` with `--env <name>`, or the `--env-file`
+  files, in the folder it runs in) (#116). A `CLOUDFLARE_ACCOUNT_ID` there chose the account while cloudpin checked
+  the one from Wrangler's account cache or `wrangler whoami`, so a command could run on the wrong account; a
+  `CLOUDFLARE_API_TOKEN` there replaced the login cloudpin checked. Both now count, as do `CLOUDFLARE_ENV` and the
+  other account and credential variables, with Wrangler's precedence: a non-empty variable already set wins, and
+  `account_id` in the Wrangler config still beats them all. cloudpin reads the files with the parser Wrangler uses
+  (dotenv's, BSD-2-Clause, copied with its notice). A value it can't work out (one that refers to another variable,
+  or a `.env.vault` that `DOTENV_KEY` would decrypt) stops the command, naming the file and variable, never the value.
+  Wrangler's account cache is now read from the one folder Wrangler reads it from (`WRANGLER_CACHE_DIR`, else
+  `node_modules/.cache/wrangler` if it exists, else `.wrangler/cache`); cloudpin went on to the next folder when that
+  one had no account, so an old account cached elsewhere could stand in for the one Wrangler would pick.
+- A Vercel token after a short flag group (`vercel -dt VALUE deploy`), or typed joined to `-t` (`-t=VALUE`,
+  `-tVALUE`), was printed in full in the block and confirmation messages, in the terminal or the agent's transcript
+  (#123). They now show `***` there, as they already did for `-t VALUE` and `--token=VALUE`.
+- Vercel: a short flag group such as `vercel -dT other-team deploy` (`-d` is `--debug`) picks the team, the token
+  (`-dt`) or the config folder (`-dQ`) the way Vercel reads it, so cloudpin checks that account instead of the active
+  one (#125). A group's value also no longer passes for the command: `vercel -dT whoami deploy` isn't exempt.
+- Vercel: `--scope` beats `--team` whatever their order, and with neither, the `scope` in `vercel.json` (or the
+  `-A` file) picks the team, as in Vercel; a local config that can't be read stops the command (#127).
+
+## [1.1.2] - 2026-10-19
+
+Completes the 1.1.1 security fix for Windows. Please upgrade.
+
+### Security
+
+- Windows: CLIs installed by npm (vercel, wrangler, ...) no longer start a `node` found in the current folder. npm's
+  `.cmd` shims run `node` by name when no node.exe sits beside them, and Windows looked for it in the current folder
+  first. cloudpin now tells Windows not to search the current folder for any process it starts, including the command
+  `cloudpin exec` runs, as PowerShell and Git Bash already do
+  ([GHSA-3cf7-5v5w-q5vr](https://github.com/paureis/cloudpin/security/advisories/GHSA-3cf7-5v5w-q5vr)).
+
+## [1.1.1] - 2026-10-18
+
+A security fix for Windows. Please upgrade.
+
+### Security
+
+- Windows: cloudpin now runs each CLI it asks about (az, gh, vercel, aws, gcloud, kubectl, helm, supabase,
+  wrangler), and the command `cloudpin exec` runs, by its full path from PATH, skipping empty and relative PATH
+  entries. Before, Windows' own lookup checked the current folder first, so a file named like one of those CLIs
+  inside a repository could run in its place when cloudpin checked a command there
+  ([GHSA-3cf7-5v5w-q5vr](https://github.com/paureis/cloudpin/security/advisories/GHSA-3cf7-5v5w-q5vr)).
+
+## [1.1.0] - 2026-10-16
+
+Claude Code gets a one-step plugin, and any MCP agent can ask cloudpin before it acts.
+
+### Added
+
+- A Claude Code plugin (#15): `claude plugin install cloudpin --marketplace paureis/cloudpin` installs the hook, a
+  read-only MCP server and a skill that tells the agent to check first and stop on a block. With the plugin enabled,
+  `install-hook claude` declines and `doctor` warns if a settings hook would also run.
+- `cloudpin mcp` (#15): a read-only MCP server (stdio) with `cloudpin_status` and `cloudpin_check`, for any agent that
+  supports MCP. No new dependency.
+
+## [1.0.0] - 2026-10-15
+
+The first stable release: the `.cloudpin.yml` format is stable from here on (later versions only add sections and
+keys), and every agent hook except Gemini CLI's is tested inside the real agent.
+
+### Fixed
+
+- Variables an agent sets earlier in its command line now count (#86). `export AWS_PROFILE=other; aws ...` and
+  PowerShell `$env:AWS_PROFILE = 'other'; aws ...` were checked against the default account and ran on another; and
+  `GH_TOKEN=$(cat other.token) gh ...` read the token as empty. cloudpin now follows `export`, `unset` and `$env:`
+  through the line, and stops a command whose account depends on a value only known when it runs, saying why. Found
+  in the threat-model review.
 - Cursor: a command on your Cursor allowlist runs again when the account matches (#2). cloudpin answered `ask`, which
   stopped even allowlisted commands; it now answers `allow`, which Cursor treats exactly like having no hook (measured
   in Cursor CLI 2026.10.01: commands not on the allowlist still need your approval). Wrong accounts are still blocked.
@@ -20,171 +147,3 @@ All notable changes to cloudpin are listed here. The format follows
   terminal; it asks rather than allows when nothing is wrong, so Antigravity's own approvals still apply.
 - The Copilot CLI and Antigravity CLI hooks are tested inside the real agents (#3): a wrong pin blocks the command, a
   right one lets it run, and Antigravity's own approval still applies to commands you haven't allowed.
-
-## [0.4.2] - 2026-10-10
-
-A clearer first run: CLIs you don't have are called "not installed".
-
-### Fixed
-
-- `init`, `status`, `doctor` and the MCP `cloudpin_status` say "not installed" for a CLI that isn't (#75). `init` used
-  to print `az account show failed (exit 127)` or `spawn wrangler ENOENT`, and `status` and `doctor` told someone
-  without Vercel, kubectl or Supabase to log in to it.
-
-## [0.4.1] - 2026-10-09
-
-Shell wrappers that survive your aliases, a clear message for pin files from a newer cloudpin, and cleaner GitHub
-Releases.
-
-### Fixed
-
-- The bash and zsh wrappers no longer break on an existing alias of a guarded CLI (#69). Before, such an alias left
-  that CLI unguarded without a word, and in zsh every CLI after it too. An alias that calls the CLI itself is now
-  guarded; one that runs another program (`kubectl=kubecolor`) can't be, so each new shell warns about it, in
-  PowerShell as well.
-- GitHub Releases carry only the tarball, its signed bundle and `SHA256SUMS` (#65): v0.4.0 also got the repo's
-  logo and demo SVGs, since removed by hand. The verify commands in the release notes now line up.
-- A `.cloudpin.yml` section or key that this cloudpin doesn't know is still refused, but the message now says the
-  file may need a newer cloudpin, with your version and the update command (#67). From 1.0 the format only adds
-  names, so this is what a teammate on an older version will see.
-
-## [0.4.0] - 2026-10-09
-
-Releases you can verify, and exempt commands that still run when the pin file is broken.
-
-### Fixed
-
-- A broken `.cloudpin.yml` no longer blocks exempt commands such as `gh auth status`, `az login` or `--help` (#62):
-  they never act on an account and are what you need to investigate. Every other guarded command is still stopped.
-
-### Added
-
-- A GitHub Release for every tag (#53): the package tarball (the same file npm serves), its SHA-256 checksum and a
-  signed build-provenance attestation, with the CHANGELOG section and how to verify a download as notes. See
-  SECURITY.md, Verifying a release.
-
-## [0.3.1] - 2026-10-09
-
-An update notice, and a quieter `doctor` and `status` outside Supabase projects.
-
-### Added
-
-- An update notice (#50): at most once a day, cloudpin's own commands run in a terminal ask registry.npmjs.org for
-  the latest version and say in one line when a newer one is out. Never from the shell wrappers, `exec` or the agent
-  hooks, never in CI; off with `CLOUDPIN_NO_UPDATE_CHECK=1` or `NO_UPDATE_NOTIFIER=1`. `cloudpin doctor` checks too,
-  and `cloudpin version` works as well as `--version`.
-
-### Fixed
-
-- `cloudpin doctor` and `cloudpin status` no longer warn about Supabase (or Wrangler) in a folder that has no
-  project for it (#48); they note it instead. A pinned CLI with nothing to target is still stopped.
-
-## [0.3.0] - 2026-10-09
-
-Two more CLIs, two commands for when something looks off, and a fix for Cursor users. The `.cloudpin.yml`
-format is backwards compatible (new `supabase` and `cloudflare` sections). **Cursor users: re-run
-`cloudpin install-hook cursor`** (see Fixed).
-
-### Added
-
-- Supabase CLI (#37): pin the project ref, and optionally the organisation. The project a command targets is worked
-  out offline, in the CLI's own order (`--project-ref`, `SUPABASE_PROJECT_ID`, the ref `supabase link` saved, with
-  `--workdir` / `SUPABASE_WORKDIR`); a linked branch counts as its parent project; the organisation comes from
-  `supabase projects list`. Local-stack commands are never blocked; a remote `--db-url` is stopped.
-- Cloudflare Wrangler (#37): pin the account ID. The account follows Wrangler's order: `account_id` in
-  `wrangler.json` / `wrangler.jsonc` / `wrangler.toml` (its `[env.NAME]` under `--env` or `CLOUDFLARE_ENV`), then
-  `CLOUDFLARE_ACCOUNT_ID`, then the project's account cache, then the credentials' only account; several accounts
-  with none set is stopped. A config file cloudpin can't read, `deploy --temporary`, and a generated deploy config
-  naming another account are stopped too. Built to Wrangler's source and docs; not yet run against a real login.
-- `cloudpin explain` (#36): what cloudpin would decide for a command, and why, without running it: the pin file and
-  environment, the pinned value, the account the command would use and what decided it (its own flags and env), whether
-  it counts as read-only, and the verdict with its reason and fix. A quoted line shows every call in it and the folder
-  each runs in; `--agent` explains what an agent hook decides; `--json` for tools. Env vars set in the line are named,
-  never shown.
-- `cloudpin doctor` (#35): checks the whole setup, read-only, and gives the fix for each problem: the `cloudpin`
-  on PATH (the one hooks and shell lines run) and its version, Node.js, the shell profiles that run `shell-init`
-  (PowerShell's own `$PROFILE` included), each agent hook and whether it is out of date, the pin file and its
-  environment, each CLI's account against its pin, and the identity cache folder. Exit 1 if anything fails.
-  `--json` shortens account IDs and writes the home folder as `~`, for bug reports; the bug report form asks for it.
-
-### Fixed
-
-- The Cursor hook now runs for `kubectl`, `helm` and `cloudpin use` commands (#42). Its command filter was written
-  before 0.2.0 added Kubernetes, so Cursor let those commands through without asking cloudpin. **Cursor users:
-  re-run `cloudpin install-hook cursor`** (add `--user` if you installed it for your user); it now updates the
-  filter instead of saying the hook is already installed.
-
-### Changed
-
-- `cloudpin init` no longer writes a docs URL into the `.cloudpin.yml` header (#39).
-
-## [0.2.1] - 2026-10-08
-
-The first release published from GitHub Actions. No change to how cloudpin behaves.
-
-### Added
-
-- Releases are published from GitHub Actions with npm trusted publishing and provenance (#19): npm shows which
-  commit and workflow built each version.
-- An OpenSSF Scorecard workflow (weekly) and badge (#20), and CodeQL static analysis.
-
-## [0.2.0] - 2026-10-08
-
-Environments, Kubernetes, and fixes from a safety review. The `.cloudpin.yml` format is backwards compatible.
-
-### Added
-
-- `cloudpin status`: each CLI's active account, the pins that apply here, and the installed agent hooks;
-  `--json` for tools (the MCP server and editor extension build on it).
-- Environments (#12): one `.cloudpin.yml` can pin several environments (`environments:`), chosen by
-  `CLOUDPIN_ENV`, `cloudpin use <name>`, a `branches` mapping or the first listed. `cloudpin init --env <name>
-  [--protected]` adds one; `status`, `check` and every message name the active environment.
-- Protected environments: on the right account, commands that may change something ask first (a y/N prompt, the
-  agent's own "ask" in Claude Code, Copilot CLI and Cursor, a block in Codex and Gemini CLI, `CLOUDPIN_CONFIRM` in CI).
-  Read-only commands are listed per CLI and can be extended with `read_only:`.
-
-- Kubernetes (#13): a `kubernetes:` section pins the cluster API server URL and, optionally, the namespace, for
-  `kubectl` and `helm`. The target is read from the kubeconfig the way kubectl does (flags, `KUBECONFIG` merging,
-  helm's `HELM_*` variables, kuberc), without contacting the cluster.
-
-- Vercel monorepos linked with `vercel link --repo` (#4): the team of the project a command acts on is read from
-  `.vercel/repo.json` the way the CLI picks it; if the folder matches no project, every linked project's team must
-  match the pin.
-
-### Changed
-
-- The flat `.cloudpin.yml` format keeps working unchanged; it is now the single-environment case.
-
-### Fixed
-
-- The identity cache no longer holds the whole `gcloud config list` output, which can include credentials such as
-  `proxy/password` (#22); only the account and project are requested. A kubeconfig server URL with
-  `user:password@` is shown without it.
-- Logins and account switches are recognised after global flags (#21), e.g. `aws --profile p sso login` or
-  `vercel --scope t switch`; before, a logged-out command like these could be blocked.
-- Agent hooks fail closed: an unexpected error or a check slower than 45 seconds now blocks the command instead of
-  letting the agent run it (agents treat a failed or timed-out hook as no objection).
-- Messages no longer repeat the value of `--token`, `--password`, `--kube-token` or Vercel's `-t`.
-- Command parsing (#7): an apostrophe in heredoc data no longer hides the commands after it; heredocs and
-  here-strings fed to a shell are checked; a `cd` inside `( )`, `$( )` or `bash -c` no longer applies to later
-  commands; commands held in variables and PowerShell `$x = <command>` assignments are checked.
-- Vercel: every page of `vercel teams ls` is read (#5). With the current team on a later page, cloudpin assumed
-  the Hobby team, so a command on another team could pass if the Hobby team was pinned.
-- An agent could skip the check by wrapping a command in `cloudpin exec` (shell mode, where `CLOUDPIN_SKIP` works);
-  the agent hook now checks the wrapped command as the agent's.
-
-## [0.1.0] - 2026-10-08
-
-First public beta.
-
-### Added
-
-- `.cloudpin.yml` pins accounts per project for `az`, `aws`, `gcloud`, `vercel` / `vc` and `gh`; the nearest file
-  above the current folder wins.
-- Identity checks that follow each command's own flags and environment, including Vercel commands that touch both a
-  team and a linked project.
-- `cloudpin init`, `check`, `exec`, `shell-init` (bash, zsh, PowerShell), `hook`, `install-hook` and
-  `uninstall-hook`.
-- Agent hooks for Claude Code, Codex, Cursor, Gemini CLI and GitHub Copilot CLI.
-- A five-minute identity cache that is dropped as soon as any account file, variable or flag changes.
-- Plain "could not tell" messages when an account can't be determined, with the CLI's own reason.

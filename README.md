@@ -22,6 +22,26 @@ which account is active. cloudpin checks before the command runs.
 pnpm add --global cloudpin
 ```
 
+On macOS and Linux, Homebrew works too, from [paureis/homebrew-tap](https://github.com/paureis/homebrew-tap) (it
+runs on Homebrew's own Node.js, installed if it isn't there yet):
+
+```sh
+brew install paureis/tap/cloudpin
+```
+
+On Windows, Scoop works too (1.2.0, out 2026-11-05), from [paureis/scoop-bucket](https://github.com/paureis/scoop-bucket).
+It installs Scoop's own Node.js (`nodejs-lts`) if needed, and cloudpin always runs on that one. A global
+install (`scoop install -g`) needs `nodejs-lts` installed globally too. `nodejs-lts` puts its folders at the front of
+your user PATH, so in new shells `node` and `npm` are Scoop's (and `npm install --global` installs there), ahead of
+any other Node.js on your user PATH; one on the system PATH, where the nodejs.org installer puts it, still comes
+first. Uninstalling `nodejs-lts` breaks cloudpin until you run `scoop install nodejs-lts` again, and Scoop's
+`no_junction` setting isn't supported.
+
+```powershell
+scoop bucket add paureis https://github.com/paureis/scoop-bucket
+scoop install paureis/cloudpin
+```
+
 <details>
 <summary>npm, Yarn, Bun, or no install</summary>
 
@@ -36,14 +56,18 @@ npx cloudpin --help
 
 </details>
 
-Requires Node.js 22 or later. Works on Windows, macOS and Linux. cloudpin is in public beta (0.x): it works and
-is tested, and [feedback before 1.0](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
+Requires Node.js 22 or later. Works on Windows, macOS and Linux. The `.cloudpin.yml` format is stable from 1.0 on
+(see Configuration), and [feedback](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
 
-**Latest release: 0.4.2** (2026-10-10): `init`, `status` and `doctor` call a CLI you don't have "not installed"
-instead of asking you to log in to it. 0.4.1 kept the bash and zsh wrappers guarding when you already have an alias
-for a guarded CLI, and a `.cloudpin.yml` written for a newer cloudpin now says to update. 0.4.0 made every release a GitHub Release with a signed build-provenance attestation (see
-[SECURITY.md](SECURITY.md), Verifying a release); 0.3.x brought the update notice, Supabase, Cloudflare Wrangler,
-`cloudpin doctor` and `cloudpin explain`. See the [CHANGELOG](CHANGELOG.md).
+**Latest release: 1.1.2** (2026-10-19): completes the Windows security fix of 1.1.1: cloudpin runs each CLI by its
+full path from PATH, and nothing it starts looks in the current folder, including the `node` that npm-installed CLIs
+run ([GHSA-3cf7-5v5w-q5vr](https://github.com/paureis/cloudpin/security/advisories/GHSA-3cf7-5v5w-q5vr)); please upgrade.
+1.1.0 (2026-10-16) added a Claude Code plugin. `claude plugin install cloudpin --marketplace
+paureis/cloudpin` gives Claude Code the hook, a read-only MCP server and a skill that tells it to check first and to
+stop and ask you when a command is blocked (see Claude Code plugin). For any other agent that supports MCP,
+`cloudpin mcp` is the same read-only server: it reports the accounts in use and whether a command would be allowed,
+and never runs or changes anything (see MCP server and the [CHANGELOG](CHANGELOG.md)). 1.0 made the
+`.cloudpin.yml` format stable.
 
 ## Quick start
 
@@ -76,6 +100,11 @@ cloudpin use [<env> | --clear]
 
 # Check every pinned account; exit 1 on a mismatch (handy in CI and scripts)
 cloudpin check
+
+# (1.2.0, out 2026-11-05) Check only these clouds; each must be pinned, installed and logged in to the pinned
+# account, so a CLI missing on the runner fails, not skipped. --json prints an overall "result" (match,
+# mismatch, unpinned or error) and each cloud's status, reason and fix. Exit codes stay the same.
+cloudpin check --only azure,aws [--json]
 
 # See each CLI's active account, what this folder pins, and which agent hooks are installed (--json for tools)
 cloudpin status
@@ -157,12 +186,12 @@ parent project. The organisation comes from `supabase projects list`. The local 
 pointing anywhere but your own machine is stopped, because cloudpin can't tell which project a URL belongs to.
 
 For Cloudflare, cloudpin follows Wrangler's own order: `account_id` in the config file Wrangler would find (it wins
-over `CLOUDFLARE_ACCOUNT_ID`), then that variable, then the account Wrangler cached for the project, then the only
-account your credentials can see (`wrangler whoami --json`). If they see several and none is set, Wrangler would ask
-or fail, so cloudpin stops the command. Local commands (`dev`, and `d1`, `kv key` or `r2 object` without `--remote`)
-are never blocked; `dev` with `remote: true` bindings in the config does reach your account and is not checked.
-The Cloudflare support is built to Wrangler's source and docs and has not yet been run against a real Cloudflare
-login; reports welcome.
+over `CLOUDFLARE_ACCOUNT_ID`), then that variable, then Wrangler's cached account, then the only account your
+credentials can see (`wrangler whoami --json`). If they see several and none is set, Wrangler would ask or fail, so
+cloudpin stops the command. Variables Wrangler loads from the project's `.env` files count too. Local commands
+(`dev`, and `d1`, `kv key` or `r2 object` without `--remote`) are never blocked; `dev` with `remote: true` bindings
+reaches your account and is not checked. It is built to Wrangler's source and docs, not yet tried on a real
+Cloudflare login; reports welcome.
 
 - **Match:** the command runs as if cloudpin wasn't there.
 - **Mismatch:** the command is stopped, and you're told which account is active and how to switch.
@@ -198,7 +227,8 @@ read_only:         # optional: more commands that never need confirmation
 
 1. `CLOUDPIN_ENV=<name>` in the environment.
 2. `cloudpin use <name>`: remembered for this clone, inside `.git`, so it is never committed.
-3. The `branches` mapping for the checked-out branch: an exact name first, then the first matching pattern.
+3. The `branches` mapping for the checked-out branch, or for `CLOUDPIN_BRANCH=<name>` (1.2.0, out 2026-11-05):
+   an exact name first, then the first matching pattern.
 4. The first environment listed.
 
 An unknown name is an error, so the command is stopped rather than checked against the wrong pins. `cloudpin
@@ -268,7 +298,39 @@ serves paid API keys and enterprise licenses, so both are supported.
 cloudpin reads the whole command line the agent is about to run, so it also catches
 `cd ../other && npx vercel deploy`, `bash -c "..."`, pipelines, `$( )`, `xargs`, `find -exec`, heredocs fed to a shell
 (`bash <<EOF`), commands held in a variable (`CLI=vercel; $CLI deploy`) and PowerShell assignments
-(`$prs = gh pr list`). It can't see inside a script file the agent writes and runs later (`bash deploy.sh`).
+(`$prs = gh pr list`). Variables set earlier in the line count too (`export AWS_PROFILE=other; aws ...`,
+`$env:AWS_PROFILE = 'other'`), and when one that decides the account is set from something only known when it runs
+(`GH_TOKEN=$(cat file) gh ...`), the command is stopped with the reason. It can't see inside a script file the agent
+writes and runs later (`bash deploy.sh`).
+
+**On Windows** (1.2.0, out 2026-11-05), Codex and Copilot CLI run hooks through PowerShell, whose `Restricted` and
+`AllSigned` execution policies block npm's `cloudpin.ps1`. So for them, `install-hook` also writes a Windows command
+starting cloudpin through cmd.exe, in a Windows-only field (Codex 0.131.0 or later). A hook from before 1.2.0
+doesn't have it: re-run `cloudpin install-hook <agent>` after upgrading (Codex runs the changed hook once you review it in
+`/hooks`). Gemini CLI has no such field, so its hook needs a policy that runs local scripts, such as `RemoteSigned`.
+`cloudpin doctor` warns about each of these, about a `.` or other relative entry in PATH, and about Claude Code
+older than 2.1.47.
+
+### Claude Code plugin
+
+One install gives Claude Code the hook, two read-only tools it can call before acting, and a short skill telling it to
+check first and to stop and ask you when cloudpin blocks a command. cloudpin itself must be installed first:
+
+```sh
+npm install --global cloudpin
+claude plugin install cloudpin --marketplace paureis/cloudpin
+```
+
+The plugin replaces `cloudpin install-hook claude`: with the plugin enabled, `install-hook claude` declines, and
+`cloudpin doctor` warns if both are present (Claude Code would run both).
+
+### MCP server
+
+`cloudpin mcp` is an MCP server (stdio) for any agent; the Claude Code plugin starts it for you. Its two tools,
+`cloudpin_status` and `cloudpin_check`, report the accounts in use and if a command would be allowed. Neither runs,
+switches or changes anything: an agent that could switch accounts could switch to the wrong one.
+[docs/mcp.md](docs/mcp.md) adds it to Codex, Cursor, VS Code and more. It gives advice, not enforcement: where the
+agent has a hook, install that too.
 
 ## Configuration
 
@@ -276,6 +338,7 @@ cloudpin reads the whole command line the agent is about to run, so it also catc
 |---|---|
 | `CLOUDPIN_SKIP=1` | Run one command without the check (terminal only; ignored for agents) |
 | `CLOUDPIN_ENV=<name>` | Use this environment (see Environments) |
+| `CLOUDPIN_BRANCH=<name>` | Use this branch for the branches mapping, as in CI; ignored for agents (1.2.0, out 2026-11-05) |
 | `CLOUDPIN_CONFIRM=<name>` | Confirm changing commands on this protected environment without a prompt (terminal and CI only; ignored for agents) |
 | `CLOUDPIN_NO_CACHE=1` | Always ask the CLI instead of using the identity cache |
 | `CLOUDPIN_CACHE_DIR` | Where the identity cache (and the time of the last update check) lives |
@@ -316,9 +379,14 @@ problem.
 **Does it slow my commands down?** Outside a pinned project, by the time it takes Node to start (about 0.1 s).
 Inside one, the first check costs one identity call, and later checks come from the cache.
 
-**What if a CLI isn't installed?** A pinned CLI that isn't installed is skipped; the command would fail on its own.
+**What if a CLI isn't installed?** A pinned CLI that isn't installed is skipped; the command would fail anyway.
+`cloudpin check --only` (1.2.0, out 2026-11-05) is the exception: it requires every cloud listed.
 
 **Can I use it in CI?** Yes. Run `cloudpin check` before deploying; it exits 1 if any pinned account doesn't match.
+Hosted runners have many cloud CLIs preinstalled, so name the clouds the job deploys to with
+`cloudpin check --only azure,aws`: each must then be installed and logged in to the pinned account. On a pull
+request or tag there is no branch; set `CLOUDPIN_BRANCH` (1.2.0, out 2026-11-05), e.g. to `GITHUB_HEAD_REF`,
+so `branches` picks the right environment.
 
 **Why block when it can't tell?** Because "probably the right account" is the situation cloudpin exists to prevent.
 The message tells you exactly why it couldn't tell.
@@ -360,6 +428,7 @@ before opening a pull request.
 
 Made by [Alvaro Reis](https://github.com/paureis) ([LinkedIn](https://www.linkedin.com/in/alpaureis)), with Claude
 Code as a pair programmer. Every behaviour is covered by tests, and every CLI integration is checked against the
-tool's own documentation and the real CLI.
+tool's own documentation and the real CLI. Why it exists: [5 ways your cloud CLI picks the wrong account without
+telling you](https://dev.to/paureis/5-ways-your-cloud-cli-picks-the-wrong-account-without-telling-you-19e2).
 
 [MIT](LICENSE)

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
-import { commandWords, flagValue, hasAnyFlag } from "../args.js";
+import { commandWords, flagValue, hasBareFlag } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef } from "../types.js";
 
@@ -101,14 +101,18 @@ export const supabase: ProviderDef<"supabase"> = {
     // `supabase login` there shows up after the cache's five minutes.
     const dir = env.SUPABASE_HOME ?? join(home(env), ".supabase");
     return {
-      env: [TOKEN_VAR, "SUPABASE_PROFILE", "SUPABASE_HOME", "SUPABASE_NO_KEYRING"],
+      // SUPABASE_PROJECT_ID and SUPABASE_WORKDIR pick the project, not the login; they are
+      // listed so guard stops a command that sets them from an unknown value (#86, #133).
+      env: [TOKEN_VAR, "SUPABASE_PROFILE", "SUPABASE_HOME", "SUPABASE_NO_KEYRING", "SUPABASE_PROJECT_ID", "SUPABASE_WORKDIR"],
       files: [join(dir, "access-token"), join(dir, "profile")],
       dirs: [],
     };
   },
 
   isExempt(args) {
-    if (hasAnyFlag(args, ["--help", "-h", "--version", "-v"])) return true;
+    // effect/cli runs the help and version actions instead of the command wherever they come
+    // before "--" (Effect-TS/effect-smol unstable/cli Command.ts runWith).
+    if (hasBareFlag(args, ["--help", "-h", "--version", "-v"])) return true;
     const dbUrl = flagValue(args, ["--db-url"]);
     if (dbUrl !== undefined) return isLocalUrl(dbUrl);
     const words = commandWords(args, VALUE_FLAGS);

@@ -27,14 +27,17 @@ const ANSI_C_CODE = /x([0-9A-Fa-f]{1,2})|([0-7]{1,3})/y;
 export function tokenize(input: string): Token[] {
   // Git Bash drops every carriage return it reads, inside quotes too, so `\` + CRLF continues the line;
   // only a decoded $'\r' keeps one (#161).
-  return scan(input.replace(/\r/g, ""), 0, false).tokens;
+  return scan(input.replace(/\r/g, ""), 0, false, new Map()).tokens;
 }
+
+type Scanned = { end: number; closed: boolean };
 
 /**
  * Reads from `from` to the end of the input or, when `nested` in a `$( )`, to the `)` that closes it;
- * `end` is the index after that `)`.
+ * `end` is the index after that `)`. `seen` keeps each `$( )` read by where it starts: one that is tried as
+ * arithmetic first is read twice, and nesting those would double the work at every level.
  */
-function scan(input: string, from: number, nested: boolean): { tokens: Token[]; end: number; closed: boolean } {
+function scan(input: string, from: number, nested: boolean, seen: Map<number, Scanned>): Scanned & { tokens: Token[] } {
   const tokens: Token[] = [];
   // Subshells opened by ( and not closed yet, inside this $( ).
   let depth = 0;
@@ -62,9 +65,13 @@ function scan(input: string, from: number, nested: boolean): { tokens: Token[]; 
   // Reads $( ... ), <( ... ) or >( ... ) starting after the "(", with this same tokenizer, so quotes,
   // comments and heredoc bodies inside it are read as on the outer line (#161).
   const readParen = (start: number): number => {
-    const { end, closed } = scan(input, start, true);
-    tokens.push({ kind: "subst", inner: input.slice(start, closed ? end - 1 : end) });
-    return end;
+    let found = seen.get(start);
+    if (!found) {
+      const { end, closed } = scan(input, start, true, seen);
+      seen.set(start, (found = { end, closed }));
+    }
+    tokens.push({ kind: "subst", inner: input.slice(start, found.closed ? found.end - 1 : found.end) });
+    return found.end;
   };
   const readBacktick = (start: number): number => {
     let i = start;

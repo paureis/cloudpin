@@ -135,6 +135,18 @@ describe("gcloud.resolve: access tokens (#165)", () => {
   });
 });
 
+describe("gcloud.compare with another identity (#165)", () => {
+  it("says impersonating, or that an access token's account can't be told", async () => {
+    const impersonated = await run(["run", "deploy", `--impersonate-service-account=${SA}`]);
+    const token = await run(["run", "deploy", "--access-token-file=t.txt"]);
+    if (impersonated.kind !== "identity" || token.kind !== "identity") throw new Error("expected identities");
+    expect(gcloud.compare({ account: ME }, impersonated.identity)).toEqual([`account: expected "${ME}", impersonating "${SA}"`]);
+    expect(gcloud.compare({ account: ME }, token.identity)).toEqual([
+      `account: expected "${ME}", the command uses an access token, whose account cloudpin can't tell`,
+    ]);
+  });
+});
+
 describe("guard with a gcloud pin (#165)", () => {
   const check = async (pin: NonNullable<Pins["gcloud"]>, args: string[], env: NodeJS.ProcessEnv = {}, file = active) => {
     const fake = fakeGcloud(file);

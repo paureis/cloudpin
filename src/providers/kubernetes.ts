@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { parse, YAMLParseError } from "yaml";
-import { commandWords as wordsAfterFlags, hasBareFlag } from "../args.js";
+import { commandWords as wordsAfterFlags, hasBareFlag, hasPflagHelp } from "../args.js";
 import { home } from "../paths.js";
 import type { ProviderDef, Resolution } from "../types.js";
 
@@ -324,7 +324,7 @@ export const kubernetes: ProviderDef<"kubernetes"> = {
 
   isExempt(args, bin) {
     const [first] = commandWords(args);
-    if (hasBareFlag(args, ["--help", "-h"]) && helpStops(args, bin, first)) return true;
+    if (hasPflagHelp(args, ["--help", "-h"]) && helpStops(args, bin, first)) return true;
     if (first === undefined) return hasBareFlag(args, ["--version"]);
     return (bin === "helm" ? HELM_EXEMPT : KUBECTL_EXEMPT).has(first);
   },

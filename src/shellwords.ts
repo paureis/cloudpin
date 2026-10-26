@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { commandName } from "./guard.js";
+import { isStream, redirection } from "./redirections.js";
 import { UNKNOWN_VALUE } from "./types.js";
 
 export interface Invocation {
@@ -22,36 +23,15 @@ export interface Invocation {
 
 export { UNKNOWN_VALUE };
 
-/**
- * Variables only the user may set. Set before starting the agent, they count; set by the agent inside its own command,
- * they would let it pick a laxer environment, confirm for the user or skip the check, so they are ignored there.
- */
-export const USER_ONLY_VARS = ["CLOUDPIN_ENV", "CLOUDPIN_BRANCH", "CLOUDPIN_CONFIRM", "CLOUDPIN_SKIP"];
-
-/**
- * The environment a call runs with: `base` (the environment the line starts
- * in), then the line's plain assignments to names already exported, its
- * `unset`s, and its exported and prefix variables. With `agent`, the line can't
- * set or unset the user-only variables.
- */
-export function envFor(base: NodeJS.ProcessEnv, inv: Invocation, opts: { agent?: boolean } = {}): NodeJS.ProcessEnv {
-  const allowed = (name: string) => !(opts.agent && USER_ONLY_VARS.includes(name));
-  const out: NodeJS.ProcessEnv = { ...base };
-  for (const [name, value] of Object.entries(inv.ifExported ?? {})) if (name in base && allowed(name)) out[name] = value;
-  for (const name of inv.unset ?? []) if (allowed(name)) delete out[name];
-  for (const [name, value] of Object.entries(inv.env)) if (allowed(name)) out[name] = value;
-  return out;
-}
-
 type Token =
   /**
    * `quoted`: some of it was in quotes, so `"vercel"` is a string, not a command.
-   * `dynamic`: it contains `$(...)`, backticks or a `$NAME` expansion, so its value is only known when it runs.
+   * `dynamic`: it contains `$(...)`, `<(...)`, backticks or a `$NAME` expansion, so its value is only known when it runs.
    */
   | { kind: "word"; value: string; quoted: boolean; dynamic: boolean }
   /** A control operator: ; & | newline, or ( and ) which open and close a subshell. */
   | { kind: "op"; op: string }
-  /** $( ... ) or backticks: a command line run in a subshell. */
+  /** $( ... ), <( ... ), >( ... ) or backticks: a command line run in a subshell. */
   | { kind: "subst"; inner: string }
   /** A heredoc or here-string: text the command reads on its standard input. */
   | { kind: "stdin"; body: string };
@@ -68,11 +48,13 @@ function tokenize(input: string): Token[] {
   let dynamic = false;
   // The next word is a here-string (`<<< word`), not an argument.
   let hereString = false;
+  // The next word is a redirection's target (#154).
+  let target = false;
   // Heredocs whose bodies start after the next newline.
   const pending: { token: { kind: "stdin"; body: string }; delimiter: string; stripTabs: boolean }[] = [];
   const flush = () => {
-    if (inWord) tokens.push(hereString ? { kind: "stdin", body: word } : { kind: "word", value: word, quoted, dynamic });
-    if (inWord) hereString = false;
+    if (inWord && !target) tokens.push(hereString ? { kind: "stdin", body: word } : { kind: "word", value: word, quoted, dynamic });
+    if (inWord) hereString = target = false;
     word = "";
     inWord = false;
     quoted = false;
@@ -81,7 +63,7 @@ function tokenize(input: string): Token[] {
   // `$NAME` or `${NAME}` (not `$` alone or `$1`): an expansion outside single quotes.
   const expands = (at: number) => /[A-Za-z_{]/.test(input[at + 1] ?? "");
 
-  // Reads $( ... ) starting after "$(", honouring nesting and quotes.
+  // Reads $( ... ), <( ... ) or >( ... ) starting after the "(", honouring nesting and quotes.
   const readParen = (start: number): number => {
     let depth = 1;
     let i = start;
@@ -145,6 +127,7 @@ function tokenize(input: string): Token[] {
   };
 
   let i = 0;
+  let n = 0;
   while (i < input.length) {
     const c = input[i]!;
     if (c === "'") {
@@ -182,7 +165,8 @@ function tokenize(input: string): Token[] {
         inWord = true;
       }
       i += 2;
-    } else if (c === "$" && input[i + 1] === "(") {
+    } else if ("$<>".includes(c) && input[i + 1] === "(") {
+      // $(...), or a process substitution <(...) >(...): one argument, joined with any text around it (#156).
       inWord = true;
       dynamic = true;
       i = readParen(i + 2);
@@ -208,6 +192,11 @@ function tokenize(input: string): Token[] {
       tokens.push(token);
       pending.push({ token, delimiter, stripTabs });
       i = next;
+    } else if ((n = redirection(input, i))) {
+      if (!quoted && !dynamic && isStream(input, i, word)) inWord = false;
+      flush();
+      target = true;
+      i += n;
     } else if (" \t\r".includes(c)) {
       flush();
       i++;

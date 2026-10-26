@@ -45,6 +45,8 @@ const SHAPES = [
   ". az group list --subscription SUB",
   "az group list --query 'x \"y --subscription SUB\"'",
   "$s = 'SUB'; az group list --subscription $s",
+  "if ($true) { } az group list --subscription SUB",
+  "function f { } az group list --subscription SUB",
 ];
 
 type Agent = { name: string; hook: AgentHook; payload: (command: string) => object; platform?: NodeJS.Platform };
@@ -79,9 +81,10 @@ describe.each(AGENT_CASES)("agent hook: $name reads PowerShell with PowerShell's
     expect(reason).toContain("can't tell");
   });
 
-  it("reads $_ and $env:X as one word that is not a flag", async () => {
-    expect((await decision(agent, "'a','b' | ForEach-Object { az group show -n $_ }")).decision).toBe("allow");
-    expect((await decision(agent, "az group show -n $env:RG")).decision).toBe("allow");
+  it("reads $_ and $env:X as one word that is not a flag (Codex on Windows: bash may split them, so can't tell)", async () => {
+    const expected = agent.platform === "win32" ? "deny" : "allow";
+    expect((await decision(agent, "'a','b' | ForEach-Object { az group show -n $_ }")).decision).toBe(expected);
+    expect((await decision(agent, "az group show -n $env:RG")).decision).toBe(expected);
   });
 
   it("never sends a marker to the CLI", () => {
@@ -100,7 +103,10 @@ describe("agent hook: a shell call that names no shell (#159)", () => {
 
   it("is read both ways on Windows, so a bash line is still checked as bash", async () => {
     expect((await codex("s=other; az group list --subscription $s", "win32")).decision).toBe("deny");
-    expect((await codex("s=pinned; az group list --subscription $s", "win32")).decision).not.toBe("deny");
+    expect((await codex(`az group list ${BT}\n  --subscription other`, "win32")).decision).toBe("deny");
+    // The price: PowerShell doesn't know a bash variable, so the pinned one can't be told either.
+    expect((await codex("s=pinned; az group list --subscription $s", "win32")).reason).toContain("can't tell");
+    expect((await codex("az group list --subscription pinned", "win32")).decision).toBe("allow");
   });
 
   it("leaves Claude Code's and Copilot's Bash tool to bash", async () => {

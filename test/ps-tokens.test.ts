@@ -101,7 +101,8 @@ describe("PowerShell: rules checked against Windows PowerShell 5.1 (#159)", () =
     ["az <#x#>b c", [az("b", "c")]],
     [`az a <# x${CRLF}y #> b`, [az("a", "b")]],
     // Stop-parsing: the rest of the line, up to a newline or |, as typed; %NAME% is expanded.
-    [String.raw`az --% a "b c" \"d`, [az("a", "b c", '"d')]],
+    // (The 5.1 re-reading is not needed after --%, which passes the text as typed; it costs an extra check.)
+    [String.raw`az --% a "b c" \"d`, [az("a", "b c", '"d'), az("a", "b c", "d")]],
     ["az --% a | Out-Null; az b", [az("a"), az("b")]],
     [`az --% a${CRLF}az b`, [az("a"), az("b")]],
     ["az --% a %FOO% b", [az("a", DYNAMIC_WORDS, "b")]],
@@ -130,7 +131,7 @@ describe("PowerShell: rules checked against Windows PowerShell 5.1 (#159)", () =
     ["az x {y} z", [az("x", DYNAMIC_WORDS, "z")]],
     ["$n = 5; az --x $n", [az("--x", "5")]],
     ['$s = "pinned"; az --x $s', [az("--x", "pinned")]],
-    ['$s = "$t"; az --x $s', [az("--x", DYNAMIC_WORDS)]],
+    ['$s = "$t"; az --x $s', [az("--x", DYNAMIC_WORD)]],
     ["$s = Get-Content f; az --x $s", [az("--x", DYNAMIC_WORDS)]],
     ["$files | ForEach-Object { gh pr view $_ }", [["gh", ["pr", "view", DYNAMIC_WORD]]]],
     // Double quotes: backtick escapes, "" for a quote (5.1 then drops it: both readings), $( ) runs.
@@ -145,6 +146,13 @@ describe("PowerShell: rules checked against Windows PowerShell 5.1 (#159)", () =
     ["if ($true) { az a } else { az b }", [az("a"), az("b")]],
     ["foreach ($x in 1, 2) { az --x $x }", [az("--x", DYNAMIC_WORD)]],
     ["try { az a } catch { Write-Host $_ } finally { az b }", [az("a"), az("b")]],
+    // A keyword statement ends with its ( ) or { }: another may follow on the same line.
+    ["if ($true) { } az x", [az("x")]],
+    ["foreach ($i in 1) { } az x", [az("x")]],
+    ["function f { } az x", [az("x")]],
+    ["try { } catch { } az x", [az("x")]],
+    ["while ($false) { } az x", [az("x")]],
+    ["& { param($x) az --subscription $x } zzother", [az("--subscription", DYNAMIC_WORD)]],
     // A comma between spaced words, and in a word.
     ["az a , b --sub,other", [az("a", "b", "--sub,other")]],
   ])("%j", (cmd, expected) => {

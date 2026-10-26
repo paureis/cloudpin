@@ -65,6 +65,34 @@ function scan(input: string, from: number, nested: boolean): { tokens: Token[]; 
     tokens.push({ kind: "subst", inner: input.slice(start, i) });
     return i + 1;
   };
+  // Reads (( ... )) arithmetic starting after the "((", so `1 << 3` is not a heredoc; only the $( ) and
+  // backticks inside it run. Returns the index after the "))", or -1 where bash reads nested subshells
+  // instead (the ")" that closes the first "(" is not followed by another) or a quote makes it unclear.
+  const readArithmetic = (start: number): number => {
+    const mark = tokens.length;
+    let open = 0;
+    let i = start;
+    while (i < input.length && input[i] !== "'" && input[i] !== '"') {
+      const c = input[i]!;
+      if (c === "$" && input[i + 1] === "(" && input[i + 2] !== "(") i = readParen(i + 2);
+      else if (c === "`") i = readBacktick(i + 1);
+      else if (c === ")" && open === 0) {
+        if (input[i + 1] === ")") return i + 2;
+        break;
+      } else {
+        if (c === "(") open++;
+        if (c === ")") open--;
+        i += c === "\\" ? 2 : 1;
+      }
+    }
+    tokens.length = mark;
+    return -1;
+  };
+  // Reads $( ... ) or $(( ... )) starting at the "$".
+  const readDollarParen = (at: number): number => {
+    const end = input[at + 2] === "(" ? readArithmetic(at + 3) : -1;
+    return end === -1 ? readParen(at + 2) : end;
+  };
   // Reads a heredoc delimiter word, removing its quotes ('EOF', "EOF", \EOF).
   const readDelimiter = (start: number): [string, number] => {
     let i = start;
@@ -126,7 +154,7 @@ function scan(input: string, from: number, nested: boolean): { tokens: Token[]; 
           i += 2;
         } else if (d === "$" && input[i + 1] === "(") {
           dynamic = true;
-          i = readParen(i + 2);
+          i = readDollarParen(i);
         } else if (d === "`") {
           dynamic = true;
           i = readBacktick(i + 1);
@@ -147,7 +175,10 @@ function scan(input: string, from: number, nested: boolean): { tokens: Token[]; 
       // $(...), or a process substitution <(...) >(...): one argument, joined with any text around it (#156).
       inWord = true;
       dynamic = true;
-      i = readParen(i + 2);
+      i = c === "$" ? readDollarParen(i) : readParen(i + 2);
+    } else if (c === "(" && input[i + 1] === "(" && !inWord && (n = readArithmetic(i + 2)) !== -1) {
+      // An arithmetic command, (( ... )), or a C-style `for ((...))`.
+      i = n;
     } else if (c === "`") {
       inWord = true;
       dynamic = true;

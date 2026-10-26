@@ -6,13 +6,13 @@ import type { Variables } from "./word-expansion.js";
 export type Words = [words: string[], quoted: boolean[], dynamic: boolean[], expansions: (Expansion[] | undefined)[]];
 
 /**
- * PowerShell's statement keywords (about_Language_Keywords). Such a statement is not a command: the ( ) and
- * { } parts it runs were read where they appear (#159).
+ * PowerShell's statement keywords (about_Language_Keywords): such a statement ends with its ( ) or { }, and
+ * another may follow on the same line (#159). return and throw are not here: they run the pipeline after them.
  */
 export const PS_KEYWORDS = new Set([
   "if", "elseif", "else", "switch", "foreach", "for", "while", "do", "until", "try", "catch", "finally",
   "function", "filter", "workflow", "trap", "param", "begin", "process", "end", "dynamicparam", "class", "enum",
-  "data", "return", "throw", "break", "continue", "exit",
+  "data", "break", "continue", "exit",
 ]);
 
 /** What a PowerShell line set, as `shellwords.ts` keeps it: its variables are stored as `$name`, in lower case. */

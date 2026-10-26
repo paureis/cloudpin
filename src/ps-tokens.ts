@@ -15,7 +15,8 @@ import type { Expansion, Token } from "./shell-tokens.js";
  * - here-strings @'...'@ and @"..."@ close only at the start of a line;
  * - # and <# #> start a comment only at the start of a word;
  * - ; and newlines end a statement, | a pipeline element, && and || (PowerShell 7; a parse error in 5.1);
- * - & and . at the start of a statement are call operators, kept as the word "&" or ".";
+ * - & and . at the start of a statement are call operators, kept as the word "&" or ".", and a keyword
+ *   statement (if, foreach, function...) ends with its ( ) or { };
  * - a bare word that reads --% (also `--% or -'-%') passes the rest of the line, up to a newline or |, as
  *   typed: the CLI splits it, %NAME% expands; a quoted '--%' is dropped;
  * - redirections (>, >>, 2>, 2>&1, *>, 3>&1) at the start of a word are not arguments;
@@ -242,8 +243,9 @@ function scan(input: string, from: number, closer: string): Scanned {
     } else if (c === "|" || (c === "&" && next === "&")) {
       op(next === c ? c + c : c);
       i += next === c ? 2 : 1;
-    } else if ((c === "&" || (c === "." && isSpace(next))) && !inWord && !commandSeen) {
-      // A call operator: the command follows (a name, a string, a variable or a script block).
+    } else if (c === "&" && !inWord && !commandSeen) {
+      // The call operator: the command follows (a name, a string, a variable or a script block). The
+      // dot-source operator is a bare word ".", which shellwords drops the same way.
       tokens.push({ kind: "word", value: c, quoted: false, dynamic: false });
       i++;
     } else if (c === "&") {

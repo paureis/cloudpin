@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { commandName } from "./guard.js";
 import { tokenizePowerShell, windowsPowerShellArgv } from "./ps-tokens.js";
-import { PS_KEYWORDS, psAssignment, psVariables } from "./ps-words.js";
+import { psAssignment, psVariables } from "./ps-words.js";
 import { type Expansion, tokenize } from "./shell-tokens.js";
 import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_VALUE } from "./types.js";
 import { expandWord, isDynamic, substitute, type Variables } from "./word-expansion.js";
@@ -132,9 +132,10 @@ function analyse(
   const valueOf = (k: number, set: RegExpExecArray): string =>
     dynamic[k] ? (substitute(words[k]!, expansions[k] ?? [], vars)?.slice(set[1]!.length + 1) ?? UNKNOWN_VALUE) : set[2]!;
   if (state.dialect === "powershell") {
-    // & and . run the command after them (about_Operators).
-    if ((words[0] === "&" || words[0] === ".") && !quoted[0]) [words, quoted, dynamic, expansions] = [words.slice(1), quoted.slice(1), dynamic.slice(1), expansions.slice(1)];
-    else {
+    // & and . run the command after them (about_Operators), return and throw the pipeline after them.
+    if (!quoted[0] && ["&", ".", "return", "throw"].includes(words[0]?.toLowerCase() ?? "")) {
+      [words, quoted, dynamic, expansions] = [words.slice(1), quoted.slice(1), dynamic.slice(1), expansions.slice(1)];
+    } else {
       const set = psAssignment([words, quoted, dynamic, expansions]);
       if (set) {
         // `$x = vercel ls` runs vercel; a single literal is the value, a "..." with $( ) one unknown word.
@@ -144,8 +145,8 @@ function analyse(
         state.lists[set.literal ? "delete" : "add"](set.name);
         return;
       }
-      // A keyword's ( ) and { } parts, and an expression's, were read where they appear; `$cli x` is a parse error.
-      if (!PS_ENV.test(words[0] ?? "") && (dynamic[0] || (!quoted[0] && PS_KEYWORDS.has(words[0]?.toLowerCase() ?? "")))) return;
+      // An expression is not a command (`$cli x` is a parse error); its ( ) and $( ) parts were read already.
+      if (!PS_ENV.test(words[0] ?? "") && dynamic[0]) return;
     }
   }
   const psEnv = PS_ENV.exec(words[0] ?? "");

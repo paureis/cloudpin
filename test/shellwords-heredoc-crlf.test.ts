@@ -113,6 +113,13 @@ describe("arithmetic (( )) and $(( )) is not a heredoc (#161)", () => {
     expect(calls(line)).toEqual([["az", ["group", "list", "--subscription", "other"]]]);
   });
 
+  it("reads nested $(( $( ) ) ), each tried as arithmetic and then as subshells, in time", { timeout: 2000 }, () => {
+    // Read twice at every level, this took seconds at 20 levels and doubled with each one.
+    let line = "az group list --subscription other";
+    for (let k = 0; k < 22; k++) line = `echo $(( $( ${line} ) ) )`;
+    expect(calls(line)).toEqual([["az", ["group", "list", "--subscription", "other"]]]);
+  });
+
   it("marks $(( )) as known only when it runs", () => {
     expect(findInvocations("N=$(( 1 << 3 )) az group list", GUARDED)[0]?.env).toEqual({ N: UNKNOWN_VALUE });
   });

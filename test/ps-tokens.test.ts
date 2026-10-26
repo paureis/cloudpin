@@ -157,6 +157,10 @@ describe("PowerShell: rules checked against Windows PowerShell 5.1 (#159)", () =
     ["try { } catch { } az x", [az("x")]],
     ["while ($false) { } az x", [az("x")]],
     ["& { param($x) az --subscription $x } zzother", [az("--subscription", DYNAMIC_WORD)]],
+    // return and throw run the pipeline after them.
+    ["& { return az r1 }", [az("r1")]],
+    ["try { throw az t1 } catch { }", [az("t1")]],
+    ["return $x", []],
     // A comma between spaced words, and in a word.
     ["az a , b --sub,other", [az("a", "b", "--sub,other")]],
   ])("%j", (cmd, expected) => {

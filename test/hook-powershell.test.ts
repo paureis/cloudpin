@@ -48,6 +48,7 @@ const SHAPES = [
   "$s = 'SUB'; az group list --subscription $s",
   "if ($true) { } az group list --subscription SUB",
   "function f { } az group list --subscription SUB",
+  "& { return az group list --subscription SUB }",
 ];
 
 type Agent = { name: string; hook: AgentHook; payload: (command: string) => object; platform?: NodeJS.Platform };

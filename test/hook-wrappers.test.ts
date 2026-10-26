@@ -129,6 +129,10 @@ describe("agent hook: a wrapper or a runner no longer hides the call (#162)", ()
     expect(reason).toContain("can't tell");
   });
 
+  it("says the words xargs adds are why it can't tell", async () => {
+    expect((await decision("echo other | xargs az group list --subscription")).reason).toContain("input xargs adds");
+  });
+
   it.each([
     ["echo x | xargs az login", "Bash"],
     ["echo x | xargs -I{} az group list --subscription pinned --query {}", "Bash"],

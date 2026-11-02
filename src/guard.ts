@@ -172,7 +172,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   if (dynamic) return { ...base, uncertain: true, problems: [dynamic.problem], fix: dynamic.fix };
   // A variable the line sets from something only known when it runs (#86): if it
   // decides this CLI's account, cloudpin can't tell which account will be used.
-  const identityVars = provider.cacheInputs(folded.env).env;
+  const identityVars = provider.cacheInputs(folded.env, platform).env;
   const unknown = Object.keys(folded.env).filter((k) => folded.env[k] === UNKNOWN_VALUE && envNameMatches(identityVars, k));
   if (unknown.length > 0) {
     return {
@@ -197,7 +197,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   }
   // Other unknown values don't decide the account; the CLI's identity check runs without them.
   const env = Object.fromEntries(Object.entries(folded.env).filter(([, v]) => v !== UNKNOWN_VALUE));
-  const res = await provider.resolve({ args: req.args, env, cwd: req.cwd, bin: name }, exec);
+  const res = await provider.resolve({ args: req.args, env, cwd: req.cwd, bin: name, platform }, exec);
   trace.resolution = res;
   if (res.kind === "error" && cliMissing) return { action: "allow", reason: "not-installed" };
   switch (res.kind) {

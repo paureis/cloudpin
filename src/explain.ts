@@ -3,7 +3,8 @@ import { maskArgv } from "./format.js";
 import { commandName, guard, type GuardDeps, type Trace, type Verdict } from "./guard.js";
 import { AGENTS, type AgentName } from "./hooks/agents.js";
 import { home } from "./paths.js";
-import { envFor, findInvocations, type Invocation } from "./shellwords.js";
+import { type Dialect, findInvocations, type Invocation } from "./shellwords.js";
+import { envFor } from "./user-env.js";
 import { describe } from "./status.js";
 import type { Identity } from "./types.js";
 
@@ -35,6 +36,8 @@ export interface ExplainOptions {
   mode: "shell" | "agent";
   cwd: string;
   env: NodeJS.ProcessEnv;
+  /** The shell a full line is read as (#159); bash by default. */
+  shell?: Dialect;
 }
 
 const AGENT_LABELS: Record<AgentName, string> = {
@@ -98,7 +101,7 @@ export async function explain(command: string | string[], opts: ExplainOptions, 
   const bins = [...deps.providers.flatMap((p) => p.bins), "cloudpin"];
   const calls: Invocation[] =
     typeof command === "string"
-      ? findInvocations(command, bins, opts.cwd)
+      ? findInvocations(command, bins, opts.cwd, opts.env, opts.shell)
       : command.length > 0
         ? [{ bin: command[0]!, args: command.slice(1), env: {} }]
         : [];
@@ -113,7 +116,7 @@ export async function explain(command: string | string[], opts: ExplainOptions, 
     }
     const cwd = call.cwd ?? opts.cwd;
     const trace: Trace = {};
-    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent" }), cwd, mode: opts.mode }, deps, trace);
+    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent", platform: deps.platform }), cwd, mode: opts.mode }, deps, trace);
     const res = trace.resolution;
     out.push({
       // Masked for every output (text, --json, MCP); the guard above read the real words (#134).

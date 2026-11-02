@@ -4,6 +4,7 @@ import { explain, formatExplain, type ExplainedCall } from "../src/explain.js";
 import type { GuardDeps } from "../src/guard.js";
 import { cloudpinTools } from "../src/mcp-tools.js";
 import type { ProviderDef, Resolution } from "../src/types.js";
+import { fakeDoctorHost } from "./fake-doctor-host.js";
 
 // #134: `cloudpin explain` (text and --json) and the MCP cloudpin_check tool hide
 // a credential flag's value as block messages do (#123). Masking is display-only:
@@ -47,7 +48,7 @@ const deps: GuardDeps = {
 
 const CWD = "/repo/app";
 const ENV = { HOME: "/home/me" } as NodeJS.ProcessEnv;
-const mcp = cloudpinTools(deps, { cwd: CWD, env: ENV, read: () => null, isDir: () => true }).find((t) => t.name === "cloudpin_check")!;
+const mcp = cloudpinTools(deps, { cwd: CWD, env: ENV, read: () => null, isDir: () => true, doctor: fakeDoctorHost }).find((t) => t.name === "cloudpin_check")!;
 
 /** What each output path shows for one command, given as argv words and as a shell line. */
 async function outputs(argv: string[]) {

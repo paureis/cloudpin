@@ -1,6 +1,7 @@
 import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { envNameMatches } from "./cache.js";
+import { dynamicTarget } from "./dynamic-args.js";
 import { isReadOnly } from "./readonly.js";
 import { type Exec, type ProviderDef, type Resolution, UNKNOWN_VALUE } from "./types.js";
 
@@ -127,6 +128,9 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
     if (result.notFound) cliMissing = true;
     return result;
   };
+  // An argument only known when it runs (#160), before resolve, so no such value reaches a CLI.
+  const dynamic = dynamicTarget(req.args, provider.targetFlags ?? []);
+  if (dynamic) return { ...base, uncertain: true, problems: [dynamic.problem], fix: dynamic.fix };
   // A variable the line sets from something only known when it runs (#86): if it
   // decides this CLI's account, cloudpin can't tell which account will be used.
   const identityVars = provider.cacheInputs(req.env).env;
@@ -154,6 +158,11 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
       // promise it is the right account.
       return { ...base, uncertain: true, problems: [res.message], fix: provider.statusCommand };
     case "identity": {
+      // A pinned field the command's identity can't be read for (#165), e.g. gcloud's account with an access token.
+      const unread = Object.entries(res.unknown ?? {}).filter(([field]) => (pin as Record<string, string>)[field]);
+      if (unread.length > 0) {
+        return { ...base, uncertain: true, problems: unread.map(([, why]) => why), fix: provider.statusCommand };
+      }
       // The provider and its pin come from the same key, so the cast is safe.
       const p = provider as ProviderDef<typeof provider.name>;
       const problems = p.compare(pin as never, res.identity);

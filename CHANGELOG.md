@@ -8,8 +8,68 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
 
 ## [Unreleased]
 
+### Fixed
+
+- Wrangler auth profiles (#103): a command run with `--profile`, or in a folder bound by `wrangler auth activate`,
+  is checked against that profile's login and its own account cache, not the default one. When nothing else names
+  the account and Wrangler can't be asked about the profile (a `--profile` the folder isn't bound to, with no API
+  token or key in the environment or the project's `.env` files), it stops the command. `cloudpin explain` names the
+  profile and why. Profiles are read from Wrangler's config folder, which an `XDG_CONFIG_HOME` or (on Windows)
+  `APPDATA` set in `.env` moves.
+- Cloudflare account variables (#119): a command line that sets `CLOUDFLARE_ACCOUNT_ID`, `CF_ACCOUNT_ID`,
+  `CLOUDFLARE_ENV`, `WRANGLER_CACHE_DIR`, `DOTENV_KEY` or another variable that picks Wrangler's account to a value
+  cloudpin can't know (`$(...)`, backticks, `$OTHER`) stops as "can't tell" instead of being checked without it.
+- Windows: variable names are read without regard to case, as Windows and the CLIs do (#119), so a lowercase
+  `gh_token`, `aws_profile`, `azure_config_dir` or `cloudflare_account_id` counts. One variable set in two spellings
+  to different values stops as "can't tell".
+- Windows: cloudpin's own variables are read without regard to case too (#136): a lowercase `cloudpin_env`,
+  `cloudpin_branch`, `cloudpin_confirm` or `cloudpin_skip` you set counts, and an agent still can't set or unset
+  `CLOUDPIN_ENV` or `CLOUDPIN_BRANCH` in any spelling. The read-only check on a protected environment reads folded
+  names, so a lowercase `aws_config_file` counts there as well.
+
+## [1.2.1] - 2026-10-29
+
+Fixes agent-hook gaps where a command could run on the wrong account without being checked (1.2.0 and earlier have
+them). Please upgrade.
+
+### Fixed
+
+- Agent hooks: a heredoc inside `$( )`, as in `git commit -m "$(cat <<'EOF' ... it's ... EOF)" && az ...`, no
+  longer hides the calls after it. Carriage returns are dropped as Git Bash does, `(( ))` and `$(( ))` are read as
+  arithmetic, and `$'...'` is decoded ([#161](https://github.com/paureis/cloudpin/issues/161)).
+- Agent hooks: an account flag whose value is only known when the command runs (`--subscription $(cat f)`,
+  `--context="$X"`, an unknown `$VAR` or `"$@"`) gives "can't tell" instead of being read as empty. A variable set
+  earlier on the same line is substituted, which also ends a false block. An unquoted `$( )` counts as one word that is
+  not a flag ([#160](https://github.com/paureis/cloudpin/issues/160)).
+- Agent hooks read PowerShell commands with PowerShell's rules: Claude Code's and Copilot's PowerShell tools, and on
+  Windows the agents that don't name their shell (Codex, Gemini CLI, Cursor, Antigravity) are read both ways, and every
+  call either reading finds is checked. Each call is also checked as Windows PowerShell 5.1 would pass it. `cloudpin
+  explain --powershell` and `cloudpin_check`'s `shell` argument take the dialect
+  ([#159](https://github.com/paureis/cloudpin/issues/159)).
+- Agent hooks find the call behind wrappers and runners: `env`, `sudo`, `nice`, `timeout`, `exec`, `command`,
+  `xargs`, `watch`, `npx`, `npm exec`, `pnpm`, `yarn`, `bunx`, `cmd /c`, `powershell -Command` and
+  `-EncodedCommand`, `Invoke-Expression` and `Start-Process` ([#162](https://github.com/paureis/cloudpin/issues/162)).
+- gcloud: `--impersonate-service-account` (and its variable and property) is checked as the account the command runs
+  as, the last one in a delegation chain. An access token or token file gives "can't tell" for an account pin; a
+  project pin is still checked ([#165](https://github.com/paureis/cloudpin/issues/165)).
+
+### Changed
+
+- These fixes fail closed, so some lines that ran before now stop as "can't tell": `... | xargs <guarded CLI>`,
+  cmd's `%VAR%`, `^`, `if`, `for` and `start`, an `Invoke-Expression` or `-EncodedCommand` that can't be read, and on
+  Windows a bash variable or `$env:X` in a command from an agent that doesn't name its shell. Run such a command
+  yourself, or write the values out.
+
+## [1.2.0] - 2026-10-29
+
+Run it everywhere: a GitHub Action, Homebrew and Scoop, the MCP server for every agent, and sharper Vercel and
+Wrangler account checks.
+
 ### Added
 
+- A GitHub Action, [paureis/cloudpin-action](https://github.com/paureis/cloudpin-action) (#10): `uses:
+  paureis/cloudpin-action@v1` after a job's cloud logins fails the job before it deploys to an account other than the
+  pinned one, with a job summary and an annotation per failing cloud.
 - `cloudpin check --only <clouds>` and `--json` (#10): `--only azure,aws` checks just those clouds and fails one
   that isn't pinned, installed or logged in, so a CI job checks what it deploys to; `--json` prints the result
   (`match`, `mismatch`, `unpinned` or `error`) and each cloud's status, reason and fix, so tools never parse text.
@@ -46,6 +106,14 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
 
 ### Fixed
 
+- Agent hooks and `cloudpin explain` read shell redirections and process substitutions as the shell does (#154, #156):
+  `az 2>&1 group list --subscription other` and `az group list <(true) --subscription other` were read as ending at
+  `2>` or `<`, which hid the `--subscription` after them and checked the default account instead. Redirection words
+  (`> out.txt`, `2>/dev/null`) are no longer taken as arguments.
+- A help or version flag no longer exempts a command the CLI still runs (#146): `vercel deploy --prod -v`, a deploy
+  flag before an exempt word (`vercel --prod --name whoami`), `vercel promote <id> --help`, `wrangler deploy -v`,
+  `gcloud app deploy --version v2`, `az keyvault secret set-attributes --version x` and `gh repo create x -h <url>`
+  are checked, and so is any CLI's `--help` after `--` or written `--help=false`.
 - kubectl and helm: `-itn other-ns`, `-is <server>` and `-Aw` are checked against the namespace and server they pick (#133), and
   `KUBECONFIG=$(...)`, `HELM_NAMESPACE=$(...)` or Supabase's `SUPABASE_PROJECT_ID=$(...)` stop the command as "can't tell".
 - Windows: Codex and Copilot CLI hooks work under PowerShell's `Restricted` and `AllSigned` execution policies (#108).

@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 import type { FoundConfig } from "../src/config.js";
 import { guard, type Verdict } from "../src/guard.js";
 import { cloudflare } from "../src/providers/cloudflare.js";
-import { envFor, findInvocations } from "../src/shellwords.js";
+import { findInvocations } from "../src/shellwords.js";
 import type { Exec } from "../src/types.js";
+import { envFor } from "../src/user-env.js";
 import { tempDir } from "./tmp.js";
 
 // #119, part 1: a variable that decides Wrangler's account, set by an agent's

@@ -8,8 +8,9 @@ import { aws } from "../src/providers/aws.js";
 import { azure } from "../src/providers/azure.js";
 import { cloudflare } from "../src/providers/cloudflare.js";
 import { github } from "../src/providers/github.js";
-import { envFor, findInvocations } from "../src/shellwords.js";
+import { findInvocations } from "../src/shellwords.js";
 import type { Exec, ProviderDef } from "../src/types.js";
+import { envFor } from "../src/user-env.js";
 import { tempDir } from "./tmp.js";
 
 // #119, part 2: Windows variable names are case-insensitive, and so is every

@@ -208,10 +208,18 @@ function analyse(
     bin = expanded[0]!;
     name = commandName(bin);
     if (state.guarded.has(name)) {
-      out.push(invocation(bin, expanded.slice(1), env, state));
+      const call = (argv: string[]) => {
+        // `cloudpin exec` checks in shell mode, where CLOUDPIN_SKIP works, and starts its command without a shell,
+        // so that command is read as the words it is: a CLI, `npx` or `bash -c` around one, `cloudpin switch` (#14).
+        if (name === "cloudpin" && argv[0] === "exec") {
+          const run = argv.slice(argv[1] === "--" ? 2 : 1);
+          analyse(run, stdin, out, { ...child(state), exported: { ...state.exported, ...env }, dialect: "bash" }, [], run.map(isDynamic));
+        } else out.push(invocation(bin, argv, env, state));
+      };
+      call(expanded.slice(1));
       // Windows PowerShell 5.1 passes quotes inside an argument unescaped, and the CLI splits it again (#159).
       const legacy = state.dialect === "powershell" ? windowsPowerShellArgv(expanded.slice(1)) : [];
-      if (state.dialect === "powershell" && JSON.stringify(legacy) !== JSON.stringify(expanded.slice(1))) out.push(invocation(bin, legacy, env, state));
+      if (state.dialect === "powershell" && JSON.stringify(legacy) !== JSON.stringify(expanded.slice(1))) call(legacy);
       return;
     }
     // eval, shells, find and script blocks get the words as typed, which the code they run expands;

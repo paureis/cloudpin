@@ -20,13 +20,11 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
   plan, asks once, runs each CLI's own switch command without a shell (`az account set`, `gh auth switch --hostname
   --user`, `vercel teams switch <slug>`, `gcloud config set ... --quiet`, `kubectl config use-context` and, for a pinned
   namespace, `set-context --current --namespace`), then checks again, exiting 0 only when every pinned, installed CLI
-  matches. A failing command doesn't stop the others. When several kube contexts or AWS profiles fit, you pick one by
-  number in a terminal. What it won't do is named for you: a missing login, `supabase link`, a Wrangler config edit, or
+  matches. When several kube contexts or AWS profiles fit, you pick one by number in a terminal. What it won't do is named for you: a missing login, `supabase link`, a Wrangler config edit, or
   something that overrides the switch (`GH_TOKEN`, `CLOUDSDK_CORE_PROJECT`, `AWS_ACCESS_KEY_ID`, `VERCEL_ORG_ID`,
   `HELM_KUBECONTEXT`, gcloud impersonation, a scope in `vercel.json`, in any spelling on Windows). AWS profiles are
   found in the AWS config file, reading only profile names, `sso_account_id` and `role_arn` (never the credentials
-  file). `--json` prints the plan, the commands run with their exit codes, and the `check --json` report after, and
-  never prompts. An agent's `cloudpin switch` asks you first, with `--yes` too and however it is spelled (agents whose
+  file). `--json` prints the plan, what ran and the `check --json` report after, and never prompts. An agent's `cloudpin switch` asks you first, with `--yes` too and however it is spelled (agents whose
   hooks can't ask are told to ask you to run it). A blocked command's fix also suggests it, except for Supabase and
   Wrangler.
 - `cloudpin shell-init` also defines a `cloudpin` function (#14), so `cloudpin switch` can set `AWS_PROFILE` in your
@@ -63,7 +61,7 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
   inside it, as in `cloudpin exec -- bash -c 'az ...'` or `cloudpin exec -- npx wrangler ...`, is checked instead of
   passing as an unguarded `bash` or `npx`.
 - Agent hooks: a `cloudpin` call whose subcommand is only known when it runs (`cloudpin $x`) asks you first (#14), since
-  it may be `cloudpin use` or `cloudpin switch`.
+  it may be `cloudpin use` or `cloudpin switch`. Cursor's matcher finds a CLI in any case (`AZ.CMD`).
 
 ## [1.2.1] - 2026-10-29
 

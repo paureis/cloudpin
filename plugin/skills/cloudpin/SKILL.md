@@ -6,7 +6,7 @@ description: Use before running cloud CLIs (az, aws, gcloud, vercel, gh, kubectl
 # cloudpin
 
 This project pins the cloud accounts it uses in `.cloudpin.yml`. cloudpin stops any cloud CLI command that would run
-on a different account. Two read-only tools let you check first; neither runs, switches or changes anything.
+on a different account. Three read-only tools let you check first; none runs, switches or changes anything.
 
 ## Before cloud work
 

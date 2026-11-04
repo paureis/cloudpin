@@ -32,7 +32,7 @@ Examples of what counts as a security problem here:
   For Vercel it checks whether a login file exists, without reading it.
 - It stores successful identity answers for up to five minutes in a cache file in your user cache folder. Keys are
   salted hashes, so tokens and command arguments are never written in clear.
-- `cloudpin mcp`, the MCP server for agents, is read-only: its two tools report status and what cloudpin would decide
+- `cloudpin mcp`, the MCP server for agents, is read-only: its three tools report status, what cloudpin would decide and why it may not be guarding
   for a command; they never run that command, log in, switch accounts or write anything.
 - It has no telemetry and sends nothing about you or your accounts. Its one request of its own asks
   registry.npmjs.org for the latest cloudpin version (public data; the request names only the package), at most once

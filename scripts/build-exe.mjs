@@ -211,7 +211,8 @@ const BUILTIN = new Set(builtinModules);
  * name `version` and must not read package.json or load any package.
  */
 export function checkBundle(code, version) {
-  if (code.includes("package.json")) throw new Error("bundle: still reads package.json (src/version.ts not inlined?)");
+  // As a string, not the word: bundled comments mention package.json too.
+  if (/["'`][^"'`\n]*package\.json["'`]/.test(code)) throw new Error("bundle: still reads package.json (src/version.ts not inlined?)");
   if (!code.includes(JSON.stringify(version))) throw new Error(`bundle: version ${version} is not inlined`);
   // Static imports and re-exports start a line in rolldown's output (an example in a JSDoc comment, as yaml's
   // has, starts with `*`); calls are matched anywhere.

@@ -1,7 +1,8 @@
 import { join } from "node:path";
+import { windowsChecks } from "./doctor-windows.js";
 import type { GuardDeps } from "./guard.js";
 import { AGENTS, type AgentName } from "./hooks/agents.js";
-import { claudePluginEnabled, hookFile, planInstall, type Scope } from "./install.js";
+import { claudePluginEnabled, hookFile, planInstall, windowsRoot, type Scope } from "./install.js";
 import { installMethod, pathFix, reinstallCommand, upgradeCommand, type InstallMethod } from "./install-method.js";
 import { cacheDir, home } from "./paths.js";
 import { collectStatus, describe } from "./status.js";
@@ -169,6 +170,7 @@ async function shellCheck(d: DoctorDeps): Promise<Check> {
 
 function hookChecks(d: DoctorDeps): Check[] {
   const checks: Check[] = [];
+  const root = windowsRoot(d.env, d.platform);
   for (const agent of Object.keys(AGENTS) as AgentName[]) {
     for (const scope of ["project", "user"] as Scope[]) {
       const file = hookFile(agent, scope, d.cwd, d.env);
@@ -177,8 +179,11 @@ function hookChecks(d: DoctorDeps): Check[] {
       const where = `${agent} hook (${scope === "user" ? "personal" : "project"})`;
       const install = `cloudpin install-hook ${agent}${scope === "user" ? " --user" : ""}`;
       let current: boolean;
+      let windowsOnly = false;
       try {
-        current = planInstall(agent, content).alreadyInstalled;
+        current = planInstall(agent, content, root).alreadyInstalled;
+        // Current everywhere but Windows: it lacks the Windows form (#108).
+        windowsOnly = !current && planInstall(agent, content).alreadyInstalled;
       } catch {
         checks.push({
           id: "hook",
@@ -196,7 +201,12 @@ function hookChecks(d: DoctorDeps): Check[] {
               id: "hook",
               level: "warn",
               title: `${where}: out of date in ${file}`,
-              detail: ["an older cloudpin wrote it; it may miss commands this version checks"],
+              detail: windowsOnly
+                ? [
+                    "on Windows it doesn't use the command this version writes, which starts cloudpin through cmd.exe so that no PowerShell execution policy can stop it",
+                    ...(agent === "codex" ? ["Codex runs a changed hook only after you review it again in /hooks"] : []),
+                  ]
+                : ["an older cloudpin wrote it; it may miss commands this version checks"],
               fix: install,
             },
       );
@@ -330,9 +340,16 @@ function cacheCheck(d: DoctorDeps): Check {
       };
 }
 
-/** Every check, read-only: cloudpin, shell wrappers, agent hooks, the pin file, each CLI, the cache. */
+/** Every check, read-only: cloudpin, shell wrappers, agent hooks (and on Windows their shells), the pin file, each CLI, the cache. */
 export async function runDoctor(d: DoctorDeps): Promise<Check[]> {
-  return [...(await selfChecks(d)), await shellCheck(d), ...hookChecks(d), ...(await pinAndCliChecks(d)), cacheCheck(d)];
+  return [
+    ...(await selfChecks(d)),
+    await shellCheck(d),
+    ...hookChecks(d),
+    ...(await windowsChecks(d)),
+    ...(await pinAndCliChecks(d)),
+    cacheCheck(d),
+  ];
 }
 
 const tildify = (text: string, env: NodeJS.ProcessEnv) => text.split(home(env)).join("~");

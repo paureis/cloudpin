@@ -1,7 +1,9 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { commandName } from "../src/guard.js";
-import { envFor, findInvocations, UNKNOWN_VALUE } from "../src/shellwords.js";
+import { findInvocations, UNKNOWN_VALUE } from "../src/shellwords.js";
+import { DYNAMIC_WORD, DYNAMIC_WORDS } from "../src/types.js";
+import { envFor } from "../src/user-env.js";
 
 const GUARDED = ["az", "aws", "gcloud", "vercel", "gh"];
 const find = (cmd: string) => findInvocations(cmd, GUARDED);
@@ -90,8 +92,9 @@ describe("findInvocations", () => {
   it.each([
     ["timeout 30 gh pr list", ["pr", "list"]],
     ["timeout -s KILL 30s gh pr list", ["pr", "list"]],
-    ["xargs -n 1 gh repo delete", ["repo", "delete"]],
-    ["xargs -I {} gh repo view {}", ["repo", "view", "{}"]],
+    // xargs adds the words it reads, or puts one where -I's string is (#162).
+    ["xargs -n 1 gh repo delete", ["repo", "delete", DYNAMIC_WORDS]],
+    ["xargs -I {} gh repo view {}", ["repo", "view", DYNAMIC_WORD]],
   ])("sees through %j", (cmd, args) => {
     expect(find(cmd)).toEqual([{ bin: "gh", args, env: {} }]);
   });

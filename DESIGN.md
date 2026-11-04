@@ -28,7 +28,7 @@ We found no popular standalone tool for per-project cloud account pinning.
 | Terminal | Shell wrappers for bash, zsh and PowerShell, enabled by one line in the shell profile; plus `cloudpin check` for scripts and CI |
 | Speed | Identity results cached; cache invalidated when the CLI's own config/credential file changes |
 | Agents | Every agent with a real blocking pre-command hook (Claude Code, Cursor; Codex, Gemini CLI and Copilot CLI **(verify)**; Antigravity, Gemini CLI's successor, added for 1.0 in #80), via `cloudpin install-hook <agent>`. Agents without a blocking hook get documented `cloudpin check` integration, never a fake hook |
-| Block rule | On mismatch, block every command except login, logout, switch, whoami, `--version` and help |
+| Block rule | On mismatch, block every command except login, logout, switch, whoami, `--version` and help (only where the CLI really stops on them, #146) |
 | Override | `CLOUDPIN_SKIP=1` works in the terminal; ignored in agent-hook mode |
 | Switching (#14, 2026-10-18) | `cloudpin switch` shows a plan, asks once (`--yes` skips it), runs each CLI's own switch command without a shell, then re-checks; logins, `supabase link`, Wrangler config edits and overriding env vars stay manual lines. An agent's `cloudpin switch` asks the human (deny where the hook can't ask). AWS_PROFILE reaches the user's shell through the `cloudpin` shell function's side file, never eval. Design: `docs/superpowers/specs/2026-10-18-switch-design.md` |
 | Scope | The full product at launch; iterate on issues afterwards |

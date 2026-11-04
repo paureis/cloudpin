@@ -57,11 +57,17 @@ cloudpin is a seatbelt, not a sandbox.
   in a public issue with its repro line (#159 to #163, #165, #168). Where cloudpin can't follow a line, the aim is
   "can't tell", never a silent allow; a shape that still slips through is a security bug to report (see
   [SECURITY.md](SECURITY.md)).
-- **Never touch credentials**: cloudpin only runs each CLI's read-only identity command, never prints, logs or caches
-  a token, and never runs commands that print secrets (`aws configure list`, `--show-token`, `--reveal`). Error
-  messages name environment variables, never their values. Two files it reads can hold credentials: the kubeconfig
-  (it takes only the server and namespace) and the `.env` files Wrangler loads, which can hold `CLOUDFLARE_API_TOKEN`
-  (it takes the account variables, and keys its cache on a salted hash of the credential variables).
+- **Never touch credentials**: to check a command, cloudpin only runs each CLI's read-only identity command. It never
+  prints, logs or caches a token, and never runs commands that print secrets (`aws configure list`, `--show-token`,
+  `--reveal`). Error messages name environment variables, never their values. Two files it reads can hold credentials:
+  the kubeconfig (it takes only the server and namespace, and for `cloudpin switch` each context's name and cluster)
+  and the `.env` files Wrangler loads, which can hold `CLOUDFLARE_API_TOKEN` (it takes the account variables, and keys
+  its cache on a salted hash of the credential variables). For `cloudpin switch` it also reads the AWS config file, only
+  profile names, `sso_account_id` and `role_arn`; it never reads the AWS credentials file.
+- **Switching is the person's decision**: `cloudpin switch` changes the active account of the CLIs, for every terminal,
+  so it shows its plan and asks first unless you pass `--yes`. An agent's attempt asks the person through its hook, or
+  is denied where the agent can't ask, and `--yes` doesn't change that (`src/hooks/agents.ts`). It runs each CLI's own
+  switch command without a shell, and never logs in. The MCP server has no tool that switches.
 - **No shell when spawning**: every process starts through `realExec` with arguments as a list
   (`src/exec.ts`, cross-spawn), so a command line is never re-interpreted by a shell.
 - **A short cache that can't go stale on a switch**: a successful identity is reused for at most 5 minutes, keyed by a

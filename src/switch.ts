@@ -53,9 +53,12 @@ export interface SwitchJson {
 
 const USAGE = "usage: cloudpin switch [--yes] [--json] [--only <clouds>]";
 
-/** `switch`'s flags: `--yes`, and `check`'s `--json` and `--only`. */
+/**
+ * `switch`'s flags: `--yes`, and `check`'s `--json` and `--only`. Help is the first word after `switch` and only
+ * there, as the agent hook reads it (#146): anywhere else it is an unknown argument and nothing runs.
+ */
 export function parseSwitchArgs(args: string[]): SwitchOptions | { help: true } | { error: string } {
-  if (args.includes("--help") || args.includes("-h")) return { help: true };
+  if (args[0] === "--help" || args[0] === "-h") return { help: true };
   const rest = args.filter((a) => a !== "--yes");
   const parsed = parseCheckArgs(rest);
   if ("error" in parsed) return parsed;

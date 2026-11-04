@@ -234,7 +234,7 @@ function unknownSubcommand(args: string[]): Confirmation {
 }
 
 /** What a call to cloudpin itself needs the user's OK for, if anything. */
-function cloudpinConfirmation(inv: Invocation, deps: GuardDeps, cwd: string, base: NodeJS.ProcessEnv): Confirmation | undefined {
+export function cloudpinConfirmation(inv: Invocation, deps: GuardDeps, cwd: string, base: NodeJS.ProcessEnv): Confirmation | undefined {
   // npm keeps the words after its `--` for the command: `npm exec cloudpin -- switch` runs `cloudpin switch`.
   const args = inv.args[0] === "--" ? inv.args.slice(1) : inv.args;
   const first = args[0];

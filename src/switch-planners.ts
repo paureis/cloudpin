@@ -1,5 +1,6 @@
 import type { CheckEntry } from "./check.js";
-import { listTeams } from "./providers/vercel.js";
+import { IMPERSONATED } from "./providers/gcloud.js";
+import { listTeams, localScope } from "./providers/vercel.js";
 import type { Candidate, PlanInput } from "./switch-plan.js";
 import type { ProviderDef, Resolution } from "./types.js";
 
@@ -129,13 +130,17 @@ export async function planGithub({ pin, entry, env, exec, resolution }: PlanInpu
   return { commands: [["gh", "auth", "switch", "--hostname", host, "--user", login]], manual };
 }
 
-export async function planVercel({ pin, entry, env, exec, resolution }: PlanInput): Promise<Plan> {
+export async function planVercel({ pin, entry, env, cwd, exec, resolution }: PlanInput): Promise<Plan> {
   if (entry.status === "not-logged-in") return { manual: ["log in: vercel login"] };
   if (entry.status === "unknown") return { manual: [unknownLine(entry)] };
   const identity = identityOf(resolution);
   const commands: string[][] = [];
   const manual: string[] = [];
-  if (identity.team !== pin.team) {
+  // The local config's scope beats the active team (#127), so a team switch would change nothing here.
+  const scope = identity.team !== pin.team ? localScope(cwd, undefined) : undefined;
+  if (typeof scope === "string") {
+    manual.push(`the Vercel config here (vercel.json) sets scope ${quoted(scope)}, which beats the active team; change it to the pinned team ${pin.team}`);
+  } else if (identity.team !== pin.team) {
     const teams = await listTeams(exec, ["--non-interactive"], env);
     if (!Array.isArray(teams)) {
       manual.push(`could not list your teams (${teams.kind === "error" ? teams.message : "logged out"}); switch yourself: vercel teams switch`);
@@ -172,7 +177,13 @@ export async function planGcloud({ pin, entry, env, exec, resolution }: PlanInpu
   const commands: string[][] = [];
   const manual: string[] = [];
   if (pin.account && identity.account?.toLowerCase() !== pin.account.toLowerCase()) {
-    if (env.CLOUDSDK_CORE_ACCOUNT) {
+    if (identity.label === IMPERSONATED) {
+      // "all API requests will be made as the given service account" (gcloud reference), whichever account is
+      // active (#165), so `config set account` would change nothing. The property follows the variable, then the
+      // configuration (`gcloud topic configurations`).
+      const clear = env.CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT ? "unset CLOUDSDK_AUTH_IMPERSONATE_SERVICE_ACCOUNT" : "gcloud config unset auth/impersonate_service_account";
+      manual.push(`${clear}: gcloud acts as that service account, whichever account is active`);
+    } else if (env.CLOUDSDK_CORE_ACCOUNT) {
       manual.push("unset CLOUDSDK_CORE_ACCOUNT: it beats the account in gcloud's configuration");
     } else {
       const res = await exec("gcloud", ["auth", "list", "--format=json"], env);

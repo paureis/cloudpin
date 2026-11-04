@@ -142,7 +142,7 @@ const nonEmpty = (v: unknown): v is string => typeof v === "string" && v !== "";
  * (read up to vercel 50; later versions refuse it and exit). A file Vercel would fail on, or
  * that cloudpin cannot read, is an error: the command's team can't be told.
  */
-function localScope(cwd: string, file: string | undefined): string | undefined | { error: string } {
+export function localScope(cwd: string, file: string | undefined): string | undefined | { error: string } {
   const paths = file !== undefined ? [resolvePath(cwd, file)] : [join(cwd, "vercel.json"), join(cwd, "now.json")];
   const found: unknown[] = [];
   for (const path of paths) {

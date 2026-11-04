@@ -72,14 +72,23 @@ export async function planKubernetes({ pin, entry, env, onPath }: PlanInput): Pr
   return { commands: commandsFor(name), chained: true, notes, manual };
 }
 
-/** helm uses HELM_KUBECONTEXT instead of the current context (helm.sh/docs/helm/helm). */
+/** helm uses its own variables instead of the current context's values (helm.sh/docs/helm/helm), which `use-context` doesn't change. */
 function helmContextLine(config: Kubeconfig, env: NodeJS.ProcessEnv, server: string, namespace: string | undefined): string[] {
+  const lines: string[] = [];
   const name = env.HELM_KUBECONTEXT;
-  if (!name) return [];
-  const ctx = config.contexts.get(name);
-  const s = ctx?.cluster ? config.clusters.get(ctx.cluster)?.server : undefined;
-  const right = s !== undefined && normaliseServer(s) === server && (!namespace || (ctx?.namespace ?? "default") === namespace);
-  return right ? [] : ["unset HELM_KUBECONTEXT: helm uses it instead of the current context"];
+  if (name) {
+    const ctx = config.contexts.get(name);
+    const s = ctx?.cluster ? config.clusters.get(ctx.cluster)?.server : undefined;
+    const right = s !== undefined && normaliseServer(s) === server && (!namespace || (ctx?.namespace ?? "default") === namespace);
+    if (!right) lines.push("unset HELM_KUBECONTEXT: helm uses it instead of the current context");
+  }
+  if (env.HELM_KUBEAPISERVER && normaliseServer(env.HELM_KUBEAPISERVER) !== server) {
+    lines.push("unset HELM_KUBEAPISERVER: helm uses it instead of the current context's server");
+  }
+  if (namespace && env.HELM_NAMESPACE && env.HELM_NAMESPACE !== namespace) {
+    lines.push("unset HELM_NAMESPACE: helm uses it instead of the current context's namespace");
+  }
+  return lines;
 }
 
 const AWS_KEY_VARS = "AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN";

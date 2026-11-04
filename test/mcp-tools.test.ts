@@ -106,7 +106,7 @@ describe("server instructions", () => {
     expect(init.result.instructions).toBe(CLOUDPIN_INSTRUCTIONS);
     expect(init.result.serverInfo).toEqual({ name: "cloudpin", version: "9.9.9" });
     const list = JSON.parse((await handle(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" })))!);
-    expect(list.result.tools.map((t: { name: string }) => t.name)).toEqual(["cloudpin_status", "cloudpin_check", "cloudpin_doctor"]);
+    expect(list.result.tools.map((t: { name: string }) => t.name)).toEqual(["cloudpin_status", "cloudpin_check", "cloudpin_doctor", "cloudpin_switch_plan"]);
   });
 
   it("name every CLI the tools describe, as the skill does", () => {

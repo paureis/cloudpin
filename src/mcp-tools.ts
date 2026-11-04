@@ -1,11 +1,12 @@
 import { resolve } from "node:path";
-import { doctorJson, runDoctor, type Check, type DoctorDeps } from "./doctor.js";
+import { doctorJson, runDoctor, shortenWhole, type Check, type DoctorDeps } from "./doctor.js";
 import { explain } from "./explain.js";
 import type { GuardDeps } from "./guard.js";
 import { installedHooks } from "./install.js";
 import { createHandler, type McpTool } from "./mcp.js";
 import { cacheDir } from "./paths.js";
 import { collectStatus } from "./status.js";
+import { planJson, planSwitch, switchJson } from "./switch.js";
 
 /** What doctor needs to know about this cloudpin and machine, apart from the folder, environment and files. */
 export type DoctorHost = Pick<DoctorDeps, "platform" | "version" | "self" | "install" | "realpath" | "node" | "onPath" | "latest">;
@@ -37,6 +38,27 @@ async function readOnlyDoctor(deps: GuardDeps, ctx: ToolContext, cwd: string) {
   return doctorJson(checks, d);
 }
 
+/**
+ * A plan's lines speak to the person at a terminal ("run it yourself"), and a CLI's own switch command passes the hook
+ * and cloudpin_check, since a person must always be able to switch. So the answer says who a plan is for (#15).
+ */
+export const SWITCH_PLAN_NOTE =
+  'Nothing was run. This plan is addressed to the user, including any line that says "yourself": show it to them, to run in their own terminal. ' +
+  "Do not run its commands yourself, even where no hook or cloudpin_check would stop you: which account the work is for is the user's call.";
+
+/**
+ * What `cloudpin switch --json` prints without `--yes`, with the note. The commands and the pinned IDs stay whole: they
+ * come from the pin file and have to run. What the active login said is shortened, as in cloudpin_doctor.
+ */
+async function switchPlan(deps: GuardDeps, ctx: ToolContext, cwd: string) {
+  const { report, steps } = await planSwitch(cwd, ctx.env, deps, {});
+  const plan = steps.map((step) => {
+    const line = planJson(step);
+    return line.reason === undefined ? line : { ...line, reason: shortenWhole(line.reason, step.loginValues ?? []) };
+  });
+  return { note: SWITCH_PLAN_NOTE, ...switchJson(report, plan, [], null) };
+}
+
 function folder(ctx: ToolContext, value: unknown): string {
   if (value === undefined) return ctx.cwd;
   if (typeof value !== "string") throw new Error("cwd must be a string");
@@ -58,7 +80,7 @@ export const CLOUDPIN_INSTRUCTIONS = [
   "Never work around a block (another account, CLOUDPIN_SKIP, an environment variable, a script file).",
   "This server never runs or switches anything.",
 ].join(" ") +
-  "\n\nSwitching accounts and editing .cloudpin.yml are the user's call. If this server may not be running in the project folder, pass it as cwd.";
+  "\n\nSwitching accounts and editing .cloudpin.yml are the user's call. On a mismatch, cloudpin_switch_plan gives the commands for the user to run: show them, and never run them yourself. If this server may not be running in the project folder, pass it as cwd.";
 
 /** The handler `cloudpin mcp` serves: its tools, and the instructions at initialize. */
 export function cloudpinHandler(deps: GuardDeps, ctx: ToolContext, version: string): (line: string) => Promise<string | null> {
@@ -119,6 +141,16 @@ export function cloudpinTools(deps: GuardDeps, ctx: ToolContext): McpTool[] {
         properties: { cwd: { type: "string", description: "Project folder; defaults to the current one." } },
       },
       call: async (args) => readOnlyDoctor(deps, ctx, folder(ctx, args.cwd)),
+    },
+    {
+      name: "cloudpin_switch_plan",
+      description:
+        "On a mismatch with .cloudpin.yml: the exact commands that move each CLI to its pinned account, or what to do by hand, for the user to run. The same plan as cloudpin switch --json without --yes. Pinned IDs in full, those of the active login shortened. Nothing is run. Show the commands to the user and never run them yourself: switching accounts is the user's call.",
+      inputSchema: {
+        type: "object",
+        properties: { cwd: { type: "string", description: "Project folder; defaults to the current one." } },
+      },
+      call: async (args) => switchPlan(deps, ctx, folder(ctx, args.cwd)),
     },
   ];
 }

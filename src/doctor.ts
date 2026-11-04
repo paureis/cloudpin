@@ -379,6 +379,18 @@ export function formatDoctor(checks: Check[], env: NodeJS.ProcessEnv): string[] 
 const shorten = (value: string) => `…${value.length > 4 ? value.slice(-4) : ""}`;
 
 /**
+ * `text` with these values shortened, as --json does, for text that must keep other values whole (a pinned ID the
+ * user needs in full): only a whole value counts, not one inside a longer ID, name or address.
+ */
+export function shortenWhole(text: string, values: string[]): string {
+  const longestFirst = [...new Set(values)].filter((v) => v && !PUBLIC_VALUES.has(v)).sort((a, b) => b.length - a.length);
+  return longestFirst.reduce((t, v) => {
+    const literal = v.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`);
+    return t.replace(new RegExp(`(?<![\\w.@-])${literal}(?![\\w@-]|\\.\\w)`, "g"), () => shorten(v));
+  }, text);
+}
+
+/**
  * The checks as JSON for a bug report, safe to paste in a public issue:
  * account IDs and names shortened to their last four characters, the home
  * folder written as ~. Nothing in it comes from the environment's values.

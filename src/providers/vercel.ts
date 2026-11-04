@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 import { flagValue } from "../args.js";
+import { DYNAMIC_FOLDER } from "../dynamic-args.js";
 import { home } from "../paths.js";
 import type { Exec, ProviderDef, Resolution } from "../types.js";
 import { HELP_COMMANDS, linkDirs, mainParse, splitShortGroups } from "./vercel-args.js";
@@ -248,7 +249,9 @@ export const vercel: ProviderDef<"vercel"> = {
     if (env.VERCEL_ORG_ID) {
       projectTeams = [env.VERCEL_ORG_ID];
     } else {
-      for (const dir of linkDirs(typed, resolvePath(cwd, flagValue(args, ["--cwd"]) ?? "."))) {
+      const linkFolders = linkDirs(typed, resolvePath(cwd, flagValue(args, ["--cwd"]) ?? "."));
+      if (!linkFolders) return { kind: "error", message: DYNAMIC_FOLDER.problem, fix: DYNAMIC_FOLDER.fix };
+      for (const dir of linkFolders) {
         const linked = linkedTeams(dir, flagValue(args, ["--project"]), home(env));
         if ("error" in linked) return { kind: "error", message: linked.error };
         projectTeams.push(...linked);

@@ -185,8 +185,8 @@ your `can_use_tool` (`canUseTool`) callback. According to the SDK's types, an ap
 
 ## The MCP server: advice, not enforcement
 
-`cloudpin mcp` gives the agent two read-only tools: which account each CLI uses here, and whether cloudpin would allow
-a command (see [cloudpin's MCP server](mcp.md)). An SDK app adds it like any stdio server:
+`cloudpin mcp` gives the agent three read-only tools: which account each CLI uses here, whether cloudpin would allow
+a command, and why cloudpin may not be guarding (see [cloudpin's MCP server](mcp.md)). An SDK app adds it like any stdio server:
 
 ```python
 options = ClaudeAgentOptions(mcp_servers={"cloudpin": {"type": "stdio", "command": "cloudpin", "args": ["mcp"]}})

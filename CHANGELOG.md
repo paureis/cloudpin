@@ -20,10 +20,10 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
 - winget manifests for `paureis.cloudpin` (#96) in `packaging/winget/`: a portable zip installing `cloudpin.exe` as
   the `cloudpin` command. `node scripts/bump-installers.mjs X.Y.Z --winget <dir>` renders them for a release, after
   checking the exe zip against `SHA256SUMS`, and `docs/winget.md` lists the maintainer's steps to submit them.
-- MCP: a third read-only tool, `cloudpin_doctor` (#112): the same report as `cloudpin doctor --json` (cloudpin on
-  PATH, shell wrappers, agent hooks, on Windows the PowerShell execution policy, the pin file and each CLI's account,
-  each with its fix), so an agent can tell you why cloudpin isn't guarding. Account IDs are shortened, and it skips
-  the identity cache check, which writes a file.
+- MCP: two more read-only tools (#112). `cloudpin_doctor`: `cloudpin doctor --json`'s report, so an agent can tell you
+  why cloudpin isn't guarding (IDs shortened; it skips the cache check, which writes a file). `cloudpin_switch_plan`: the
+  plan `cloudpin switch --json` prints without `--yes`, for you to run, pinned IDs in full; nothing is run. The plugin's
+  skill names both.
 - Docs: [Guard a Claude Agent SDK app](docs/agent-sdk.md) (#142). An app that loads project settings needs no code;
   for one that loads none, there is a Python and a TypeScript `PreToolUse` callback that denies on every error.
 - `cloudpin switch [--yes] [--json] [--only <clouds>]` (#14) switches each pinned CLI to its pinned account. It shows a

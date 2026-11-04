@@ -30,9 +30,8 @@ issues it ships. Open an [issue](https://github.com/paureis/cloudpin/issues) to 
 - **Threat model** ([#84](https://github.com/paureis/cloudpin/issues/84)): done. What cloudpin protects against and what
   it doesn't, in THREAT_MODEL.md.
 - **MCP: `cloudpin_switch_plan` and `cloudpin_doctor` tools** ([#112](https://github.com/paureis/cloudpin/issues/112)):
-  two more read-only tools: the commands you would run to move each CLI to the pinned account (from `cloudpin
+  done. Two more read-only tools: the commands you would run to move each CLI to the pinned account (from `cloudpin
   switch`, nothing run), and `cloudpin doctor`'s report, so an agent can say why the hook isn't guarding.
-  `cloudpin_doctor` is done; `cloudpin_switch_plan` follows `cloudpin switch` (#14).
 - **Write-up** ([#114](https://github.com/paureis/cloudpin/issues/114)): why AI agents need an account guardrail, and
   how cloudpin does it, with numbers from the test suite.
 - **Short flags joined with `=`** ([#118](https://github.com/paureis/cloudpin/issues/118)): read `-e=production`

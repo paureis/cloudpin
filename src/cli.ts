@@ -57,7 +57,7 @@ Usage:
                               (one quoted argument is read as a full shell line, bash unless --powershell;
                               --agent: as an agent hook)
   cloudpin mcp                Read-only MCP server for agents (stdio): cloudpin_status, cloudpin_check,
-                              cloudpin_doctor
+                              cloudpin_doctor, cloudpin_switch_plan
   cloudpin doctor [--json]    Check the whole setup (PATH, shell, hooks, pins, CLIs) and say what to fix
                               (--json is safe to paste in a bug report)
   cloudpin use [<env> | --clear]

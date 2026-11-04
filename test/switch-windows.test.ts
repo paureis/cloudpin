@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import { type FoundConfig, findConfig, type Pins } from "../src/config.js";
 import type { GuardDeps } from "../src/guard.js";
 import { providers } from "../src/providers/index.js";
+import { findInvocations } from "../src/shellwords.js";
 import { planSwitch, runSwitch, type SwitchIO } from "../src/switch.js";
 import type { Exec } from "../src/types.js";
+import { envFor } from "../src/user-env.js";
 import { tempDir } from "./tmp.js";
 
 // #14 on Windows, where a variable's name has no case (#119, #136): an override spelled in lowercase is still the
@@ -179,6 +181,14 @@ describe("planSwitch: which environment on Windows", () => {
     const { report, steps } = await planSwitch(dir, { cloudpin_env: "production" }, { providers, exec, platform: "win32", findConfig }, {});
     expect(report.environment?.name).toBe("production");
     expect(steps.map((s) => s.commands)).toEqual([[["gh", "auth", "switch", "--hostname", "github.com", "--user", "me"]]]);
+  });
+});
+
+describe("envFor: CLOUDPIN_ENV_FILE on Windows", () => {
+  it("an agent's line can't set it in any spelling for guard; control: on another platform it is another variable", () => {
+    const [inv] = findInvocations("cloudpin_env_file=/x gh pr list", ["gh"]);
+    expect(envFor({}, inv!, { agent: true, platform: "win32" })).toEqual({});
+    expect(envFor({}, inv!, { agent: true, platform: "linux" })).toEqual({ cloudpin_env_file: "/x" });
   });
 });
 

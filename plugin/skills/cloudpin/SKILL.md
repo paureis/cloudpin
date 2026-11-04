@@ -6,7 +6,7 @@ description: Use before running cloud CLIs (az, aws, gcloud, vercel, gh, kubectl
 # cloudpin
 
 This project pins the cloud accounts it uses in `.cloudpin.yml`. cloudpin stops any cloud CLI command that would run
-on a different account. Three read-only tools let you check first; none runs, switches or changes anything.
+on a different account. Four read-only tools let you check first; none runs, switches or changes anything.
 
 ## Before cloud work
 
@@ -24,6 +24,13 @@ Stop. Show the user cloudpin's reason and its fix, and wait for them to decide. 
 the command another way, never set `CLOUDPIN_SKIP` or `CLOUDPIN_CONFIRM`, never edit `.cloudpin.yml`, and never
 switch accounts yourself. Switching is the user's call, because only they know which account the work is for: you
 may suggest they run `cloudpin switch`, which shows its plan and asks them before switching anything.
+
+On a mismatch, show the user the plan from `cloudpin_switch_plan`. Its commands are for them to run: never run them
+yourself, even when nothing stops you.
+
+## If cloudpin seems not to be guarding
+
+Call `cloudpin_doctor` and tell the user what it finds and its fix.
 
 ## If the tools are missing
 

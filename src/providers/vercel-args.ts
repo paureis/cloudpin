@@ -2,6 +2,7 @@
 import { lstatSync } from "node:fs";
 import { resolve as resolvePath } from "node:path";
 import { hasAnyFlag } from "../args.js";
+import { isDynamic } from "../word-expansion.js";
 
 // Global options (vercel/vercel packages/cli/src/util/arg-common.ts globalCommandOptions; 50.35).
 const GLOBAL_BOOLEAN_FLAGS: Readonly<Record<string, string>> = {
@@ -162,14 +163,18 @@ const isDirectory = (path: string) => {
  * - pull (src/commands/pull/index.ts): `parsedArgs.args[1] || client.cwd`, used unchecked.
  * - dev (src/commands/dev/index.ts): the first argument after "dev" (Vercel refuses a second;
  *   reading the first anyway only adds a check).
+ * Undefined when the word that names the folder is known only when the command runs (#160), or
+ * the first word is: that one may be any command, or the folder itself.
  */
-export function linkDirs(args: string[], base: string): string[] {
+export function linkDirs(args: string[], base: string): string[] | undefined {
   const command = mainParse(args)?.positionals[0];
+  if (command && isDynamic(command)) return undefined;
   const at = (path: string | undefined) => (path ? resolvePath(base, path) : base);
-  if (command === "pull") return [at(argParse(args, PULL, false)?.positionals[1])];
+  const named = (path: string | undefined) => (path && isDynamic(path) ? undefined : [at(path)]);
+  if (command === "pull") return named(argParse(args, PULL, false)?.positionals[1]);
   if (command === "dev" || command === "develop") {
     const words = argParse(args, DEV, false)?.positionals.slice(1) ?? [];
-    return [at(words[0] === "dev" ? words[1] : words[0])];
+    return named(words[0] === "dev" ? words[1] : words[0]);
   }
   if (!command || (command !== "deploy" && COMMANDS.has(command))) return [base];
 
@@ -178,6 +183,7 @@ export function linkDirs(args: string[], base: string): string[] {
   let paths: string[] = [];
   if (sub === "init") paths = strip(strip(argParse(args, DEPLOY_INIT, false)?.positionals ?? [], "deploy"), "init");
   else if (sub !== "continue") paths = strip(argParse(args, DEPLOY, false)?.positionals ?? [], "deploy");
+  if (paths[0] && isDynamic(paths[0])) return undefined;
   const target = paths.length > 0 && isDirectory(at(paths[0])) ? at(paths[0]) : base;
   return command === "deploy" || target === base ? [target] : [base, target];
 }

@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve as resolvePath, sep } from "node:path";
 import { flagValue } from "../args.js";
+import { DYNAMIC_FOLDER } from "../dynamic-args.js";
 import { home } from "../paths.js";
 import type { Exec, ProviderDef, Resolution } from "../types.js";
 import { HELP_COMMANDS, linkDirs, mainParse, splitShortGroups } from "./vercel-args.js";
@@ -20,7 +21,7 @@ const EXEMPT_COMMANDS = new Set(["login", "logout", "switch", "whoami", "help", 
 const TEAMS_COMMANDS = new Set(["teams", "team"]);
 const EXEMPT_TEAMS_SUBCOMMANDS = new Set(["ls", "list", "switch", "change"]);
 
-interface Team {
+export interface Team {
   id: string;
   slug: string;
   current?: boolean;
@@ -59,7 +60,7 @@ const nonEmpty = (v: unknown): v is string => typeof v === "string" && v !== "";
  * (read up to vercel 50; later versions refuse it and exit). A file Vercel would fail on, or
  * that cloudpin cannot read, is an error: the command's team can't be told.
  */
-function localScope(cwd: string, file: string | undefined): string | undefined | { error: string } {
+export function localScope(cwd: string, file: string | undefined): string | undefined | { error: string } {
   const paths = file !== undefined ? [resolvePath(cwd, file)] : [join(cwd, "vercel.json"), join(cwd, "now.json")];
   const found: unknown[] = [];
   for (const path of paths) {
@@ -138,7 +139,7 @@ const MAX_TEAM_PAGES = 25;
  * marked current may be on any of them, and missing it would wrongly mean the
  * Hobby team. Pages that never end, or repeat, fail closed.
  */
-async function listTeams(exec: Exec, common: string[], env: NodeJS.ProcessEnv): Promise<Team[] | Resolution> {
+export async function listTeams(exec: Exec, common: string[], env: NodeJS.ProcessEnv): Promise<Team[] | Resolution> {
   const teams: Team[] = [];
   let next: number | undefined;
   for (let page = 0; page < MAX_TEAM_PAGES; page++) {
@@ -169,6 +170,10 @@ export const vercel: ProviderDef<"vercel"> = {
   name: "vercel",
   bins: ["vercel", "vc"],
   statusCommand: "vercel whoami",
+  // The flags resolve reads (#160).
+  targetFlags: [
+    "--token", "-t", "--global-config", "-Q", "--local-config", "-A", "--scope", "-S", "--team", "-T", "--cwd", "--project",
+  ],
 
   cacheInputs(env) {
     // config.json holds currentTeam (`vercel switch` rewrites it); auth.json is
@@ -248,7 +253,9 @@ export const vercel: ProviderDef<"vercel"> = {
     if (env.VERCEL_ORG_ID) {
       projectTeams = [env.VERCEL_ORG_ID];
     } else {
-      for (const dir of linkDirs(typed, resolvePath(cwd, flagValue(args, ["--cwd"]) ?? "."))) {
+      const linkFolders = linkDirs(typed, resolvePath(cwd, flagValue(args, ["--cwd"]) ?? "."));
+      if (!linkFolders) return { kind: "error", message: DYNAMIC_FOLDER.problem, fix: DYNAMIC_FOLDER.fix };
+      for (const dir of linkFolders) {
         const linked = linkedTeams(dir, flagValue(args, ["--project"]), home(env));
         if ("error" in linked) return { kind: "error", message: linked.error };
         projectTeams.push(...linked);

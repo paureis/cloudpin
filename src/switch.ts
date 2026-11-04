@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { type CheckReport, checkExitCode, formatCheckText, parseCheckArgs, runCheck } from "./check.js";
-import type { GuardDeps, Trace } from "./guard.js";
+import { maskArgv } from "./format.js";
+import { foldEnvNames, type GuardDeps, type Trace } from "./guard.js";
 import { type Candidate, planProvider, type Step } from "./switch-plan.js";
 
 /*
@@ -145,6 +146,43 @@ function describe(c: Candidate): string {
 }
 
 /**
+ * What `cloudpin switch` would do, running no switch command and writing nothing: the check it starts from and one
+ * step per provider, using only the CLIs' read-only listings. On Windows the environment comes back with its names
+ * folded as guard folds them (#119, #136), so every override and path below it is seen in any spelling.
+ */
+export async function planSwitch(
+  cwd: string,
+  typed: NodeJS.ProcessEnv,
+  deps: GuardDeps,
+  opts: { only?: string[] },
+): Promise<{ report: CheckReport; steps: Step[]; env: NodeJS.ProcessEnv }> {
+  const { env } = foldEnvNames(typed, deps.platform ?? process.platform);
+  const traces = new Map<string, Trace>();
+  const report = await runCheck(cwd, env, deps, { ...opts, traces });
+  const steps: Step[] = [];
+  if (report.error !== undefined || report.path === null) return { report, steps, env };
+  for (const entry of report.providers) {
+    const provider = deps.providers.find((p) => p.name === entry.provider)!;
+    const trace = traces.get(entry.provider);
+    steps.push(
+      await planProvider({
+        provider,
+        pin: trace?.pin ?? {},
+        entry,
+        ...(trace?.resolution ? { resolution: trace.resolution } : {}),
+        env,
+        cwd,
+        // The raw exec: the identity cache must never hold these listings.
+        exec: deps.exec,
+        ...(deps.onPath ? { onPath: (bin: string) => deps.onPath!(bin, env) } : {}),
+        envFile: Boolean(env.CLOUDPIN_ENV_FILE),
+      }),
+    );
+  }
+  return { report, steps, env };
+}
+
+/**
  * Runs `cloudpin switch` and returns its exit code: 0 only when every pinned,
  * installed provider matches afterwards (or nothing is pinned, as with check).
  * `deps.exec` runs the planners' read-only listings and the switch commands;
@@ -152,10 +190,9 @@ function describe(c: Candidate): string {
  * environment; `CLOUDPIN_ENV_FILE` in it lets the cloudpin shell function apply
  * AWS_PROFILE afterwards.
  */
-export async function runSwitch(cwd: string, env: NodeJS.ProcessEnv, deps: GuardDeps, opts: SwitchOptions, io: SwitchIO): Promise<number> {
+export async function runSwitch(cwd: string, typed: NodeJS.ProcessEnv, deps: GuardDeps, opts: SwitchOptions, io: SwitchIO): Promise<number> {
   const only = opts.only ? { only: opts.only } : {};
-  const traces = new Map<string, Trace>();
-  const report = await runCheck(cwd, env, deps, { ...only, traces });
+  const { report, steps, env } = await planSwitch(cwd, typed, deps, only);
   const emit = (plan: PlanJson[], ran: RanJson[], after: CheckReport | null) => {
     const json: SwitchJson = {
       result: (after ?? report).result,
@@ -177,26 +214,6 @@ export async function runSwitch(cwd: string, env: NodeJS.ProcessEnv, deps: Guard
   }
 
   const envFile = env.CLOUDPIN_ENV_FILE || undefined;
-  const steps: Step[] = [];
-  for (const entry of report.providers) {
-    const provider = deps.providers.find((p) => p.name === entry.provider)!;
-    const trace = traces.get(entry.provider);
-    steps.push(
-      await planProvider({
-        provider,
-        pin: trace?.pin ?? {},
-        entry,
-        ...(trace?.resolution ? { resolution: trace.resolution } : {}),
-        env,
-        cwd,
-        // The raw exec: the identity cache must never hold these listings.
-        exec: deps.exec,
-        ...(deps.onPath ? { onPath: (bin: string) => deps.onPath!(bin, env) } : {}),
-        envFile: envFile !== undefined,
-      }),
-    );
-  }
-
   const canChoose = io.isTTY && !opts.yes && !opts.json;
   if (opts.json && !opts.yes) {
     emit(steps.map(planJson), [], null);
@@ -271,8 +288,9 @@ export async function runSwitch(cwd: string, env: NodeJS.ProcessEnv, deps: Guard
         say("    ok");
       } else {
         failed = true;
+        // A CLI's own words: a value after a secret flag is masked, as in every other message (#134).
         const first = res.stderr.split(/\r?\n/).map((l) => l.trim()).find(Boolean)?.slice(0, 200);
-        say(`    failed (exit ${res.code})${first ? `: ${first}` : ""}`);
+        say(`    failed (exit ${res.code})${first ? `: ${maskArgv(["", ...first.split(" ")]).slice(1).join(" ")}` : ""}`);
       }
     }
     if (action.awsProfile !== undefined && envFile !== undefined) {

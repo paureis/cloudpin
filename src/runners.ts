@@ -35,7 +35,7 @@ export interface Run {
   here?: boolean;
   /** `bash -a` or `-o allexport`: its lines start as after `set -a` (#163). */
   allexport?: boolean;
-  /** `trap`: its lines run later, in this shell, seeing what the line has left by then (#163). */
+  /** `trap`: its lines run later too, in this shell, seeing what the line has left by then (#163). */
   later?: boolean;
 }
 
@@ -90,7 +90,8 @@ function shell(args: Arg[]): Run {
     if (!flags) break;
     const on = flags[1] === "-";
     for (const letter of flags[2]!) {
-      if (on && letter === "c") command = true;
+      // Real Git Bash takes +c for -c too.
+      if (letter === "c") command = true;
       if (on && letter === "s") input = true;
       if (on && letter === "a") allexport = true;
       if (letter === "o" || letter === "O") {
@@ -108,12 +109,12 @@ function shell(args: Arg[]): Run {
   return options;
 }
 
-/** `trap [--] string signal...` (bash(1), trap): one word alone, or -, resets; -l and -p print. */
+/** `trap [--] string signal...` (bash(1), trap): one word alone resets; a `-`, -l or -p as the string runs nothing. */
 function trap(args: Arg[]): Run {
   const words = args[0]?.raw === "--" ? args.slice(1) : args;
   const string = words[0];
-  if (!string || words.length === 1 || string.raw === "-" || /^-[lp]+$/.test(string.raw)) return {};
-  return { lines: [{ text: string.value ?? string.raw, dialect: "bash" }], here: true, later: true };
+  if (!string || words.length === 1) return {};
+  return { lines: [{ text: string.value ?? string.raw, dialect: "bash" }], later: true };
 }
 
 /** `. file` is a script, not read; what a <( ) prints, or standard input, is text the line gives it. */

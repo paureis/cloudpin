@@ -233,7 +233,7 @@ function analyse(
     // Each line is read with the rules of the shell that runs it (#159); a shell without a script reads
     // its commands from standard input: `bash <<EOF`, `pwsh -Command - <<EOF`, `'...' | iex`.
     for (const { text, dialect } of [...(run.lines ?? []), ...(run.stdin ? stdin.map((text) => ({ text, dialect: run.stdin! })) : [])]) {
-      runLine(text, dialect, out, env, run.later ? child(state) : run.allexport ? { ...state, allexport: true } : state, run.here);
+      runLine(text, dialect, out, env, run.allexport ? { ...state, allexport: true } : state, run.here);
       if (run.later) state.atExit = [...(state.atExit ?? []), text];
     }
     const started = forCall(state, run.cwd === undefined ? {} : { cwd: run.cwd }, child);

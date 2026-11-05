@@ -4,8 +4,8 @@ import type { EnvArg } from "./line-env.js";
 import type { State } from "./line-state.js";
 import type { Words } from "./ps-words.js";
 import { type Token, tokenize } from "./shell-tokens.js";
-import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_FOLDER } from "./types.js";
-import { isDynamic, substitute, type Variables } from "./word-expansion.js";
+import { DYNAMIC_WORDS, UNKNOWN_FOLDER } from "./types.js";
+import { substitute, type Variables } from "./word-expansion.js";
 
 /**
  * Text that runs, unread (#163): what a pipe hands a shell, an alias. What can be read is read; for the rest a guarded
@@ -43,8 +43,7 @@ function onlyExempt(name: string, state: State): boolean {
 
 /** Guarded CLI names that appear as whole words in `text`, the whole line by default, other than to ask what it is. */
 export function namedClis(state: State, text = state.line): string[] {
-  const typed = text.split(DYNAMIC_WORDS).join(" ").split(DYNAMIC_WORD).join(" ");
-  return [...state.guarded].filter((name) => mention(name).test(typed) && !onlyExempt(name, state));
+  return [...state.guarded].filter((name) => mention(name).test(text) && !onlyExempt(name, state));
 }
 
 /**
@@ -54,7 +53,7 @@ export function namedClis(state: State, text = state.line): string[] {
  */
 export function cantTell(text: string, wholeLine: boolean, out: Invocation[], env: Record<string, string>, state: State): void {
   for (const name of new Set([...namedClis(state, text), ...(wholeLine ? namedClis(state) : [])])) {
-    const read = out.filter((call) => commandName(call.bin) === name && call.args[0] !== DYNAMIC_WORDS).length;
+    const read = out.filter((call) => commandName(call.bin) === name).length;
     if (read < [...state.line.matchAll(mention(name, "g"))].length) out.push(invocation(name, [DYNAMIC_WORDS], env, state));
   }
 }
@@ -124,10 +123,10 @@ function readSetAlias(args: EnvArg[], state: State, vars: Variables): "read" | "
   const read = (a: EnvArg | undefined) => (a?.expansions ? substitute(a.raw, a.expansions, vars) : a?.raw);
   const nameArg = named.name ?? rest.shift();
   const valueArg = named.value ?? rest.shift();
-  const name = read(nameArg);
   if (!nameArg || !valueArg) return "read";
-  if (name === undefined) return "unknown";
-  state.aliases = { ...state.aliases, [commandName(name)]: read(valueArg) ?? DYNAMIC_WORDS };
+  const [name, value] = [read(nameArg), read(valueArg)];
+  if (name === undefined || value === undefined) return "unknown";
+  state.aliases = { ...state.aliases, [commandName(name)]: value };
   return "read";
 }
 
@@ -141,11 +140,9 @@ function readBashAlias(name: string, args: EnvArg[], state: State, vars: Variabl
       else delete next[arg.raw];
       continue;
     }
-    if (!arg.expansions && arg.raw.startsWith("-")) continue;
     const text = arg.expansions ? substitute(arg.raw, arg.expansions, vars) : arg.raw;
-    const set = /^([^=]+)=(.*)$/s.exec(text ?? arg.raw);
-    if (set && text !== undefined) next[set[1]!] = set[2]!;
-    else if (set && !/[$<`]/.test(set[1]!)) next[set[1]!] = DYNAMIC_WORDS;
+    const set = text === undefined ? null : /^([^=]+)=(.*)$/s.exec(text);
+    if (set) next[set[1]!] = set[2]!;
     else if (text === undefined) result = "unknown";
   }
   state.aliasesNext = next;
@@ -176,7 +173,6 @@ export function withAlias([words, quoted, dynamic, expansions]: Words, i: number
   const key = powershell ? commandName(words[i]!) : words[i]!;
   const text = dynamic[i] || (quoted[i] && !powershell) ? undefined : state.aliases?.[key];
   if (text === undefined) return undefined;
-  if (isDynamic(text)) return "unknown";
   const tokens = powershell ? [{ kind: "word" as const, value: text, quoted: false, dynamic: false }] : tokenize(text);
   const parts = tokens.flatMap((t) => (t.kind === "word" ? [t] : []));
   if (parts.length !== tokens.length) return "unknown";

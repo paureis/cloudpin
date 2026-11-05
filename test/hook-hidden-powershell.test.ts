@@ -51,22 +51,34 @@ describe("PowerShell: text piped into a shell (#163)", () => {
   });
 });
 
+/** Each shape, with a host that isn't the pinned one, denies: only a call read through the alias can. The pinned one passes. */
+function throughAlias(shapes: string[]) {
+  it.each(shapes)("reads %j", async (shape) => {
+    const fill = (host: string) => shape.split("CALL").join(`--hostname ${host} pr list`);
+    expect((await hook(fill("other.example"), PS)).decision).toBe("deny");
+    expect((await hook(fill("github.com"), PS)).decision).toBe("allow");
+  });
+}
+
 describe("PowerShell: Set-Alias works from the next statement on (#163)", () => {
-  followed(PS, [
-    `Set-Alias a gh; ${SET}; a pr list`,
-    `Set-Alias -Name a -Value gh; ${SET}; a pr list`,
-    `Set-Alias -Name:a -Value:gh; ${SET}; a pr list`,
-    `Set-Alias a -Value gh -Force; ${SET}; a pr list`,
-    `Set-Alias -Scope Global a gh; ${SET}; a pr list`,
-    `Set-Alias -Option AllScope -Description 'x y' a gh; ${SET}; a pr list`,
-    `sal a gh; ${SET}; a pr list`,
-    `New-Alias a gh; ${SET}; a pr list`,
-    `nal a gh; ${SET}; & a pr list`,
-    `Set-Alias a gh; ${SET}; A pr list`,
-    `$x='gh'; Set-Alias a $x; ${SET}; a pr list`,
-    `Set-Alias a gh.exe; ${SET}; a pr list`,
-    `if ($true) { Set-Alias a gh }; ${SET}; a pr list`,
-    `Set-Alias b a; Set-Alias a gh; ${SET}; b pr list`,
+  throughAlias([
+    "Set-Alias a gh; a CALL",
+    "Set-Alias -Name a -Value gh; a CALL",
+    "Set-Alias -Name:a -Value:gh; a CALL",
+    "Set-Alias a -Value gh -Force; a CALL",
+    "Set-Alias -Force a gh; a CALL",
+    "Set-Alias -Scope Global a gh; a CALL",
+    "Set-Alias -Option AllScope -Description 'x y' a gh; a CALL",
+    "sal a gh; a CALL",
+    "New-Alias a gh; a CALL",
+    "nal a gh; & a CALL",
+    "Set-Alias a gh; A CALL",
+    "Set-Alias A gh; a CALL",
+    "$x='gh'; Set-Alias a $x; a CALL",
+    "Set-Alias a gh.exe; a CALL",
+    "if ($true) { Set-Alias a gh }; a CALL",
+    "Set-Alias b a; Set-Alias a gh; b CALL",
+    "Set-Alias a gh; a --version; a CALL",
   ]);
 
   it.each([
@@ -163,10 +175,7 @@ describe("PowerShell: a bare & $c (#163)", () => {
     "& (echo 'CLI')",
   ]);
 
-  followed(PS, [
-    `$c='gh'; ${SET}; & $c pr list`,
-    `${SET}; & $env:CMD pr list; gh pr list`,
-  ]);
+  throughAlias(["$c='gh'; & $c CALL", "& $env:CMD CALL; echo gh"]);
 
   it.each(["$c='gh pr list'; & $c", "$c; echo 'gh pr list'", "$c", "$env:CMD; echo 'gh pr list'", "if ($c) { }; echo 'gh pr list'", "return $c; echo 'gh pr list'", "throw $c; echo 'gh pr list'", ". $f; echo 'gh pr list'"])("no call: %s", async (line) => {
     expect((await hook(line, PS)).decision).toBe("allow");
@@ -231,6 +240,11 @@ describe("explain and cloudpin_check read the line as the hook does (#163)", () 
     expect((await hook(`export CLOUDPIN_SKIP=1; cat f | bash; ${CALL}`, "Bash")).decision).toBe("deny");
     expect((await hook(`cat f | bash; ${CALL}`, "Bash", { CLOUDPIN_SKIP: "1" })).decision).toBe("deny");
     expect((await hook(`$env:CLOUDPIN_SKIP='1'; gc f | iex; ${CALL}`, PS)).decision).toBe("deny");
+  });
+
+  it("a trap's call is listed once when nothing changed before the end, and twice when something did", async () => {
+    expect(await explain(`trap '${CALL}' EXIT`, { mode: "agent", cwd: pinned, env: {}, shell: "bash" }, deps)).toHaveLength(1);
+    expect(await explain(`trap '${CALL}' EXIT; export FOO=1`, { mode: "agent", cwd: pinned, env: {}, shell: "bash" }, deps)).toHaveLength(2);
   });
 
   it("findInvocations alone keeps every refusal: only the check knows what is exempt", () => {

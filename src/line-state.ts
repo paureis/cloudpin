@@ -44,7 +44,7 @@ export interface State {
   marked?: string[];
   /** Names `local` set, which end with their function (#163). */
   locals?: string[];
-  /** What each alias of this line stands for (#163), by name; DYNAMIC_WORDS when the line can't say. */
+  /** What each alias of this line stands for, by name (#163). */
   aliases?: Record<string, string>;
   /** bash reads a whole line before it runs any of it: the aliases the next line will see (#163). */
   aliasesNext?: Record<string, string>;

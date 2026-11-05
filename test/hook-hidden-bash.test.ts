@@ -38,6 +38,8 @@ describe("bash: text piped into a shell (#163)", () => {
     "echo 'GH_TOKEN=VALUE gh pr list' > f",
     "echo 'GH_TOKEN=VALUE gh pr list'",
     "echo 'GH_TOKEN=VALUE gh pr list' || bash",
+    "echo 'GH_TOKEN=VALUE gh pr list' ||\nbash",
+    "echo x |& export GH_TOKEN=VALUE",
     "echo 'GH_TOKEN=VALUE gh pr list' && bash",
     "cat <<X\nGH_TOKEN=VALUE gh pr list\nX",
   ]);
@@ -54,6 +56,8 @@ describe("bash: text piped into a shell (#163)", () => {
     "cat f | powershell -; echo CLI",
     "bash <<< \"$(echo CLI)\"",
     "bash < <(echo CLI)",
+    "echo \"$X CLI\" | bash",
+    "cat f <<X | bash\nCLI\nX",
   ]);
 
   // Nothing on the line names a guarded CLI, so a refusal has no CLI to stop: `curl ... | bash` must not stop every
@@ -67,6 +71,7 @@ describe("bash: text piped into a shell (#163)", () => {
     expect(stopped.decision).toBe("deny");
     expect(stopped.reason).toContain(HIDDEN);
     expect((await hook("cat f | bash; gh --version", BASH)).decision).toBe("allow");
+    expect((await hook("cat f | bash; gh --version > v; gh auth status 2>&1", BASH)).decision).toBe("allow");
     expect((await hook("gh --version > v; gh auth status 2>&1; cat f | bash", BASH)).decision).toBe("allow");
     expect((await hook(`gh --version; cat f | bash; ${CALL}`, BASH)).decision).toBe("deny");
   });
@@ -89,6 +94,11 @@ describe("bash: text piped into a shell (#163)", () => {
     }
   });
 
+  it("output sent to a process substitution isn't input", async () => {
+    expect((await hook("bash > >(tee log); echo gh pr list", BASH)).decision).toBe("allow");
+    expect((await hook("bash < <(cat f); echo gh pr list", BASH)).decision).toBe("deny");
+  });
+
   it("a heredoc wins over the pipe, as the shell's redirection does", async () => {
     expect((await hook(`true | bash <<E\ngh pr list\nE`, BASH)).decision).toBe("allow");
     expect((await hook(`cat f | bash <<E\nGH_TOKEN=${WRONG} gh pr list\nE`, BASH)).decision).toBe("deny");
@@ -103,6 +113,10 @@ describe("bash: text piped into a shell (#163)", () => {
     expect((await hook("while ($true) { gh pr list }", BASH)).decision).toBe("allow");
     expect((await hook("($x); echo gh pr list", BASH)).decision).toBe("deny");
     expect((await hook("if $x; then echo gh pr list; fi", BASH)).decision).toBe("deny");
+    expect((await hook("$x || echo gh pr list", BASH)).decision).toBe("deny");
+    expect((await hook("echo gh pr list | $y", BASH)).decision).toBe("deny");
+    // A value here, not in the line a shell runs before the pipe.
+    expect((await hook("bash -c '$c' | tee f; echo gh pr list", BASH)).decision).toBe("deny");
   });
 
   it("the marker for what can't be read doesn't name cloudpin itself", async () => {
@@ -127,6 +141,7 @@ describe("bash: bash -c reads its options as bash does (#163)", () => {
     "bash --rcfile /dev/null -c 'GH_TOKEN=VALUE gh pr list'",
     "bash -c -O extglob 'GH_TOKEN=VALUE gh pr list'",
     "bash +x -c 'GH_TOKEN=VALUE gh pr list'",
+    "bash +c 'GH_TOKEN=VALUE gh pr list'",
     "bash -c +x 'GH_TOKEN=VALUE gh pr list'",
     "bash -e -c -u 'GH_TOKEN=VALUE gh pr list'",
     "sh -c -e 'GH_TOKEN=VALUE gh pr list'",
@@ -346,6 +361,7 @@ describe("bash: a bare $c, whose value the line can't say (#163)", () => {
 describe("bash: aliases reach the lines after theirs (#163)", () => {
   followed(BASH, [
     "alias a=gh\nGH_TOKEN=VALUE a pr list",
+    "alias a=gh\na --version\nGH_TOKEN=VALUE a pr list",
     "shopt -s expand_aliases\nalias a=gh\nGH_TOKEN=VALUE a pr list",
     "alias a='gh pr'\nGH_TOKEN=VALUE a list",
     "alias x=ls a=gh\nGH_TOKEN=VALUE a pr list",
@@ -383,6 +399,14 @@ describe("bash: aliases reach the lines after theirs (#163)", () => {
     const wrong = await hook(`alias gh='GH_TOKEN=${WRONG} gh'\ngh pr list`, BASH);
     expect(wrong.decision).toBe("deny");
     expect(wrong.reason).toContain("someone-else");
+  });
+});
+
+describe("bash: a line PowerShell would read, read as bash (#163)", () => {
+  it("what can't be read stays unknown, with $( ) now in its word", async () => {
+    const stopped = await hook(`$env:GH_TOKEN=$(cat f); ${CALL}`, BASH);
+    expect(stopped.decision).toBe("deny");
+    expect(stopped.reason).toContain("GH_TOKEN is set by the command line");
   });
 });
 

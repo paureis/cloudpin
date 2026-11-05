@@ -45,6 +45,10 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Security
 
+- On Windows, cmd.exe reads the arguments of a `.cmd` or `.bat` CLI (az, npm's shims) again, so in PowerShell
+  `--query 'x&kubectl'` also ran kubectl and `--subs^cription other` reached the CLI as `--subscription other`. An unquoted
+  `&`, `|`, `<`, `>`, `^` or `)`, a newline or `%NAME%` there is now "can't tell" when a pin is in play. `gh.exe` and other
+  `.exe` CLIs are unaffected, as is Git Bash unless the `.cmd` name is typed (#168).
 - A guarded CLI in text a line runs was never checked: `echo '...' | bash`, `cat <<X | bash`, `trap '...' EXIT`,
   `${x:-$(az ...)}`, `bash -c -e '...'`, `alias` on a later line, `Set-Alias`. Each is now read. What cloudpin can't read
   stops the CLIs the line names as "can't tell" when a pin is in play: `eval "$(...)"`, `sh -c "$(...)"`, `source <(...)`,

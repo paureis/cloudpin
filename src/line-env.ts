@@ -67,10 +67,6 @@ function readRead(list: string[], state: State): void {
   let k = 0;
   for (; k < list.length; k++) {
     const word = list[k]!;
-    if (word === "--") {
-      k++;
-      break;
-    }
     if (!word.startsWith("-") || word === "-" || isDynamic(word)) break;
     const at = word.slice(1).search(/[adinNptu]/) + 1;
     if (at === 0) continue;
@@ -151,7 +147,8 @@ const PS_ITEMS = new Map<string, Item>([
   ["rename-item", "move"], ["rni", "move"], ["ren", "move"], ["copy-item", "move"], ["cpi", "move"], ["cp", "move"], ["copy", "move"],
 ]);
 const ENV_PATH = /(^|,)\s*env:/i;
-const ENV_NAME = /^env:[\\/]*([^*?[\],$`\s]*)$/i;
+const ENV_NAME = /^env:[\\/]*(.*)$/is;
+const PS_NAME = /^[\w.-]+$/;
 const sameName = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 /** Whether PowerShell's environment holds `name`, which it spells any way. */
@@ -234,8 +231,8 @@ function readPsItem(item: Item, args: EnvArg[], state: State, vars: Variables, p
   const text = path.expansions ? substitute(path.raw, path.expansions, vars) : path.raw;
   if (!ENV_PATH.test(text ?? path.raw)) return;
   const pathName = text === undefined ? null : ENV_NAME.exec(text);
-  const name = pathName?.[1] || (named && !named.expansions ? named.raw : undefined);
-  if (!name || !NAME.test(name.replace(/[().-]/g, "_"))) {
+  const name = pathName?.[1] || named?.raw;
+  if (!name || !PS_NAME.test(name)) {
     state.envUnknown = true;
     return;
   }
@@ -268,7 +265,7 @@ function splitArguments(text: string): string[] {
       part = "";
     } else part += c;
   }
-  return text.trim() === "" ? [] : [...parts, part];
+  return [...parts, part];
 }
 
 /** One literal argument, or undefined: '...', "..." with nothing to expand, $null, a number, `[Enum]::Name`. */

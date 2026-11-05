@@ -46,10 +46,15 @@ describe("bash: set -a and set -o allexport export what follows (#163)", () => {
     "bash -c 'set -a'; GH_TOKEN=VALUE",
     "bash -a -c 'GH_TOKEN=VALUE'",
     "bash -c 'GH_TOKEN=VALUE; gh pr list'",
+    "bash -c 'GH_TOKEN=VALUE; gh pr list' -a",
+    "(export GH_TOKEN); GH_TOKEN=VALUE",
+    "export GH_TOKEN; export -n GH_TOKEN; GH_TOKEN=VALUE",
   ]);
 
   it("a set -a only the shell can read refuses what follows", async () => {
     expect((await hook(`set $V; ${CALL}`, BASH)).decision).toBe("deny");
+    expect((await hook(`set -$(cat f); ${CALL}`, BASH)).decision).toBe("deny");
+    expect((await hook(`set -o $V; ${CALL}`, BASH)).decision).toBe("deny");
     expect((await hook(`set -- $V; ${CALL}`, BASH)).decision).toBe("allow");
     expect((await hook(`set "$(cat f)"; ${CALL}`, BASH)).decision).toBe("allow");
   });
@@ -75,6 +80,7 @@ describe("bash: export X+=y and the other assignments (#163)", () => {
     "V=GH_TOKEN=VALUE; export $V",
     'V=GH_TOKEN=VALUE; export "$V"',
     "export GH_TOKEN; GH_TOKEN=VALUE",
+    "V=GH_TOKEN; GH_TOKEN=VALUE; export $V",
     "declare -x GH_TOKEN; GH_TOKEN=VALUE",
     "f(){ local -x GH_TOKEN=VALUE; gh pr list; }; f",
     "f(){ local -rx GH_TOKEN=VALUE; gh pr list; }; f",
@@ -97,6 +103,8 @@ describe("bash: export X+=y and the other assignments (#163)", () => {
     expect(await value("GH_TOKEN=c; export GH_TOKEN+=b", { GH_TOKEN: "a" })).toBe("cb");
     expect(await value("unset GH_TOKEN; export GH_TOKEN+=b", { GH_TOKEN: "a" })).toBe("b");
     expect(await value("GH_TOKEN+=b gh pr list; true", { GH_TOKEN: "a" })).toBe("ab");
+    expect(await value("N=b; export GH_TOKEN+=$N")).toBe("b");
+    expect(await value("V=GH_TOKEN+=b; export $V", { GH_TOKEN: "a" })).toBe("ab");
     // Plain, and never exported: it doesn't reach the CLI.
     expect(await value("GH_TOKEN+=b")).toBeUndefined();
   });
@@ -127,6 +135,9 @@ describe("bash: export X+=y and the other assignments (#163)", () => {
     expect(after.decision).toBe("deny");
     expect(after.reason).toContain(NAMED);
     expect((await hook(`f(){ local -x FOO=${WRONG}; ${CALL}; }; f; ${CALL}`, BASH)).decision).toBe("allow");
+    // Only its own function's end, once, and not a local of a subshell.
+    expect((await hook(`f(){ local -x GH_TOKEN=x; }; export GH_TOKEN=${RIGHT}; { true; }; ${CALL}`, BASH)).decision).toBe("allow");
+    expect((await hook(`export GH_TOKEN=${RIGHT}; f(){ (local -x GH_TOKEN=x); }; ${CALL}`, BASH)).decision).toBe("allow");
   });
 
   it("export -n and declare +x take the variable from the commands", async () => {
@@ -139,6 +150,7 @@ describe("bash: export X+=y and the other assignments (#163)", () => {
     expect((await hook(`export -n GH_TOKEN; export GH_TOKEN; ${CALL}`, BASH, env)).decision).toBe("deny");
     expect((await hook(`export GH_TOKEN=${WRONG}; export -n GH_TOKEN; ${CALL}`, BASH)).decision).toBe("allow");
     expect((await hook(`export -n FOO; ${CALL}`, BASH, env)).decision).toBe("deny");
+    expect((await hook(`export -n GH_TOKEN=x; ${CALL}`, BASH, env)).decision).toBe("allow");
   });
 
   it("export -p, -f and declare -p, -f set nothing, whatever follows", async () => {
@@ -244,7 +256,7 @@ describe("bash: read names what it sets (#163)", () => {
 
   it("the flag's value is not the name", async () => {
     const env = { GH_TOKEN: RIGHT };
-    for (const line of ["read -p GH_TOKEN", "read -t 1", "read -d GH_TOKEN FOO", "read", "read -r", "read -a FOO", "read -ra FOO", "read FOO BAR"]) {
+    for (const line of ["read -p GH_TOKEN", "read -r -p GH_TOKEN FOO", "read -t 1", "read -d GH_TOKEN FOO", "read", "read -r", "read -a FOO", "read -ra FOO", "read FOO BAR"]) {
       expect((await hook(`${line}; ${CALL}`, BASH, env)).decision, line).toBe("allow");
     }
   });

@@ -25,6 +25,9 @@ describe("PowerShell: every literal way to set a variable is followed (#163)", (
     '$s=\'VALUE\'; ${env:GH_TOKEN}="x$s"',
     "Set-Item env:GH_TOKEN VALUE",
     "Set-Item env:GH_TOKEN 'VALUE'",
+    "Set-Item env:GH_TOKEN '-VALUE'",
+    "$n='GH_TOKEN'; Set-Item -Path:env:$n VALUE",
+    "Remove-Item env:GH_TOKEN; New-Item env:GH_TOKEN -Value VALUE",
     'Set-Item env:GH_TOKEN "VALUE"',
     "set-item ENV:GH_TOKEN VALUE",
     "Set-Item Env:\\GH_TOKEN VALUE",
@@ -51,6 +54,7 @@ describe("PowerShell: every literal way to set a variable is followed (#163)", (
     "[environment]::setenvironmentvariable('GH_TOKEN','VALUE')",
     '[Environment]::SetEnvironmentVariable("GH_TOKEN","VALUE")',
     "[Environment]::SetEnvironmentVariable('GH_TOKEN', 'VALUE')",
+    "[Environment]::SetEnvironmentVariable('GH_TOKEN','VALUE,x')",
     "[Environment]::SetEnvironmentVariable( 'GH_TOKEN' , 'VALUE' )",
     "[Environment]::SetEnvironmentVariable('GH_TOKEN','VALUE','Process')",
     "[Environment]::SetEnvironmentVariable('GH_TOKEN','VALUE','process')",
@@ -64,6 +68,7 @@ describe("PowerShell: every literal way to set a variable is followed (#163)", (
   notSet(PS, [
     "if ($true) { $s='x' }",
     "Set-Variable env:GH_TOKEN VALUE",
+    "Set-Item env:MY-VAR.A VALUE",
     "Set-Item Variable:GH_TOKEN VALUE",
     "Set-Content notes.txt 'env:GH_TOKEN'",
     "Set-Content env.txt VALUE",
@@ -81,6 +86,7 @@ describe("PowerShell: every literal way to set a variable is followed (#163)", (
     "[Environment]::SetEnvironmentVariable('GH_TOKEN','VALUE',1)",
     "[Environment]::SetEnvironmentVariable('GH_TOKEN','VALUE',2)",
     "[Environment]::GetEnvironmentVariable('GH_TOKEN','VALUE')",
+    "[Environment]::SetEnvironmentVariable('GH_TOKEN',(Get-Content 'a','VALUE'),'User')",
   ]);
 
   it("+= adds to what the variable holds", async () => {
@@ -187,6 +193,9 @@ describe("PowerShell: a value only known when it runs stops the variable that pi
     "$env:NAME+=$y",
     "[string]$env:NAME=$y",
     "$env:NAME-='y'",
+    "$env:NAME=$y; $env:NAME+='b'",
+    "Remove-Item env:NAME x",
+    "New-Item env:NAME x -Value y",
     "$env:NAME='a','b'",
     "$env:NAME = 'a' + 'b'",
     "Set-Item env:NAME $y",
@@ -273,6 +282,8 @@ describe("PowerShell: what only the shell can read makes later calls can't tell 
     "Remove-Item env:GH_*",
     "Remove-Item env:$n",
     "Remove-Item -Path env:FOO, env:GH_TOKEN",
+    "Remove-Item x.txt, env:GH_TOKEN",
+    "Remove-Item -Path x.txt,env:GH_TOKEN",
     "Remove-Item Env:\\$n",
     "New-Item -Path env: -Name $n -Value x",
     "New-Item env:$n -Value x",
@@ -295,6 +306,7 @@ describe("PowerShell: what only the shell can read makes later calls can't tell 
 
   it("a dot-sourced call is still read, and a path that isn't env: passes", async () => {
     expect((await hook(`. gh pr list`, PS, { GH_TOKEN: WRONG })).decision).toBe("deny");
+    expect((await hook(`. gh pr list`, PS, { GH_TOKEN: RIGHT })).decision).toBe("allow");
     expect((await hook(`Remove-Item $f; ${CALL}`, PS)).decision).toBe("allow");
     expect((await hook(`Set-Content $f 'x'; ${CALL}`, PS)).decision).toBe("allow");
     expect((await hook(`Set-Content x.yml 'env: prod'; ${CALL}`, PS)).decision).toBe("allow");

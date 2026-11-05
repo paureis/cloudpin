@@ -51,7 +51,7 @@ export function psVariables(state: PsState): Variables {
   };
 }
 
-const ASSIGNMENT = /^(?:\[[\w.[\]]+\])*\$(?:(?:script|global|local|private):)?([A-Za-z_]\w*)([-+*/%]?=)?/i;
+const ASSIGNMENT = /^\$(?:(?:script|global|local|private):)?([A-Za-z_]\w*)([-+*/%]?=)?/i;
 // `$env:X` and `${env:X}`, with a cast or not (#163): PowerShell takes them all.
 const ENV_ASSIGNMENT = /^(?:\[[\w.[\]]+\])*\$(?:env:([A-Za-z_]\w*)|\{env:([^}]+)\})([-+*/%]?=)?/i;
 const NUMBER = /^-?\d+(\.\d+)?$/;

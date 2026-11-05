@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { realpathSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { explain } from "../src/explain.js";
@@ -221,6 +221,8 @@ describe("explain and cloudpin_check read the line as the hook does (#163)", () 
     expect(JSON.parse(out!).permission).toBe("deny");
     const passes = await runHook(AGENTS.cursor, input(`echo x; ${CALL}`), deps, {}, undefined, "win32");
     expect(JSON.parse(passes!).permission).toBe("allow");
-    expect(resolve(pinned)).toBe(pinned);
+    // A shell it can't name reads ${env:X} the same in both readings, as it does $env:X.
+    const curly = await runHook(AGENTS.cursor, input(`\${env:GH_TOKEN}='${RIGHT}'; ${CALL}`), deps, { GH_TOKEN: WRONG }, undefined, "win32");
+    expect(JSON.parse(curly!).permission).toBe("allow");
   });
 });

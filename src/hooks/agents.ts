@@ -273,6 +273,7 @@ async function checkCommand(
         bin: inv.bin,
         args: inv.args,
         env: envFor(env, inv, { agent: true }),
+        before: env,
         cwd: inv.cwd ?? call.cwd,
         mode: "agent",
       },

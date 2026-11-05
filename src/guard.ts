@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { envNameMatches } from "./cache.js";
 import { dynamicTarget } from "./dynamic-args.js";
+import { codeVarsSet, codeVarsStop } from "./line-code-env.js";
 import { isReadOnly } from "./readonly.js";
 import { type Exec, type ProviderDef, type Resolution, UNKNOWN_VALUE } from "./types.js";
 
@@ -11,6 +12,11 @@ export interface GuardRequest {
   args: string[];
   env: NodeJS.ProcessEnv;
   cwd: string;
+  /**
+   * The environment the line starts in, when cloudpin read the call from a line: what `env` changes from it, the line
+   * set. Absent for `cloudpin exec`, whose whole environment is the person's.
+   */
+  before?: NodeJS.ProcessEnv;
   /** "agent" ignores CLOUDPIN_SKIP and CLOUDPIN_CONFIRM, so an agent cannot opt itself out. */
   mode: "shell" | "agent";
 }
@@ -27,6 +33,8 @@ export interface GuardDeps {
    * not installed when none of its commands is found, since some providers never spawn it (#75).
    */
   onPath?: (bin: string, env: NodeJS.ProcessEnv) => string | null;
+  /** The platform the command runs on, for how the line's variable names are read. Defaults to this process's. */
+  platform?: NodeJS.Platform;
 }
 
 /** False only when `onPath` is given and finds none of the provider's commands. */
@@ -128,6 +136,13 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
     if (result.notFound) cliMissing = true;
     return result;
   };
+  // A variable the line set that can make the CLI run code, before resolve, so no process starts with it.
+  const platform = deps.platform ?? process.platform;
+  const codeVars = req.before ? codeVarsSet(req.before, req.env, platform) : [];
+  if (codeVars.length > 0) {
+    const { problem, fix } = codeVarsStop(codeVars);
+    return { ...base, uncertain: true, problems: [problem], fix };
+  }
   // An argument only known when it runs (#160), before resolve, so no such value reaches a CLI.
   const dynamic = dynamicTarget(req.args, provider.targetFlags ?? []);
   if (dynamic) return { ...base, uncertain: true, problems: [dynamic.problem], fix: dynamic.fix };

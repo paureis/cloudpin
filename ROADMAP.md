@@ -34,8 +34,8 @@ issues it ships. Open an [issue](https://github.com/paureis/cloudpin/issues) to 
   switch`, nothing run), and `cloudpin doctor`'s report, so an agent can say why the hook isn't guarding.
 - **Write-up** ([#114](https://github.com/paureis/cloudpin/issues/114)): why AI agents need an account guardrail, and
   how cloudpin does it, with numbers from the test suite.
-- **Short flags joined with `=`** ([#118](https://github.com/paureis/cloudpin/issues/118)): read `-e=production`
-  the way each CLI does, in every provider.
+- **Short flags joined with `=`** ([#118](https://github.com/paureis/cloudpin/issues/118)): done. Wrangler's
+  `-e=production` and `-c=file` are read; a CLI that rejects the form, like Vercel, stays as it was.
 - **Cloudflare account variables** ([#119](https://github.com/paureis/cloudpin/issues/119)): done. An account
   variable whose value cloudpin can't know blocks, and Windows reads variable names without regard to case.
 - **Explain masks credentials** ([#134](https://github.com/paureis/cloudpin/issues/134)): done. `cloudpin explain`

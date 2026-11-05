@@ -57,6 +57,9 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Fixed
 
+- Short flags joined with `=` (for example, `wrangler deploy -e=production`) were ignored by the shared
+  argument reader, so cloudpin could resolve the account without the requested environment (#118). It now
+  reads the joined form only for the CLIs that accept it, starting with Wrangler.
 - Vercel: `-y` inside a short group (`vercel project inspect -dy`) asks on a protected environment, since it can create
   and link a project, and `vercel teams change` and the `team` alias are exempt like `teams switch` (#148).
 - Help no longer exempts a command that runs anyway (#153): a kubectl or helm plugin given `--help` (it gets the flag

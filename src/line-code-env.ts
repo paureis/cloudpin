@@ -1,3 +1,7 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { home } from "./paths.js";
+
 /**
  * Variables that can make a program run code it is pointed at. To check a call cloudpin starts the CLI's identity
  * lookup with the call's own environment (rules 3 and 5 of provider code), so one of these set on the line would run
@@ -29,6 +33,7 @@ const RUNS_CODE = new Set([
   "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB",
 ]);
 const RUNS_CODE_PREFIX = /^(DYLD_|BASH_FUNC_)/;
+const AZ_DIR = "AZURE_CONFIG_DIR";
 
 /** Each name of `before` with every value it holds: on Windows a name has several spellings, each with its own. */
 function valuesByName(before: NodeJS.ProcessEnv, platform: NodeJS.Platform): Map<string, Set<string | undefined>> {
@@ -51,9 +56,30 @@ function setOnLine(before: NodeJS.ProcessEnv, env: NodeJS.ProcessEnv, platform: 
   return [...names].sort();
 }
 
-/** The variables the line set, from `before` to `env`, that can make the CLI run code. */
-export function codeVarsSet(before: NodeJS.ProcessEnv, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string[] {
-  return setOnLine(before, env, platform, (name) => RUNS_CODE.has(name) || RUNS_CODE_PREFIX.test(name));
+/**
+ * AZURE_CONFIG_DIR picks the account, so a line may honestly set it and the lookup must see it. az also imports
+ * extensions from <that folder>/cliextensions or where its `config` file's [extension] section says, all of them when
+ * its command index misses (azure-cli-core extension/__init__.py; core/__init__.py, load_command_table). A folder with
+ * neither is only an account folder. From az's source alone: no real az runs here. az expands a leading ~ itself.
+ */
+function azFolderRunsCode(typed: string, env: NodeJS.ProcessEnv): boolean {
+  const dir = typed.replace(/^~(?=$|[\\/])/, () => home(env));
+  if (existsSync(join(dir, "cliextensions"))) return true;
+  try {
+    return /^\s*\[extension\]/im.test(readFileSync(join(dir, "config"), "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+/** The variables the line set, from `before` to `env`, that can make the CLI run code; "az" adds its config folder's check. */
+export function codeVarsSet(before: NodeJS.ProcessEnv, env: NodeJS.ProcessEnv, platform: NodeJS.Platform, cli?: string): string[] {
+  const names = setOnLine(before, env, platform, (name) => RUNS_CODE.has(name) || RUNS_CODE_PREFIX.test(name));
+  if (cli !== "az") return names;
+  const dirs = setOnLine(before, env, platform, (name) => name === AZ_DIR);
+  if (dirs.length === 0) return names;
+  const typed = Object.entries(env).filter(([key]) => (platform === "win32" ? key.toUpperCase() : key) === AZ_DIR);
+  return typed.some(([, value]) => value !== undefined && azFolderRunsCode(value, env)) ? [...names, AZ_DIR] : names;
 }
 
 /**

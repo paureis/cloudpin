@@ -35,9 +35,8 @@ export function cmdReads(line: string): string | undefined {
   return undefined;
 }
 
-/** The command line Git Bash builds (Cygwin's linebuf::fromargv): a word with a space or a quote is wrapped, each quote as \". */
-const gitBashLine = (args: readonly string[]) =>
-  args.map((a) => (a === "" || /[ \t\r\n"]/.test(a) ? `"${a.split('"').join('\\"')}"` : a)).join(" ");
+/** The command line Git Bash builds, as cmd.exe toggles on it: a word with a space or a quote is wrapped (its quotes become \", still quotes to cmd.exe). */
+const gitBashLine = (args: readonly string[]) => args.map((a) => (/[ \t\r\n"]/.test(a) ? `"${a}"` : a)).join(" ");
 
 /**
  * The arguments as the shell passes them, with the text around a part only known when it runs (which `expandWord` drops:

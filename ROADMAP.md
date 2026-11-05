@@ -60,7 +60,7 @@ issues it ships. Open an [issue](https://github.com/paureis/cloudpin/issues) to 
 - **A CLI's own switch command** ([#180](https://github.com/paureis/cloudpin/issues/180)): an agent asks the person
   before running one, since which account the work is for is their call.
 
-## 1.4.0
+## 1.4.0: Beyond parsing (release 2027-01-14)
 
 - **PATH shim spike** ([#181](https://github.com/paureis/cloudpin/issues/181)): a shim folder first on PATH that sends
   each CLI through `cloudpin exec`, which sees the real arguments, environment and folder with no parsing. A spike only.

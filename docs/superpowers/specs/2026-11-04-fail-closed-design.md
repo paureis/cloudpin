@@ -116,7 +116,8 @@ Today the matcher passes 7,261 of 31,764 lines (23%) [M]. Dropping it adds about
 ## Owner's decisions (2026-11-04)
 
 Option 3, one PR per family. The answers to the seven above: 1 yes; 2 yes; 3 deny; 4 follow; 5 can't tell; 6 widen; 7 yes.
-Also: agents ask on a CLI's own switch command (#180), and the PATH shim spike is #181 in 1.4.0.
+Also: agents ask on a CLI's own switch command (#180), and the PATH shim spike is #181 in 1.4.0. And after PR 1 was
+built: an unknown folder stops a call only with a pin file in sight of the last folder the line knew (pin in sight only).
 
 ## What I did not measure
 

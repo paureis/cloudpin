@@ -45,6 +45,9 @@ describe("bash: a plain variable set where it may not run is unknown after it (#
     `if c; then ls; fi; s=${PINNED}; ${CHECK}`,
     `c && ls; s=${PINNED}; ${CHECK}`,
     `for i in 1; do ls; done; s=${PINNED}; ${CHECK}`,
+    `case x in y) ls;; esac; s=${PINNED}; ${CHECK}`,
+    `until c; do ls; done; s=${PINNED}; ${CHECK}`,
+    `"if" x; s=${PINNED}; ${CHECK}`,
   ])("still read: %s", async (line) => {
     expect((await hook(line, BASH)).decision).toBe("allow");
   });
@@ -62,6 +65,7 @@ describe("bash: a plain variable set where it may not run is unknown after it (#
     expect((await hook("s='--hostname x'; if c; then s=a; fi; gh pr list $s", BASH)).decision).toBe("deny");
     expect((await hook("s=a; if c; then s=--hostname; fi; gh pr list $s x", BASH)).decision).toBe("deny");
     expect((await hook("if c; then s=a; fi; s=$(cat f); gh pr list $s", BASH)).decision).toBe("deny");
+    expect((await hook("if c; then s='x --hostname y'; fi; gh pr list $s", BASH)).decision).toBe("deny");
   });
 
   it("one that reaches the CLI, and picks its account", async () => {

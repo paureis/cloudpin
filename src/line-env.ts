@@ -349,7 +349,6 @@ export function assignInBranch(state: State, name: string, value: string): void 
 export function branchTracker(state: State): (head: string | undefined, andOr: boolean) => void {
   let open = 0;
   return (head, andOr) => {
-    if (state.dialect !== "bash") return;
     if (/^(if|while|until|for|case)$/.test(head ?? "")) open++;
     else if (/^(fi|done|esac)$/.test(head ?? "")) open--;
     state.inBranch = open > 0 || andOr;

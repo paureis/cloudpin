@@ -91,6 +91,13 @@ describe("bash: a command word known only when it runs, with arguments (#163)", 
 describe("PowerShell: & with a word known only when it runs (#163)", () => {
   refused(PS, ["& $c CLI", "& \"$c\" CLI", "& $c x; echo 'CLI'", "& $env:CMD x; echo 'CLI'", "& $args[0] CLI"]);
 
+  it("a word that looks the CLI up runs that CLI", async () => {
+    for (const lookup of ["(Get-Command gh).Source", "(gcm gh).Source"]) {
+      expect((await hook(`& ${lookup} pr list`, PS)).decision).toBe("allow");
+      expect((await hook(`& ${lookup} --hostname other.example pr list`, PS)).decision).toBe("deny");
+    }
+  });
+
   it("the rest is as it was", async () => {
     expect((await hook("$c='gh'; & $c --hostname other.example pr list", PS)).decision).toBe("deny");
     expect((await hook("$c='gh'; & $c pr list", PS)).decision).toBe("allow");

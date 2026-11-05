@@ -45,8 +45,6 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Security
 
-- On Windows, cloudpin's own identity checks and `cloudpin exec` no longer start a `.cmd` or `.bat` CLI when cmd.exe would
-  act on its arguments: the command stops as "can't tell", or `cloudpin exec` exits non-zero. `.exe` CLIs are unaffected.
 - On Windows, cmd.exe reads the arguments of a `.cmd` or `.bat` CLI (az, npm's shims) again, so in PowerShell
   `--query 'x&kubectl'` also ran kubectl and `--subs^cription other` reached the CLI as `--subscription other`. An unquoted
   `&`, `|`, `<`, `>`, `^` or `)`, a newline or `%NAME%` there is now "can't tell" when a pin is in play. `gh.exe` and other
@@ -118,6 +116,19 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
   passing as an unguarded `bash` or `npx`.
 - Agent hooks: a `cloudpin` call whose subcommand is only known when it runs (`cloudpin $x`) asks you first (#14), since
   it may be `cloudpin use` or `cloudpin switch`. Cursor's matcher finds a CLI in any case (`AZ.CMD`).
+
+## [1.2.2] - 2026-11-05
+
+A security fix for Windows. Please upgrade.
+
+### Security
+
+- Windows: a value in a command could start another command through cmd.exe while cloudpin checked or ran that
+  command, when the CLI is a `.cmd` or `.bat` file (the Azure CLI, and CLIs installed by npm such as Vercel). cloudpin's
+  dependency escapes arguments for cmd.exe, but a batch file reads them a second time. A value could also lose or change
+  the flags after it. cloudpin now refuses to start such a file when cmd.exe would act on its arguments: the check stops
+  the command as "can't tell", and `cloudpin exec` exits non-zero. Values that arrive intact keep working, including
+  JMESPath with double quotes. `.exe` CLIs, Linux and macOS are not affected.
 
 ## [1.2.1] - 2026-10-29
 

@@ -1,4 +1,4 @@
-import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, it } from "vitest";
 import { defaultFindConfig, type GuardDeps } from "../src/guard.js";
@@ -35,7 +35,6 @@ export const bare = realpathSync(tempDir("cloudpin-163-env-bare-"));
 /** A pin file for another provider. */
 export const otherPin = realpathSync(tempDir("cloudpin-163-env-az-"));
 writeFileSync(join(otherPin, ".cloudpin.yml"), "azure:\n  subscription: 11111111-0000-0000-0000-000000000001\n");
-mkdirSync(join(pinned, "sub"));
 
 export type Shell = "Bash" | "PowerShell";
 export interface Answer {

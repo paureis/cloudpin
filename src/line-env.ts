@@ -10,8 +10,9 @@ import { expandWord, isDynamic, substitute, type Variables } from "./word-expans
  * tell" when a pin is in play; a name it can read with a value it can't is UNKNOWN_VALUE, which stops only the CLI
  * that name picks the account for. Each rule was checked against real Git Bash and Windows PowerShell 5.1 with a
  * printer named like the CLI (bash(1) SHELL BUILTIN COMMANDS; about_Environment_Provider, Set-Item, Set-Content,
- * New-Item, Remove-Item, Clear-Item). A User or Machine target of SetEnvironmentVariable is from .NET's docs alone:
- * running one writes to the registry.
+ * New-Item, Remove-Item, Clear-Item). A User or Machine target of SetEnvironmentVariable is from .NET's source alone
+ * (microsoft/referencesource, mscorlib/system/environment.cs: those branches only write the registry), as running one
+ * would write to the registry.
  */
 
 /** One argument as typed; `expansions` when a part of it is only known when it runs. */

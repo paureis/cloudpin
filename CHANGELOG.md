@@ -45,6 +45,10 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Security
 
+- A call after `set -a`, `export X+=y`, `local -x`, `${env:X}=`, `Set-Item env:X`, `[Environment]::SetEnvironmentVariable`
+  or `Remove-Item Env:X` was checked without what they set. Each is now followed. What cloudpin can't read stops later
+  calls as "can't tell" when a pin is in play: `. file`, `source file` and `export $(...)` for any CLI, `read X` and
+  `$env:X` inside a block for the CLI that X picks the account of (#163).
 - A call after `cd -- x`, `pushd x` or `Set-Location x` was checked against the wrong pin file. Each spelling is now
   followed, and a folder cloudpin can't read in advance (`cd "$(...)"`) stops later calls as "can't tell" when a pin
   file is in sight (#163).

@@ -33,6 +33,11 @@ export interface Run {
   cwd?: string;
 }
 
+// find options whose arguments, up to ";" or "+", are a command it runs.
+export const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
+// Builtins that export: `export`, and `declare`/`typeset` with -x.
+export const EXPORTERS = new Set(["export", "declare", "typeset"]);
+
 const SHELLS = new Set(["bash", "sh", "zsh", "dash"]);
 // procps-ng watch.c: getopt "+bCcefd::ghq:n:prs:twvx"; without -x it runs the arguments, joined with
 // spaces, through system(), which is `sh -c`.

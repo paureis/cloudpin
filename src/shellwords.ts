@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { commandName } from "./guard.js";
 import { tokenizePowerShell, windowsPowerShellArgv } from "./ps-tokens.js";
 import { pipedValues, psAssignment, psVariables } from "./ps-words.js";
-import { type Arg, type Run, runner } from "./runners.js";
+import { type Arg, EXPORTERS, FIND_EXEC, type Run, runner } from "./runners.js";
 import { type Expansion, tokenize } from "./shell-tokens.js";
 import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_VALUE } from "./types.js";
 import { expandWord, isDynamic, substitute, type Variables } from "./word-expansion.js";
@@ -36,8 +36,6 @@ export type Dialect = "bash" | "powershell";
 const ASSIGNMENT = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/s;
 // Shell keywords that run the command after them; wrappers and runners are in wrappers.ts and runners.ts.
 const KEYWORDS = new Set(["{", "!", "if", "then", "else", "elif", "while", "until", "do"]);
-// find options whose arguments, up to ";" or "+", are a command it runs.
-const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
 
 interface State {
   /** Working directory after any `cd` seen so far; undefined until one is. */
@@ -92,8 +90,6 @@ const child = (state: State): State => ({
 const PS_ASSIGNMENT = /^\$([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/s;
 // PowerShell environment variable: `$env:NAME = <value>` or `$env:NAME=<value>` (#86).
 const PS_ENV = /^\$env:([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/is;
-// Builtins that export: `export`, and `declare`/`typeset` with -x.
-const EXPORTERS = new Set(["export", "declare", "typeset"]);
 
 /** Sets NAME for the rest of the line, exported or not. */
 function assign(state: State, name: string, value: string, exported: boolean): void {

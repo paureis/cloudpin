@@ -2,19 +2,17 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { commandName } from "./guard.js";
 import type { Invocation } from "./invocation.js";
+import { assign, child, type Dialect, type State, variables } from "./line-state.js";
 import { tokenizePowerShell, windowsPowerShellArgv } from "./ps-tokens.js";
-import { pipedValues, psAssignment, psVariables } from "./ps-words.js";
+import { pipedValues, psAssignment } from "./ps-words.js";
 import { type Arg, type Run, runner } from "./runners.js";
 import { type Expansion, tokenize } from "./shell-tokens.js";
 import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_VALUE } from "./types.js";
-import { expandWord, isDynamic, substitute, type Variables } from "./word-expansion.js";
+import { expandWord, isDynamic, substitute } from "./word-expansion.js";
 import { forCall, unwrap, wrappedWords } from "./wrappers.js";
 
-export type { Invocation };
+export type { Dialect, Invocation };
 export { UNKNOWN_VALUE };
-
-/** The shell that reads the line: bash (also sh, zsh, Git Bash) or PowerShell (5.1 or 7) (#159). */
-export type Dialect = "bash" | "powershell";
 
 const ASSIGNMENT = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/s;
 // Shell keywords that run the command after them; wrappers and runners are in wrappers.ts and runners.ts.
@@ -22,72 +20,12 @@ const KEYWORDS = new Set(["{", "!", "if", "then", "else", "elif", "while", "unti
 // find options whose arguments, up to ";" or "+", are a command it runs.
 const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
 
-interface State {
-  /** Working directory after any `cd` seen so far; undefined until one is. */
-  cwd?: string;
-  base?: string;
-  /** Variables set by plain `NAME=value` commands earlier in the line. */
-  vars: Record<string, string>;
-  /** Of those, the ones the shell passes to the commands it runs: `export`ed, or PowerShell `$env:` (#86). */
-  exported: Record<string, string>;
-  /** Plain `NAME=value` assignments not exported here: they reach a command only if NAME was already exported. */
-  plain: Record<string, string>;
-  /** Names `unset` and not set again since. */
-  unset: Set<string>;
-  /** The whole command line, to spot CLI names behind an unknown `$VAR` command. */
-  line: string;
-  guarded: Set<string>;
-  /** The environment the line starts in, when given: only to tell that an unknown variable is one word (#160). */
-  env?: NodeJS.ProcessEnv;
-  dialect: Dialect;
-  /** PowerShell variables set from something other than one literal, which may be several words (#159). */
-  lists: Set<string>;
-  /** What a wrapper did to the environment of the call it runs (#162): `env -i`, `env -u NAME`. */
-  clearEnv?: boolean;
-  callUnset?: string[];
-}
-
-/** The variables the line set, as word expansion reads them (#160). */
-const variables = (state: State): Variables => (state.dialect === "powershell" ? psVariables(state) : {
-  known(name) {
-    if (state.unset.has(name)) return "";
-    const value = state.vars[name];
-    return value === UNKNOWN_VALUE ? undefined : value;
-  },
-  oneWord(name) {
-    // Never its value, which may be a secret: only that it can't split or be a flag.
-    const value = name in state.vars ? undefined : state.env?.[name];
-    return value !== undefined && !/\s/.test(value) && !value.startsWith("-");
-  },
-});
-
-/** A copy for code that runs in a child shell, whose `cd` and variables do not come back. */
-const child = (state: State): State => ({
-  ...state,
-  vars: { ...state.vars },
-  exported: { ...state.exported },
-  plain: { ...state.plain },
-  unset: new Set(state.unset),
-  lists: new Set(state.lists),
-});
-
 // PowerShell assignment: `$name = <value>` or `$name=<value>`.
 const PS_ASSIGNMENT = /^\$([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/s;
 // PowerShell environment variable: `$env:NAME = <value>` or `$env:NAME=<value>` (#86).
 const PS_ENV = /^\$env:([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/is;
 // Builtins that export: `export`, and `declare`/`typeset` with -x.
 const EXPORTERS = new Set(["export", "declare", "typeset"]);
-
-/** Sets NAME for the rest of the line, exported or not. */
-function assign(state: State, name: string, value: string, exported: boolean): void {
-  state.vars[name] = value;
-  state.unset.delete(name);
-  // Assigning to an exported variable updates what commands receive.
-  if (exported || name in state.exported) {
-    state.exported[name] = value;
-    delete state.plain[name];
-  } else state.plain[name] = value;
-}
 
 function analyse(
   words: string[],

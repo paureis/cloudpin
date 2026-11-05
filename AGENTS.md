@@ -40,6 +40,7 @@ Run the type-check and the tests as separate commands and read each exit code.
 | `src/mcp.ts`, `src/mcp-tools.ts` | `cloudpin mcp`: the JSON-RPC stdio server, and its read-only tools |
 | `plugin/`, `.claude-plugin/marketplace.json` | The Claude Code plugin (hook, MCP server, skill) and its marketplace |
 | `src/shellwords.ts` | Finds CLI calls inside a full shell command line |
+| `src/line-state.ts` | What `shellwords.ts` keeps while it reads a line: the shell, the folder and the variables so far |
 | `src/shell-tokens.ts` | The tokenizer behind it: words, operators, `$( )` and heredocs, read as bash reads them |
 | `src/ps-tokens.ts` | The same tokens from a PowerShell line, read as PowerShell reads it, and the arguments Windows PowerShell 5.1 hands a CLI |
 | `src/ps-words.ts` | PowerShell variables, assignments and keywords, for `shellwords.ts` |

@@ -205,6 +205,14 @@ describe("cloudpin_switch_plan: what it answers", () => {
     expect(JSON.stringify(a)).not.toContain(FAKE_VALUE);
   });
 
+  it("a gcloud configuration whose name cloudpin won't pass on: named by its variable, not its value", async () => {
+    const pin = "gcloud: { project: mine }\n";
+    const a = await project(pin, {}, { CLOUDSDK_ACTIVE_CONFIG_NAME: "example value!" }).call();
+    expect(line(a, "gcloud").status).toBe("manual");
+    expect(line(a, "gcloud").reason).toContain("CLOUDSDK_ACTIVE_CONFIG_NAME");
+    expect(JSON.stringify(a)).not.toContain("example value!");
+  });
+
   it("AWS: no command exists, so the line says what to set by hand, with the profile's name", async () => {
     const aws = line(await project(AWS_PIN, {}, { AWS_CONFIG_FILE: awsConfig().file }).call(), "aws");
     expect(aws.status).toBe("manual");

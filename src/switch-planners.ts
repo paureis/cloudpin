@@ -175,7 +175,7 @@ export async function planGcloud({ pin, entry, env, exec, resolution }: PlanInpu
   // configuration, so `config set` must write that one.
   const configuration = env.CLOUDSDK_ACTIVE_CONFIG_NAME;
   if (configuration && !safeName(configuration)) {
-    return { manual: [`CLOUDSDK_ACTIVE_CONFIG_NAME is ${quoted(configuration)}; set the account and project in that configuration yourself`] };
+    return { manual: ["CLOUDSDK_ACTIVE_CONFIG_NAME names a configuration cloudpin won't pass to gcloud; set the account and project in that configuration yourself"] };
   }
   // --quiet: `config set project` otherwise asks to confirm when it can't check access.
   const tail = ["--quiet", ...(configuration ? ["--configuration", configuration] : [])];

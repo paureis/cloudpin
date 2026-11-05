@@ -34,8 +34,8 @@ What cloudpin protects against, what it trusts and what is out of scope: [THREAT
   For Vercel it checks whether a login file exists, without reading it.
 - It stores successful identity answers for up to five minutes in a cache file in your user cache folder. Keys are
   salted hashes, so tokens and command arguments are never written in clear.
-- `cloudpin mcp`, the MCP server for agents, is read-only: its three tools report status, what cloudpin would decide and why it may not be guarding
-  for a command; they never run that command, log in, switch accounts or write anything.
+- `cloudpin mcp`, the MCP server for agents, is read-only: its four tools report status, what cloudpin would decide for a command, why it may not be
+  guarding and what a person would run to switch; they never run any of those commands, log in, switch accounts or write anything.
 - It has no telemetry and sends nothing about you or your accounts. Its one request of its own asks
   registry.npmjs.org for the latest cloudpin version (public data; the request names only the package), at most once
   a day, and only from cloudpin's own commands run in a terminal: never from the shell wrappers, `cloudpin exec` or the

@@ -36,6 +36,8 @@ export interface Step {
   notes: string[];
   /** What cloudpin will not or cannot do, naming the exact command or variable. */
   manual: string[];
+  /** Account IDs and names the active login gave and the pin doesn't hold; cloudpin_switch_plan shortens them in its text. */
+  loginValues?: string[];
 }
 
 export interface PlanInput {
@@ -83,6 +85,9 @@ export async function planProvider(input: PlanInput): Promise<Step> {
   const candidates = plan.candidates ?? [];
   const status: StepStatus =
     commands.length > 0 || plan.awsProfile !== undefined ? "run" : candidates.length > 1 ? "choose" : "manual";
+  const pinned = new Set(Object.values(input.pin));
+  const identity = input.resolution?.kind === "identity" ? Object.values(input.resolution.identity) : [];
+  const loginValues = [...identity, ...(plan.loginValues ?? [])].filter((v) => v && !pinned.has(v));
   return {
     ...base,
     status,
@@ -93,5 +98,6 @@ export async function planProvider(input: PlanInput): Promise<Step> {
     ...(plan.listed && plan.listed.length > 0 ? { listed: plan.listed } : {}),
     notes: plan.notes ?? [],
     manual: plan.manual ?? [],
+    ...(loginValues.length > 0 ? { loginValues } : {}),
   };
 }

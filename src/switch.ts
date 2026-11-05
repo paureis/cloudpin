@@ -93,7 +93,7 @@ function reasonOf(step: Step): string | undefined {
   return parts.length > 0 ? parts.join("; ") : undefined;
 }
 
-function planJson(step: Step): PlanJson {
+export function planJson(step: Step): PlanJson {
   const reason = reasonOf(step);
   const candidates = step.candidates?.map((c) => c.name) ?? step.listed;
   return {
@@ -145,6 +145,19 @@ function describe(c: Candidate): string {
   return parts.length > 0 ? `: ${parts.join(", then ")}` : "";
 }
 
+/** The object `--json` prints; with no `ran` and no `after`, the plan alone (and cloudpin_switch_plan's answer). */
+export function switchJson(report: CheckReport, plan: PlanJson[], ran: RanJson[], after: CheckReport | null): SwitchJson {
+  return {
+    result: (after ?? report).result,
+    path: report.path,
+    environment: report.environment,
+    ...(report.error !== undefined ? { error: report.error } : {}),
+    plan,
+    ran,
+    after,
+  };
+}
+
 /**
  * What `cloudpin switch` would do, running no switch command and writing nothing: the check it starts from and one
  * step per provider, using only the CLIs' read-only listings. On Windows the environment comes back with its names
@@ -194,16 +207,7 @@ export async function runSwitch(cwd: string, typed: NodeJS.ProcessEnv, deps: Gua
   const only = opts.only ? { only: opts.only } : {};
   const { report, steps, env } = await planSwitch(cwd, typed, deps, only);
   const emit = (plan: PlanJson[], ran: RanJson[], after: CheckReport | null) => {
-    const json: SwitchJson = {
-      result: (after ?? report).result,
-      path: report.path,
-      environment: report.environment,
-      ...(report.error !== undefined ? { error: report.error } : {}),
-      plan,
-      ran,
-      after,
-    };
-    io.out(JSON.stringify(json, null, 2));
+    io.out(JSON.stringify(switchJson(report, plan, ran, after), null, 2));
   };
 
   if (report.error !== undefined || report.path === null) {

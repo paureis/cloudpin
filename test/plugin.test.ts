@@ -29,11 +29,19 @@ describe("the Claude Code plugin", () => {
     expect(market.plugins).toEqual([expect.objectContaining({ name: "cloudpin", source: "./plugin" })]);
   });
 
-  it("ships a skill that names both tools and says to stop on a block", () => {
+  it("ships a skill that names every tool and says to stop on a block", () => {
     const skill = read("plugin/skills/cloudpin/SKILL.md");
     expect(skill).toMatch(/^---\nname: cloudpin\ndescription: .+\n---\n/);
     expect(skill).toContain("cloudpin_status");
     expect(skill).toContain("cloudpin_check");
+    expect(skill).toContain("cloudpin_doctor");
+    expect(skill).toContain("cloudpin_switch_plan");
     expect(skill).toMatch(/never .*CLOUDPIN_SKIP/i);
+  });
+
+  it("has the skill say a switch plan is for the user to run, never the agent", () => {
+    const skill = read("plugin/skills/cloudpin/SKILL.md").replace(/\s+/g, " ");
+    expect(skill).toMatch(/show the user the plan from `cloudpin_switch_plan`/);
+    expect(skill).toMatch(/for them to run: never run them yourself/);
   });
 });

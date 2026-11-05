@@ -146,7 +146,7 @@ export function readme() {
     "5. If Cursor asks whether you trust the authors of the files in this folder, answer that you trust them:",
     "   Cursor runs a project's hooks only in a trusted workspace.",
     "6. Open Cursor Settings > MCP (called \"Tools & MCP\" or \"Tools & Integrations\" in some versions): `cloudpin`",
-    "   is listed with its toggle on and two tools, `cloudpin_status` and `cloudpin_check`. If it shows an error, see",
+    "   is listed with its toggle on and four tools, among them `cloudpin_status` and `cloudpin_check`. If it shows an error, see",
     "   Troubleshooting.",
     "7. Open Cursor Settings > Hooks: `beforeShellExecution` lists `cloudpin hook cursor`.",
     "8. Rehearse in a new agent chat: type `Call cloudpin_status for this project.` It reports environment",

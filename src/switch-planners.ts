@@ -36,6 +36,8 @@ export interface Plan {
   listed?: string[];
   notes?: string[];
   manual?: string[];
+  /** Account IDs in these lines that the login's listings gave, not the pin. */
+  loginValues?: string[];
 }
 
 /** The line for a provider whose account cloudpin could not determine. */
@@ -74,7 +76,10 @@ export async function planAzure({ pin, entry, env, exec }: PlanInput): Promise<P
     return { manual: [`subscription ${pin.subscription} is not among the subscriptions this login knows; log in to its tenant: ${login}`] };
   }
   if (pin.tenant && typeof found.tenantId === "string" && found.tenantId.toLowerCase() !== pin.tenant.toLowerCase()) {
-    return { manual: [`subscription ${pin.subscription} belongs to tenant ${found.tenantId}, not the pinned tenant ${pin.tenant}; check .cloudpin.yml`] };
+    return {
+      manual: [`subscription ${pin.subscription} belongs to tenant ${found.tenantId}, not the pinned tenant ${pin.tenant}; check .cloudpin.yml`],
+      loginValues: [found.tenantId],
+    };
   }
   if (!safeName(pin.subscription!)) return { manual: [`run it yourself: az account set --subscription ${quoted(pin.subscription!)}`] };
   // Always the ID, never a name (az account set --help: "Name or ID").
@@ -170,7 +175,7 @@ export async function planGcloud({ pin, entry, env, exec, resolution }: PlanInpu
   // configuration, so `config set` must write that one.
   const configuration = env.CLOUDSDK_ACTIVE_CONFIG_NAME;
   if (configuration && !safeName(configuration)) {
-    return { manual: [`CLOUDSDK_ACTIVE_CONFIG_NAME is ${quoted(configuration)}; set the account and project in that configuration yourself`] };
+    return { manual: ["CLOUDSDK_ACTIVE_CONFIG_NAME names a configuration cloudpin won't pass to gcloud; set the account and project in that configuration yourself"] };
   }
   // --quiet: `config set project` otherwise asks to confirm when it can't check access.
   const tail = ["--quiet", ...(configuration ? ["--configuration", configuration] : [])];

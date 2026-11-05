@@ -23,6 +23,8 @@ describe("an agent's cloudpin switch with a variable that can run code on its li
     expect(answer.decision).toBe("deny");
     expect(answer.reason).toContain(name);
     expect(answer.reason).not.toContain(SECRET);
+    // Not the answer for an agent that can't ask, which this one can.
+    expect(answer.reason).not.toContain("cannot ask");
     expect(calls).toEqual([]);
   });
 
@@ -35,11 +37,17 @@ describe("an agent's cloudpin switch with a variable that can run code on its li
 
   it("explain says so, and starts nothing", async () => {
     calls.length = 0;
-    const [call] = await explain(`NODE_OPTIONS=${SECRET} cloudpin switch`, { mode: "agent", cwd: pinned, env }, { ...deps, platform: "linux" });
+    const explained = await explain(`NODE_OPTIONS=${SECRET} cloudpin switch`, { mode: "agent", cwd: pinned, env }, { ...deps, platform: "linux" });
+    expect(explained).toHaveLength(1);
+    const [call] = explained;
     expect(call!.verdict).toBe("block");
     expect(call!.reason).toContain("NODE_OPTIONS");
     expect(JSON.stringify(call)).not.toContain(SECRET);
     expect(calls).toEqual([]);
+  });
+
+  it("explain in shell mode is about a person's own line, which isn't refused", async () => {
+    expect(await explain(`NODE_OPTIONS=${SECRET} cloudpin switch`, { mode: "shell", cwd: pinned, env }, { ...deps, platform: "linux" })).toEqual([]);
   });
 
   it("with the name in any case on Windows", async () => {

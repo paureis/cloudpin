@@ -11,7 +11,7 @@ import { type Arg, FIND_EXEC, type Run, runner } from "./runners.js";
 import { type Expansion, tokenize } from "./shell-tokens.js";
 import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_VALUE } from "./types.js";
 import { expandWord, isDynamic, substitute } from "./word-expansion.js";
-import { forCall, unwrap, wrappedWords } from "./wrappers.js";
+import { forCall, unwrap, wrappedWords, wrapperOperand } from "./wrappers.js";
 
 export type { Dialect, Invocation };
 export { UNKNOWN_VALUE };
@@ -79,6 +79,7 @@ function analyse(
   const env: Record<string, string> = {};
   let i = 0;
   let wrapper: string | undefined;
+  let last: string | undefined; // The wrapper just read.
   for (;;) {
     const word = words[i];
     if (word === undefined) {
@@ -86,9 +87,10 @@ function analyse(
       for (const [name, value] of Object.entries(env)) (state.inBranch ? assignInBranch(state, name, value) : assign(state, name, value, false));
       return;
     }
-    const assignment = ASSIGNMENT.exec(word);
+    const assignment = ASSIGNMENT.exec(word) ?? wrapperOperand(last, word, dynamic[i]);
+    if (assignment === "unknown") return cantTell(words.slice(i).join(" "), true, out, env, state);
     if (assignment) {
-      env[assignment[1]!] = valueOf(i, assignment);
+      if (assignment !== "none") env[assignment[1]!] = valueOf(i, assignment);
       i++;
       continue;
     }
@@ -110,6 +112,7 @@ function analyse(
       return;
     }
     wrapper ??= word;
+    last = commandName(word);
     if (step.clearEnv) for (const k of Object.keys(env)) delete env[k];
     for (const k of step.unset ?? []) delete env[k];
     state = forCall(state, step, child);

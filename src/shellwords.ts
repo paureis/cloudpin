@@ -2,7 +2,7 @@ import { folderCommand, loseFolder, moveFolder } from "./folder.js";
 import { commandName } from "./guard.js";
 import { cantTell, invocation, looksUpCli, namedClis, nextAliases, pipedText, psValue, readAlias, readTraps, wholeExpansion, withAlias } from "./hidden-calls.js";
 import type { Invocation } from "./invocation.js";
-import { ASSIGNMENT, assignedValue, carryBlock, type EnvArg, isPsEnvWord, readEnvCommand, readPsAssignment, readPsEnvWords, readSetEnvironmentVariable } from "./line-env.js";
+import { ASSIGNMENT, assignedValue, assignInBranch, branchTracker, carryBlock, type EnvArg, isPsEnvWord, readEnvCommand, readPsAssignment, readPsEnvWords, readSetEnvironmentVariable } from "./line-env.js";
 import { assign, child, type Dialect, restoreEnv, restoreFolder, type State, variables } from "./line-state.js";
 import { tokenizePowerShell, windowsPowerShellArgv } from "./ps-tokens.js";
 import { pipedValues, psAssignment, type Words } from "./ps-words.js";
@@ -85,7 +85,7 @@ function analyse(
     const word = words[i];
     if (word === undefined) {
       // Only assignments: they set shell variables for the rest of the line.
-      for (const [name, value] of Object.entries(env)) assign(state, name, value, false);
+      for (const [name, value] of Object.entries(env)) (state.inBranch ? assignInBranch(state, name, value) : assign(state, name, value, false));
       return;
     }
     const assignment = ASSIGNMENT.exec(word);
@@ -250,6 +250,8 @@ function collect(input: string, out: Invocation[], state: State): void {
   let dynamic: boolean[] = [];
   let expansions: (Expansion[] | undefined)[] = [];
   let stdin: string[] = [];
+  const branch = branchTracker(state);
+  let andOr = false;
   nextAliases(state);
   state.asValue = false;
   const trapsBefore = state.atExit?.length ?? 0;
@@ -260,7 +262,11 @@ function collect(input: string, out: Invocation[], state: State): void {
     const before = child(state);
     // A compound's body is read after the `;` that ends this segment, still in that child shell (`| while read X; do`).
     const compound = KEYWORDS.has(segment[0] ?? "") && !quoted[0];
-    if (segment.length > 0) analyse(segment, stdin, out, state, quoted, dynamic, expansions);
+    if (segment.length > 0) {
+      branch(quoted[0] ? undefined : segment[0], andOr);
+      analyse(segment, stdin, out, state, quoted, dynamic, expansions);
+      andOr = false;
+    }
     if (own) restoreFolder(state, before);
     if (own && !compound) restoreEnv(state, before);
     segment = [];
@@ -308,6 +314,7 @@ function collect(input: string, out: Invocation[], state: State): void {
       const pipe = state.dialect === "bash" && (lone(t, "|") || carried);
       state.asValue = psValue(tokens, t);
       end(afterPipe || pipe || lone(t, "&"));
+      if ((token.op === "&" && isOp(t - 1, "&")) || (token.op === "|" && isOp(t - 1, "|"))) andOr = true;
       state.asValue = false;
       afterPipe = pipe;
       stdin = passed;

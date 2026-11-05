@@ -334,6 +334,28 @@ export function readEnvCommand(name: string, args: EnvArg[], state: State, vars:
 const PS_ENV = /^\$(?:env:([A-Za-z_][A-Za-z0-9_]*)|\{env:([A-Za-z_][A-Za-z0-9_]*)\})(?:=(.*))?$/is;
 export const isPsEnvWord = (word: string | undefined): boolean => PS_ENV.test(word ?? "");
 
+/**
+ * A plain `NAME=value`, which may not run: from here on NAME is unknown, unless it already holds that value (`export` and
+ * `cd` in a branch stay read as if they ran). Real bash ran `s=a; false && s=b` with `a`.
+ */
+export function assignInBranch(state: State, name: string, value: string): void {
+  if (state.vars[name] === value) return;
+  const oneWord = [value, state.vars[name] ?? ""].every((v) => !/\s/.test(v) && !v.startsWith("-"));
+  assign(state, name, UNKNOWN_VALUE, false);
+  if (oneWord) (state.oneWords ??= new Set()).add(name);
+}
+
+/** Tracks, statement by statement, whether a bash statement may not run. */
+export function branchTracker(state: State): (head: string | undefined, andOr: boolean) => void {
+  let open = 0;
+  return (head, andOr) => {
+    if (state.dialect !== "bash") return;
+    if (/^(if|while|until|for|case)$/.test(head ?? "")) open++;
+    else if (/^(fi|done|esac)$/.test(head ?? "")) open--;
+    state.inBranch = open > 0 || andOr;
+  };
+}
+
 /** The whole statement is `$env:X=value` or `$env:X = value`, as a line read as bash has it: sets X. */
 export function readPsEnvWords(words: string[], dynamic: boolean[], state: State): boolean {
   const psEnv = PS_ENV.exec(words[0] ?? "");

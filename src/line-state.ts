@@ -4,6 +4,9 @@ import type { Variables } from "./word-expansion.js";
 
 // What `shellwords.ts` keeps while it reads a line: the shell, the folder and the variables so far.
 
+// Builtins that export: `export`, and `declare`/`typeset` with -x.
+export const EXPORTERS = new Set(["export", "declare", "typeset"]);
+
 /** The shell that reads the line: bash (also sh, zsh, Git Bash) or PowerShell (5.1 or 7) (#159). */
 export type Dialect = "bash" | "powershell";
 

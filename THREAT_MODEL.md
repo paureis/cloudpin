@@ -92,6 +92,9 @@ These are real limits, stated so nobody relies on cloudpin for them:
   locked out of fixing a mismatch, and that holds for an agent too. `cloudpin switch` asks; those don't.
 - **A folder cloudpin can't read, from a folder with no pin file in sight.** `cd "$REPO" && az ...` from there passes,
   because cloudpin doesn't know that folder has a pin file. With one in sight, it stops as "can't tell".
+- **Text cloudpin can't read, on a line that names no guarded CLI.** `curl ... | bash`, `eval "$(cat f)"` or a bare `$c`
+  could run anything, and nothing on the line says which CLI to stop, so it passes. Once the line names one, that one
+  stops, except for a lone `$c` before a pipe or in `if ($c)`, which is how PowerShell writes a value and is read as one.
 - **A name Cursor's hook filter can't see.** Cursor runs the hook only when its text matcher finds a guarded name on the
   line, so `"cloud"pin` or `-EncodedCommand <base64>` never reach cloudpin there. Other agents have no such filter.
 - **A command cloudpin doesn't guard.** Only the CLIs above are checked. A cloud SDK called from a program, `curl` to a

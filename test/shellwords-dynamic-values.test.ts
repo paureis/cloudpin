@@ -77,7 +77,7 @@ describe("findInvocations: words known only when the command runs (#160)", () =>
   it("still finds a CLI held in a variable, known or not", () => {
     expect(calls("CLI=az; $CLI group list")).toEqual([["az", ["group", "list"]]]);
     expect(calls('CLI="az group"; $CLI list')).toEqual([["az", ["group", "list"]]]);
-    expect(calls("$TOOL group list # az")).toEqual([["az", ["group", "list"]]]);
+    expect(calls("$TOOL group list # az")).toEqual([["az", [DYNAMIC_WORDS]]]);
   });
 
   it("reads a variable from the environment it was given only to know it is one word, never its value", () => {

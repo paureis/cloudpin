@@ -50,7 +50,7 @@ describe("commands held in variables (#7)", () => {
   });
 
   it("checks a CLI named on the line when the command is an unknown variable", () => {
-    expect(bins("$DEPLOY_TOOL deploy --prod # uses vercel")).toEqual(["vercel deploy --prod"]);
+    expect(bins("$DEPLOY_TOOL deploy --prod # uses vercel")).toEqual([`vercel ${DYNAMIC_WORDS}`]);
   });
 
   it("does not guess when no guarded CLI is named", () => {

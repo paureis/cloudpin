@@ -45,6 +45,12 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Security
 
+- A guarded CLI in text a line runs was never checked: `echo '...' | bash`, `cat <<X | bash`, `trap '...' EXIT`,
+  `${x:-$(az ...)}`, `bash -c -e '...'`, `alias` on a later line, `Set-Alias`. Each is now read. What cloudpin can't read
+  stops the CLIs the line names as "can't tell" when a pin is in play: `eval "$(...)"`, `sh -c "$(...)"`, `source <(...)`,
+  unknown text piped into a shell, `$c` as a command with or without arguments. A line that names none has nothing to
+  stop, so `curl ... | bash` passes. A plain variable set where it may not run is unknown after it: a PowerShell block,
+  and bash's `if`, loops, `case`, `&&` and `||` (#163).
 - A call after `set -a`, `export X+=y`, `local -x`, `${env:X}=`, `Set-Item env:X`, `[Environment]::SetEnvironmentVariable`
   or `Remove-Item Env:X` was checked without what they set. Each is now followed. What cloudpin can't read stops later
   calls as "can't tell" when a pin is in play: `. file`, `source file` and `export $(...)` for any CLI, `read X` and

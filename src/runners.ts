@@ -1,7 +1,7 @@
 import { cmdCommands } from "./cmd-line.js";
 import { splitCommandLine } from "./ps-tokens.js";
 import type { Dialect } from "./shellwords.js";
-import { DYNAMIC_WORDS, UNKNOWN_FOLDER } from "./types.js";
+import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_FOLDER } from "./types.js";
 import { readOptions, table } from "./wrappers.js";
 
 /**
@@ -35,6 +35,8 @@ export interface Run {
   here?: boolean;
   /** `bash -a` or `-o allexport`: its lines start as after `set -a` (#163). */
   allexport?: boolean;
+  /** `trap`: its lines run later too, in this shell, seeing what the line has left by then (#163). */
+  later?: boolean;
 }
 
 const SHELLS = new Set(["bash", "sh", "zsh", "dash"]);
@@ -48,13 +50,7 @@ const WATCH = table(
 
 /** What `name` runs, or undefined when it doesn't run a line or a list it is given. */
 export function runner(name: string, args: Arg[], dialect: Dialect): Run | undefined {
-  if (SHELLS.has(name)) {
-    const flag = args.findIndex((a) => /^-[a-z]*c$/.test(a.raw));
-    const script = flag === -1 ? undefined : args[flag + 1]?.raw;
-    const options = flag === -1 ? args : args.slice(0, flag + 1);
-    const allexport = options.some((a, k) => /^-[a-z]*a/.test(a.raw) || (a.raw === "allexport" && /^-[a-z]*o$/.test(options[k - 1]?.raw ?? "")));
-    return { ...(script === undefined || script === "-" ? { stdin: "bash" as const } : { lines: [{ text: script, dialect: "bash" as const }] }), ...(allexport ? { allexport } : {}) };
-  }
+  if (SHELLS.has(name)) return shell(args);
   if (name === "watch") {
     const o = readOptions(args.map((a) => a.raw), 0, WATCH, args.map((a) => a.dynamic));
     if (o.unknown) return { unknown: true };
@@ -63,10 +59,69 @@ export function runner(name: string, args: Arg[], dialect: Dialect): Run | undef
   }
   if (name === "cmd") return cmd(args, dialect);
   if (name === "powershell" || name === "pwsh") return powershell(args, name === "pwsh");
-  if (dialect !== "powershell") return undefined;
+  if (dialect !== "powershell") return name === "trap" ? trap(args) : name === "source" || name === "." ? source(args) : undefined;
   if (name === "iex" || name === "invoke-expression") return invokeExpression(args);
   if (name === "start-process" || name === "saps" || name === "start") return startProcess(args);
   return undefined;
+}
+
+// A file that is the shell's standard input.
+const STDIN_FILE = /^\/dev\/(stdin|fd\/0)$/;
+
+/**
+ * `bash [long options] [options] [-c string | -s | script] [arguments]` (bash(1), INVOCATION; dash takes the same):
+ * -c takes the first word after all the options, which may come after it (`bash -c -e '...'`); `--` or `-` ends them,
+ * -o and -O take the next word. A script file is not read, as `bash deploy.sh` is not, and then standard input isn't
+ * commands. Checked against real Git Bash and dash with a printer (#163).
+ */
+function shell(args: Arg[]): Run {
+  let k = 0;
+  for (; args[k]?.raw.startsWith("--") && args[k]!.raw !== "--"; k++) if (/^--(rcfile|init-file)$/.test(args[k]!.raw)) k++;
+  let command = false;
+  let input = false;
+  let allexport = false;
+  for (; k < args.length; k++) {
+    const raw = args[k]!.raw;
+    if (raw === "--" || raw === "-") {
+      k++;
+      break;
+    }
+    const flags = /^([-+])([A-Za-z]+)$/.exec(raw);
+    if (!flags) break;
+    const on = flags[1] === "-";
+    for (const letter of flags[2]!) {
+      // Real Git Bash takes +c for -c too.
+      if (letter === "c") command = true;
+      if (on && letter === "s") input = true;
+      if (on && letter === "a") allexport = true;
+      if (letter === "o" || letter === "O") {
+        k++;
+        if (on && letter === "o" && args[k]?.raw === "allexport") allexport = true;
+      }
+    }
+  }
+  const options = allexport ? { allexport } : {};
+  const operand = args[k];
+  if (command) return { ...(operand ? { lines: [{ text: operand.value ?? operand.raw, dialect: "bash" as const }] } : {}), ...options };
+  if (!operand || input || STDIN_FILE.test(operand.value ?? "")) return { stdin: "bash", ...options };
+  // What a <( ) or $( ) prints may be the script, and a word only known when it runs may be the flags before -c.
+  if (operand.raw === DYNAMIC_WORD || (operand.dynamic && args.slice(k + 1).some((a) => /^-[a-z]*c$/.test(a.raw)))) return { unknown: true };
+  return options;
+}
+
+/** `trap [--] string signal...` (bash(1), trap): one word alone resets; a `-`, -l or -p as the string runs nothing. */
+function trap(args: Arg[]): Run {
+  const words = args[0]?.raw === "--" ? args.slice(1) : args;
+  const string = words[0];
+  if (!string || words.length === 1) return {};
+  return { lines: [{ text: string.value ?? string.raw, dialect: "bash" }], later: true };
+}
+
+/** `. file` is a script, not read; what a <( ) prints, or standard input, is text the line gives it. */
+function source(args: Arg[]): Run | undefined {
+  const file = args[0];
+  if (file?.raw === DYNAMIC_WORD) return { unknown: true };
+  return STDIN_FILE.test(file?.value ?? "") ? { stdin: "bash", here: true } : undefined;
 }
 
 /** `cmd [switches] /C|/K|/R string` (`cmd /?`); Git Bash turns `//c` into `/c`. */
@@ -144,8 +199,11 @@ function powershell(args: Arg[], pwsh: boolean): Run {
     if (value === undefined) return raw.startsWith("{") ? {} : { unknown: true };
     const key = /^(?:--?|\/)(.*)$/s.exec(value)?.[1]?.toLowerCase();
     const param = key === undefined ? undefined : PS_PARAMS.find(([full, shortest]) => full.startsWith(key) && key.length >= shortest.length);
-    // The first argument it doesn't know starts the script: a command in 5.1, a file in pwsh.
-    if (!param) return pwsh ? {} : script(k);
+    // The first argument it doesn't know starts the script: a command in 5.1, a file in pwsh. about_Pwsh: -File "is the
+    // default parameter if no parameters are present but values are present", and "if the value of File is `-`, then
+    // commands are read from standard input" (learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_pwsh).
+    // pwsh isn't installed here, so that is the docs alone.
+    if (!param) return pwsh && value !== "-" ? {} : script(k);
     const takes = param[2];
     if (takes === "none") continue;
     if (takes === "value") k++;
@@ -160,7 +218,9 @@ function powershell(args: Arg[], pwsh: boolean): Run {
       return { lines: [{ text: Buffer.from(text, "base64").toString("utf16le"), dialect: "powershell" }] };
     }
   }
-  return {};
+  // With no script it reads its commands from standard input (real 5.1). about_Pwsh says it of `-File -`, not of no
+  // script at all; read the same, which only adds a check.
+  return { stdin: "powershell" };
 }
 
 /** `Invoke-Expression [-Command] <string>`, or the strings piped to it. */

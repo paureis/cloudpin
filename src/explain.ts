@@ -1,6 +1,6 @@
 import type { ActiveEnvironment } from "./config.js";
 import { maskArgv } from "./format.js";
-import { commandName, guard, type GuardDeps, type Trace, type Verdict } from "./guard.js";
+import { commandName, exemptCall, guard, type GuardDeps, type Trace, type Verdict } from "./guard.js";
 import { AGENTS, type AgentName, cloudpinConfirmation } from "./hooks/agents.js";
 import { home } from "./paths.js";
 import { type Dialect, findInvocations, type Invocation } from "./shellwords.js";
@@ -103,7 +103,7 @@ export async function explain(command: string | string[], opts: ExplainOptions, 
   const bins = [...deps.providers.flatMap((p) => p.bins), "cloudpin"];
   const calls: Invocation[] =
     typeof command === "string"
-      ? findInvocations(command, bins, opts.cwd, opts.env, opts.shell)
+      ? findInvocations(command, bins, opts.cwd, opts.env, opts.shell, exemptCall(deps.providers))
       : command.length > 0
         ? [{ bin: command[0]!, args: command.slice(1), env: {} }]
         : [];

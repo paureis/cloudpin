@@ -68,6 +68,10 @@ export function foldEnvNames(env: NodeJS.ProcessEnv, platform: NodeJS.Platform):
   return { env: out, conflicts };
 }
 
+/** Whether a call of `name` is one that never acts on an account, for the line reader (#163). */
+export const exemptCall = (providers: ProviderDef[]) => (name: string, args: string[]): boolean =>
+  providers.find((p) => p.bins.includes(name))?.isExempt(args, name) ?? false;
+
 /** False only when `onPath` is given and finds none of the provider's commands. */
 export function installed(provider: ProviderDef, env: NodeJS.ProcessEnv, onPath?: GuardDeps["onPath"]): boolean {
   return !onPath || provider.bins.some((bin) => onPath(bin, env) !== null);

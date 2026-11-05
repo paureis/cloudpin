@@ -292,12 +292,25 @@ export function readSetEnvironmentVariable(text: string, state: State): void {
   psSet(state, key, where === "process" || where === "0" ? (value === undefined ? undefined : literalArgument(value)) : undefined);
 }
 
-/** A PowerShell ( ), $( ), @( ) or { } is not a child shell, and may or may not run: what it set can't tell. */
-export function carryBlock(state: State, inner: State): void {
+/**
+ * A PowerShell ( ), $( ), @( ) or { } is not a child shell, and may or may not run: what it set can't tell. A plain
+ * variable stays in a scope of its own when the block is called with & or is a function's (about_Scopes), and in
+ * `foreach ($x in ...)` the loop sets $x. `words` are the statement's so far, `text` the block's.
+ */
+export function carryBlock(state: State, inner: State, words: readonly string[], text: string): void {
   if (inner.envUnknown) state.envUnknown = true;
   for (const name of new Set([...Object.keys(inner.exported), ...Object.keys(state.exported), ...inner.unset])) {
     if (inner.exported[name] !== state.exported[name] || (inner.unset.has(name) && !state.unset.has(name))) assign(state, name, UNKNOWN_VALUE, true);
   }
+  const first = words[0]?.toLowerCase() ?? "";
+  if (["&", "function", "filter"].includes(first)) return;
+  const loop = first === "foreach" ? /^\s*(\$\w+)\s/.exec(text)?.[1]?.toLowerCase() : undefined;
+  for (const key of Object.keys(inner.vars)) {
+    if (key.startsWith("$") && inner.vars[key] !== state.vars[key]) state.vars[key] = UNKNOWN_VALUE;
+  }
+  if (loop) state.vars[loop] = UNKNOWN_VALUE;
+  for (const name of inner.lists) state.lists.add(name);
+  if (inner.aliases) state.aliases = inner.aliases;
 }
 
 /** Applies a command that changes the line's variables; false when `name` isn't one. */
@@ -315,4 +328,47 @@ export function readEnvCommand(name: string, args: EnvArg[], state: State, vars:
   } else if (name === "}") endBlock(state);
   else return false;
   return true;
+}
+
+// PowerShell environment variable: `$env:NAME = <value>` or `$env:NAME=<value>` (#86).
+const PS_ENV = /^\$(?:env:([A-Za-z_][A-Za-z0-9_]*)|\{env:([A-Za-z_][A-Za-z0-9_]*)\})(?:=(.*))?$/is;
+export const isPsEnvWord = (word: string | undefined): boolean => PS_ENV.test(word ?? "");
+
+/**
+ * A plain `NAME=value`, which may not run: from here on NAME is unknown, unless it already holds that value (`export` and
+ * `cd` in a branch stay read as if they ran). Real bash ran `s=a; false && s=b` with `a`.
+ */
+export function assignInBranch(state: State, name: string, value: string): void {
+  if (state.vars[name] === value) return;
+  const oneWord = [value, state.vars[name] ?? ""].every((v) => !/\s/.test(v) && !v.startsWith("-"));
+  assign(state, name, UNKNOWN_VALUE, false);
+  if (oneWord) (state.oneWords ??= new Set()).add(name);
+}
+
+/** Tracks, statement by statement, whether a bash statement may not run. */
+export function branchTracker(state: State): (head: string | undefined, andOr: boolean) => void {
+  let open = 0;
+  return (head, andOr) => {
+    if (/^(if|while|until|for|case)$/.test(head ?? "")) open++;
+    else if (/^(fi|done|esac)$/.test(head ?? "")) open--;
+    state.inBranch = open > 0 || andOr;
+  };
+}
+
+/** The whole statement is `$env:X=value` or `$env:X = value`, as a line read as bash has it: sets X. */
+export function readPsEnvWords(words: string[], dynamic: boolean[], state: State): boolean {
+  const psEnv = PS_ENV.exec(words[0] ?? "");
+  if (psEnv && (psEnv[3] !== undefined || words[1] === "=")) {
+    // A single literal (`'other'`, `other`) is known; anything else (an expression,
+    // a command, `(Get-Content f)`, `$x`) is only known when it runs.
+    const inline = psEnv[3] !== undefined && psEnv[3] !== "";
+    const from = inline ? 1 : psEnv[3] !== undefined ? 1 : 2;
+    const value = inline ? psEnv[3]! : words[from];
+    // Inline, the word's own `$env:` counts as an expansion, so look at the value part alone.
+    const expandsValue = inline ? /\$[A-Za-z_{(]/.test(value!) || isDynamic(value!) : dynamic[from];
+    const known = value !== undefined && words.length === (inline ? 1 : from + 1) && !expandsValue;
+    assign(state, psEnv[1] ?? psEnv[2]!, known ? value : UNKNOWN_VALUE, true);
+    return true;
+  }
+  return false;
 }

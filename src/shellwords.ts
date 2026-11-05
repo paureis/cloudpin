@@ -1,13 +1,14 @@
 import { folderCommand, loseFolder, moveFolder } from "./folder.js";
 import { commandName } from "./guard.js";
+import { cantTell, invocation, looksUpCli, namedClis, nextAliases, pipedText, psValue, readAlias, readTraps, wholeExpansion, withAlias } from "./hidden-calls.js";
 import type { Invocation } from "./invocation.js";
-import { ASSIGNMENT, assignedValue, carryBlock, type EnvArg, readEnvCommand, readPsAssignment, readSetEnvironmentVariable } from "./line-env.js";
+import { ASSIGNMENT, assignedValue, assignInBranch, branchTracker, carryBlock, type EnvArg, isPsEnvWord, readEnvCommand, readPsAssignment, readPsEnvWords, readSetEnvironmentVariable } from "./line-env.js";
 import { assign, child, type Dialect, restoreEnv, restoreFolder, type State, variables } from "./line-state.js";
 import { tokenizePowerShell, windowsPowerShellArgv } from "./ps-tokens.js";
-import { pipedValues, psAssignment } from "./ps-words.js";
+import { pipedValues, psAssignment, type Words } from "./ps-words.js";
 import { type Arg, type Run, runner } from "./runners.js";
 import { type Expansion, tokenize } from "./shell-tokens.js";
-import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_FOLDER, UNKNOWN_VALUE } from "./types.js";
+import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_VALUE } from "./types.js";
 import { expandWord, isDynamic, substitute } from "./word-expansion.js";
 import { forCall, unwrap, wrappedWords } from "./wrappers.js";
 
@@ -21,8 +22,6 @@ const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
 
 // PowerShell assignment: `$name = <value>` or `$name=<value>`.
 const PS_ASSIGNMENT = /^\$([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/s;
-// PowerShell environment variable: `$env:NAME = <value>` or `$env:NAME=<value>` (#86).
-const PS_ENV = /^\$(?:env:([A-Za-z_][A-Za-z0-9_]*)|\{env:([A-Za-z_][A-Za-z0-9_]*)\})(?:=(.*))?$/is;
 // Builtins that export: `export`, and `declare`/`typeset` with -x.
 const EXPORTERS = new Set(["export", "declare", "typeset"]);
 
@@ -36,6 +35,8 @@ function analyse(
   expansions: (Expansion[] | undefined)[] = [],
 ): void {
   const vars = variables(state);
+  // PowerShell's first word runs only after & (`$c` prints, `if ($c)` tests, `. $f` is a script, not read).
+  let runsWord = state.dialect === "bash" && !(state.asValue && words.length === 1);
   // An assignment word's value with the variables the line set; UNKNOWN_VALUE when a part isn't known.
   const valueOf = (k: number, set: RegExpExecArray): string =>
     assignedValue({ raw: words[k]!, quoted: false, expansions: dynamic[k] ? (expansions[k] ?? []) : undefined }, set, state, vars);
@@ -44,6 +45,7 @@ function analyse(
     if (!quoted[0] && ["&", ".", "return", "throw"].includes(words[0]?.toLowerCase() ?? "")) {
       // A dot-sourced script runs here, and can set anything; a call or a block is read as what it is (#163).
       if (words[0] === "." && words[1] !== undefined && !words[1].startsWith("{") && !state.guarded.has(commandName(words[1]))) state.envUnknown = true;
+      runsWord = words[0] === "&";
       [words, quoted, dynamic, expansions] = [words.slice(1), quoted.slice(1), dynamic.slice(1), expansions.slice(1)];
     } else {
       const set = psAssignment([words, quoted, dynamic, expansions]);
@@ -57,22 +59,10 @@ function analyse(
         return;
       }
       // An expression is not a command (`$cli x` is a parse error); its ( ) and $( ) parts were read already.
-      if (!PS_ENV.test(words[0] ?? "") && dynamic[0]) return;
+      if (!isPsEnvWord(words[0]) && dynamic[0]) return;
     }
   }
-  const psEnv = PS_ENV.exec(words[0] ?? "");
-  if (psEnv && (psEnv[3] !== undefined || words[1] === "=")) {
-    // A single literal (`'other'`, `other`) is known; anything else (an expression,
-    // a command, `(Get-Content f)`, `$x`) is only known when it runs.
-    const inline = psEnv[3] !== undefined && psEnv[3] !== "";
-    const from = inline ? 1 : psEnv[3] !== undefined ? 1 : 2;
-    const value = inline ? psEnv[3]! : words[from];
-    // Inline, the word's own `$env:` counts as an expansion, so look at the value part alone.
-    const expandsValue = inline ? /\$[A-Za-z_{(]/.test(value!) : dynamic[from];
-    const known = value !== undefined && words.length === (inline ? 1 : from + 1) && !expandsValue;
-    assign(state, psEnv[1] ?? psEnv[2]!, known ? value : UNKNOWN_VALUE, true);
-    return;
-  }
+  if (readPsEnvWords(words, dynamic, state)) return;
   const ps = state.dialect === "bash" ? PS_ASSIGNMENT.exec(words[0] ?? "") : null;
   if (ps && (ps[2] !== undefined || words[1] === "=")) {
     // `$x = "vercel"` stores a string; `$x = vercel ls` runs vercel and stores its output.
@@ -95,7 +85,7 @@ function analyse(
     const word = words[i];
     if (word === undefined) {
       // Only assignments: they set shell variables for the rest of the line.
-      for (const [name, value] of Object.entries(env)) assign(state, name, value, false);
+      for (const [name, value] of Object.entries(env)) (state.inBranch ? assignInBranch(state, name, value) : assign(state, name, value, false));
       return;
     }
     const assignment = ASSIGNMENT.exec(word);
@@ -127,6 +117,15 @@ function analyse(
     [words, quoted, dynamic, expansions] = wrappedWords([words, quoted, dynamic, expansions], step, split.map((t) => (t.kind === "word" ? t.value : "")));
     i = step.next;
   }
+  const alias = withAlias([words, quoted, dynamic, expansions], i, state);
+  if (alias === "unknown") return cantTell("", true, out, env, state);
+  if (alias) {
+    const all = state.aliases!;
+    state.aliases = alias.others;
+    analyse(alias.words[0], stdin, out, state, alias.words[1], alias.words[2], alias.words[3]);
+    state.aliases = all;
+    return;
+  }
   let bin = words[i]!;
   let args = words.slice(i + 1);
   // Where `args` starts in `words`, while it holds the words as typed.
@@ -140,9 +139,10 @@ function analyse(
       .flatMap((w, k) => (expansions[i + k] ? expandWord(w, expansions[i + k]!, quoted[i + k] ?? false, vars) : [w]));
     if (expanded.length === 0) return;
     if (expanded[0] === DYNAMIC_WORD || expanded[0] === DYNAMIC_WORDS) {
-      // A command held in a variable set elsewhere: check every guarded CLI the line names.
-      // A bare `$files` is most likely a value (PowerShell pipes it), not a command.
-      if (expanded.length > 1) for (const named of namedClis(state)) out.push(invocation(named, expanded.slice(1), env, state));
+      // A command only known when it runs: every guarded CLI the line names can't tell (#163). With text around it, it is
+      // a path to a script, and its arguments are still read as the CLI's.
+      if (runsWord && wholeExpansion(words[i]!, quoted[i] ?? false, expansions[i], state) && !looksUpCli(state)) cantTell("", true, out, env, state);
+      else if (expanded.length > 1) for (const named of namedClis(state)) out.push(invocation(named, expanded.slice(1), env, state));
       return;
     }
     bin = expanded[0]!;
@@ -153,7 +153,8 @@ function analyse(
         // so that command is read as the words it is: a CLI, `npx` or `bash -c` around one, `cloudpin switch` (#14).
         if (name === "cloudpin" && argv[0] === "exec") {
           const run = argv.slice(argv[1] === "--" ? 2 : 1);
-          analyse(run, stdin, out, { ...child(state), exported: { ...state.exported, ...env }, dialect: "bash" }, [], run.map(isDynamic));
+          if (run[0] !== undefined && isDynamic(run[0])) cantTell("", true, out, env, state);
+          else analyse(run, stdin, out, { ...child(state), exported: { ...state.exported, ...env }, dialect: "bash" }, [], run.map(isDynamic));
         } else out.push(invocation(bin, argv, env, state));
       };
       call(expanded.slice(1));
@@ -177,7 +178,19 @@ function analyse(
     const at = from === -1 ? -1 : from + k;
     return { raw, quoted: quoted[at] ?? false, expansions: dynamic[at] ? (expansions[at] ?? []) : undefined };
   });
-  if (readEnvCommand(name, envArgs, state, vars, stdin.length > 0)) return;
+  const aliased = readAlias(name, envArgs, state, vars);
+  if (aliased === "unknown") cantTell("", true, out, env, state);
+  if (aliased) return;
+  // The arguments with the line's variables, for a command that runs them (#162).
+  const runArgs = (): Arg[] =>
+    args.map((raw, k) => {
+      const at = from === -1 ? -1 : from + k;
+      const x = expansions[at];
+      return { raw, quoted: quoted[at] ?? false, dynamic: dynamic[at] ?? isDynamic(raw), value: isDynamic(raw) ? undefined : x ? substitute(raw, x, vars) : raw };
+    });
+  const run: Run | undefined = name === "eval" || name === "find" ? undefined : runner(name, runArgs(), state.dialect);
+  // `. <(...)` both may set anything and runs text cloudpin can't read.
+  if (readEnvCommand(name, envArgs, state, vars, stdin.length > 0) && !run) return;
   if (name === "unset") {
     if (args.includes("-f")) return;
     for (const arg of args) {
@@ -194,14 +207,6 @@ function analyse(
     moveFolder(state, folder, args.map((raw, k) => (from === -1 ? { raw, quoted: false } : { raw, quoted: quoted[from + k] ?? false, expansions: expansions[from + k] })), vars, env);
     return;
   }
-  // The arguments with the line's variables, for a command that runs them (#162).
-  const runArgs = (): Arg[] =>
-    args.map((raw, k) => {
-      const at = from === -1 ? -1 : from + k;
-      const x = expansions[at];
-      return { raw, quoted: quoted[at] ?? false, dynamic: dynamic[at] ?? isDynamic(raw), value: isDynamic(raw) ? undefined : x ? substitute(raw, x, vars) : raw };
-    });
-  const run: Run | undefined = name === "eval" || name === "find" ? undefined : runner(name, runArgs(), state.dialect);
   if (name === "eval") {
     // eval joins its arguments and runs them as a command line, in this shell.
     if (isDynamic(args.join(" "))) cantTell(args.join(" "), true, out, env, state);
@@ -217,6 +222,7 @@ function analyse(
     // its commands from standard input: `bash <<EOF`, `pwsh -Command - <<EOF`, `'...' | iex`.
     for (const { text, dialect } of [...(run.lines ?? []), ...(run.stdin ? stdin.map((text) => ({ text, dialect: run.stdin! })) : [])]) {
       runLine(text, dialect, out, env, run.allexport ? { ...state, allexport: true } : state, run.here);
+      if (run.later) state.atExit = [...(state.atExit ?? []), text];
     }
     const started = forCall(state, run.cwd === undefined ? {} : { cwd: run.cwd }, child);
     for (const argv of run.argvs ?? []) analyse(argv, [], out, { ...child(started), dialect: "bash" });
@@ -231,37 +237,11 @@ function analyse(
   }
 }
 
-function invocation(bin: string, args: string[], env: Record<string, string>, state: State): Invocation {
-  const inv: Invocation = { bin, args, env: { ...state.exported, ...env } };
-  // `env -i` leaves only what its own line gives the call.
-  if (state.envUnknown && !state.clearEnv) inv.envUnknown = true;
-  if (Object.keys(state.plain).length > 0) inv.ifExported = { ...state.plain };
-  const unset = [...state.unset, ...(state.callUnset ?? [])];
-  if (unset.length > 0) inv.unset = unset;
-  if (state.cwd !== undefined) inv.cwd = state.cwd;
-  if (state.cwd === UNKNOWN_FOLDER && state.known !== undefined) inv.knownCwd = state.known;
-  if (state.clearEnv) inv.clearEnv = true;
-  return inv;
-}
-
-/** Guarded CLI names that appear as whole words in `text`, the whole line by default. */
-function namedClis(state: State, text = state.line): string[] {
-  return [...state.guarded].filter((name) =>
-    new RegExp(`(^|[^A-Za-z0-9_.-])${name.replace(/[.*+?^${}()|[\]\\]/g, (c) => `\\${c}`)}([^A-Za-z0-9_.-]|$)`).test(text),
-  );
-}
-
-/** Something cloudpin can't read decides what runs (#162): each guarded CLI named in `text` (or the line) can't tell. */
-function cantTell(text: string, wholeLine: boolean, out: Invocation[], env: Record<string, string>, state: State): void {
-  for (const name of new Set([...namedClis(state, text), ...(wholeLine ? namedClis(state) : [])])) {
-    out.push(invocation(name, [DYNAMIC_WORDS], env, state));
-  }
-}
-
 /** A line a runner runs, read with its shell's rules, in a child shell. */
 function runLine(text: string, dialect: Dialect, out: Invocation[], env: Record<string, string>, state: State, here = false): void {
   if (isDynamic(text)) cantTell(text, true, out, env, state);
-  else collect(text, out, here ? state : { ...child(state), dialect });
+  // A new shell has none of this one's aliases.
+  else collect(text, out, here ? state : { ...child(state), dialect, aliases: {}, aliasesNext: {} });
 }
 
 function collect(input: string, out: Invocation[], state: State): void {
@@ -270,6 +250,11 @@ function collect(input: string, out: Invocation[], state: State): void {
   let dynamic: boolean[] = [];
   let expansions: (Expansion[] | undefined)[] = [];
   let stdin: string[] = [];
+  const branch = branchTracker(state);
+  let andOr = false;
+  nextAliases(state);
+  state.asValue = false;
+  const trapsBefore = state.atExit?.length ?? 0;
   // What to go back to when a ( ) subshell ends: its `cd` and variables don't come back (#86).
   const saved: State[] = [];
   // A pipe's sides and a background job run in child shells, in bash; PowerShell only moves a job (#163).
@@ -277,7 +262,11 @@ function collect(input: string, out: Invocation[], state: State): void {
     const before = child(state);
     // A compound's body is read after the `;` that ends this segment, still in that child shell (`| while read X; do`).
     const compound = KEYWORDS.has(segment[0] ?? "") && !quoted[0];
-    if (segment.length > 0) analyse(segment, stdin, out, state, quoted, dynamic, expansions);
+    if (segment.length > 0) {
+      branch(quoted[0] ? undefined : segment[0], andOr);
+      analyse(segment, stdin, out, state, quoted, dynamic, expansions);
+      andOr = false;
+    }
     if (own) restoreFolder(state, before);
     if (own && !compound) restoreEnv(state, before);
     segment = [];
@@ -291,6 +280,7 @@ function collect(input: string, out: Invocation[], state: State): void {
   // `&` or `|` alone: `&&` and `||` are two of them in a row.
   const lone = (t: number, op: string) => isOp(t, op) && !isOp(t - 1, op) && !isOp(t + 1, op);
   let afterPipe = false;
+  let fromPipe = false;
   for (const [t, token] of tokens.entries()) {
     if (token.kind === "word") {
       segment.push(token.value);
@@ -298,7 +288,12 @@ function collect(input: string, out: Invocation[], state: State): void {
       dynamic.push(token.dynamic);
       expansions.push(token.expansions);
     }
-    else if (token.kind === "stdin") stdin.push(token.body);
+    else if (token.kind === "stdin") {
+      // A heredoc or a redirection wins over the pipe.
+      if (fromPipe) stdin = [];
+      fromPipe = false;
+      stdin.push(token.body);
+    }
     // Runs where it appears, in a child shell, so a `cd` inside does not leak. PowerShell has no child shell here: a
     // ( ) or a block moves the session's folder, if it runs at all, so what follows it can't tell (#163).
     else if (token.kind === "subst") {
@@ -307,15 +302,24 @@ function collect(input: string, out: Invocation[], state: State): void {
       const inner = child(state);
       collect(token.inner, out, inner);
       if (powershell && (inner.cwd !== state.cwd || inner.stack !== state.stack)) loseFolder(state);
-      if (powershell) carryBlock(state, inner);
+      if (powershell) carryBlock(state, inner, segment, token.inner);
     } else {
       // PowerShell pipes values: the next command reads a literal string as its input (`'az ...' | iex`), a
-      // variable's known value, and anything else as input it can't read (#162).
-      const piped = token.op === "|" && state.dialect === "powershell" ? pipedValues([segment, quoted, dynamic, expansions], state) : [];
-      const pipe = state.dialect === "bash" && lone(t, "|");
+      // variable's known value, and anything else as input it can't read (#162). bash pipes text (#163).
+      const statement: Words = [segment, quoted, dynamic, expansions];
+      const piped = state.dialect === "powershell" ? (token.op === "|" ? pipedValues(statement, state) : []) : lone(t, "|") ? pipedText(statement, stdin, variables(state)) : [];
+      // `|&`, a new line or a ( right after the pipe: the next command still reads it.
+      const carried = segment.length === 0 && isOp(t - 1, "|") && !isOp(t - 2, "|") && token.op !== "|";
+      const passed = carried ? stdin : piped;
+      const pipe = state.dialect === "bash" && (lone(t, "|") || carried);
+      state.asValue = psValue(tokens, t);
       end(afterPipe || pipe || lone(t, "&"));
+      if ((token.op === "&" && isOp(t - 1, "&")) || (token.op === "|" && isOp(t - 1, "|"))) andOr = true;
+      state.asValue = false;
       afterPipe = pipe;
-      stdin = piped;
+      stdin = passed;
+      fromPipe = passed.length > 0;
+      if (token.op === "\n") nextAliases(state);
       if (token.op === "(") saved.push(child(state));
       else if (token.op === ")" && saved.length > 0) {
         const outer = saved.pop()!;
@@ -325,6 +329,7 @@ function collect(input: string, out: Invocation[], state: State): void {
     }
   }
   end(afterPipe);
+  readTraps(trapsBefore, out, state, (text, into) => runLine(text, "bash", into, {}, child(state), true));
 }
 
 /**
@@ -340,7 +345,8 @@ function collect(input: string, out: Invocation[], state: State): void {
  * environment the line starts in) can only narrow to one word (#160).
  * `dialect` is the shell that reads the line: a PowerShell line is read with
  * PowerShell's rules (`ps-tokens.ts`), and each call also as Windows
- * PowerShell 5.1 passes it on (#159).
+ * PowerShell 5.1 passes it on (#159). Text that runs and can't be read stops the
+ * CLIs the line names, except one it only ever calls in ways `exempt` lets by.
  */
 export function findInvocations(
   command: string,
@@ -348,6 +354,7 @@ export function findInvocations(
   baseCwd?: string,
   env?: NodeJS.ProcessEnv,
   dialect: Dialect = "bash",
+  exempt?: State["exempt"],
 ): Invocation[] {
   const out: Invocation[] = [];
   collect(command, out, {
@@ -361,6 +368,7 @@ export function findInvocations(
     dialect,
     lists: new Set(),
     ...(env ? { env } : {}),
+    ...(exempt ? { exempt } : {}),
   });
   return out;
 }

@@ -40,7 +40,7 @@ export function dynamicTarget(args: readonly string[], targetFlags: readonly str
     if (arg === "--") break;
     if (arg.includes(DYNAMIC_WORDS)) {
       return {
-        problem: `the command has words only known when it runs (an unquoted variable not set earlier in the line, "$@", input xargs adds, or a wrapper or command string cloudpin can't read), which could be flags that pick the account, ${CANT_TELL}`,
+        problem: `the command has words only known when it runs (an unquoted variable not set earlier in the line, "$@", input xargs adds, or a wrapper, alias, pipe into a shell or command string cloudpin can't read), which could be flags that pick the account, ${CANT_TELL}`,
         fix: "quote a variable if it is one value, give it a literal value, write the call out, or run the command yourself",
       };
     }

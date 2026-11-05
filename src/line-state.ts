@@ -44,6 +44,20 @@ export interface State {
   marked?: string[];
   /** Names `local` set, which end with their function (#163). */
   locals?: string[];
+  /** What each alias of this line stands for, by name (#163). */
+  aliases?: Record<string, string>;
+  /** bash reads a whole line before it runs any of it: the aliases the next line will see (#163). */
+  aliasesNext?: Record<string, string>;
+  /** The statement being read is a bare value in what looks like PowerShell's writing: see `psValue` (#163). */
+  asValue?: boolean;
+  /** This statement may not run (#163): in an `if`, a loop or a `case`, or after `&&` or `||`. */
+  inBranch?: boolean;
+  /** Names set in a branch, unknown from there on, whose values were each one word that is no flag (#163). */
+  oneWords?: Set<string>;
+  /** The strings `trap` keeps, which run later (#163). */
+  atExit?: string[];
+  /** Whether a call is one that never acts on an account; only the check knows (#163). */
+  exempt?: (name: string, args: string[]) => boolean;
 }
 
 /** The variables the line set, as word expansion reads them (#160). */
@@ -54,6 +68,7 @@ export const variables = (state: State): Variables => (state.dialect === "powers
     return value === UNKNOWN_VALUE ? undefined : value;
   },
   oneWord(name) {
+    if (state.oneWords?.has(name)) return true;
     // Never its value, which may be a secret: only that it can't split or be a flag.
     const value = name in state.vars ? undefined : state.env?.[name];
     return value !== undefined && !/\s/.test(value) && !value.startsWith("-");
@@ -93,6 +108,7 @@ export function restoreEnv(state: State, to: State): void {
 /** Sets NAME for the rest of the line, exported or not. */
 export function assign(state: State, name: string, value: string, exported: boolean): void {
   state.vars[name] = value;
+  state.oneWords?.delete(name);
   state.unset.delete(name);
   // Assigning to an exported variable updates what commands receive, and after `set -a` every assignment exports.
   if (exported || state.allexport || name in state.exported || state.marked?.includes(name)) {

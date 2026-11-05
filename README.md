@@ -59,7 +59,7 @@ npx cloudpin --help
 Requires Node.js 22 or later. Works on Windows, macOS and Linux. The `.cloudpin.yml` format is stable from 1.0 on
 (see Configuration), and [feedback](https://github.com/paureis/cloudpin/issues/new/choose) is very welcome.
 
-**Latest release: 1.2.2** (2026-11-05): a security fix for Windows, please upgrade. 1.2.1 (2026-10-29): agent hooks now find calls hidden by heredocs in `$( )`, run-time values,
+**Latest release: 1.2.3** (2026-11-05): a security fix for agent hooks, please upgrade. 1.2.2 (2026-11-05): a security fix for Windows. 1.2.1 (2026-10-29): agent hooks now find calls hidden by heredocs in `$( )`, run-time values,
 PowerShell syntax and wrappers such as `xargs`, `sudo`, `npx` or `cmd /c`, and gcloud checks the impersonated
 account; please upgrade. 1.2.0 (2026-10-29) was run it everywhere. A GitHub Action
 ([paureis/cloudpin-action](https://github.com/paureis/cloudpin-action)) checks the accounts before a deploy job, built

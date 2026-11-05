@@ -56,6 +56,7 @@ An idea gets a version when work on it starts.
 
 ## Shipped
 
+- **1.2.3** (2026-11-05): a security fix: variables an agent set on its line could run code during a check.
 - **1.2.2** (2026-11-05): a security fix for Windows: a value in a command could start another command through cmd.exe.
 - **1.2.1** (2026-10-29): must-fix patch for agent-hook gaps found in a parser audit: heredocs inside `$( )`
   ([#161](https://github.com/paureis/cloudpin/issues/161)), run-time values

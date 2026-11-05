@@ -8,6 +8,21 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-11-05
+
+A security fix. Please upgrade.
+
+### Security
+
+- Agent hooks, `cloudpin explain` and MCP `cloudpin_check`: a variable the agent set on its own line reached the identity
+  lookup cloudpin starts to check a command, so `NODE_OPTIONS`, `PYTHONPATH` and other variables that make a program run
+  code, or a `PATH` pointing at a planted file, could run that code during the check. These variables now stop the call
+  as "can't tell", naming the variable and never its value, and the lookup finds the CLI on the PATH the line started
+  with. Variables set before the agent started are unchanged, and so is a person's own terminal.
+- A `PATH` built from `$PATH` on the line (`PATH=/x:$PATH az ...`) skipped the check, because the CLI read as not installed.
+  It is now checked.
+- `env` and `sudo` with a variable name that isn't an identifier, and `cmd /c "set X=y&& ..."`, are now followed.
+
 ## [1.2.2] - 2026-11-05
 
 A security fix for Windows. Please upgrade.

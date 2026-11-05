@@ -36,6 +36,14 @@ export interface State {
   /** What a wrapper did to the environment of the call it runs (#162): `env -i`, `env -u NAME`. */
   clearEnv?: boolean;
   callUnset?: string[];
+  /** After `set -a`: every assignment exports (#163). */
+  allexport?: boolean;
+  /** Something earlier may have set any variable, which cloudpin can't read (#163): `. file`, `export $(...)`. */
+  envUnknown?: boolean;
+  /** Names `export X` marked with no value yet: the next assignment exports them (#163). */
+  marked?: string[];
+  /** Names `local` set, which end with their function (#163). */
+  locals?: string[];
 }
 
 /** The variables the line set, as word expansion reads them (#160). */
@@ -70,12 +78,24 @@ export function restoreFolder(state: State, to: Pick<State, "cwd" | "known" | "p
   state.stack = to.stack;
 }
 
+/** Back to what `to` holds: a child shell's variables don't come back. */
+export function restoreEnv(state: State, to: State): void {
+  state.vars = to.vars;
+  state.exported = to.exported;
+  state.plain = to.plain;
+  state.unset = to.unset;
+  for (const key of ["allexport", "envUnknown", "marked", "locals", "callUnset"] as const) {
+    if (to[key] === undefined) delete state[key];
+    else (state[key] as unknown) = to[key];
+  }
+}
+
 /** Sets NAME for the rest of the line, exported or not. */
 export function assign(state: State, name: string, value: string, exported: boolean): void {
   state.vars[name] = value;
   state.unset.delete(name);
-  // Assigning to an exported variable updates what commands receive.
-  if (exported || name in state.exported) {
+  // Assigning to an exported variable updates what commands receive, and after `set -a` every assignment exports.
+  if (exported || state.allexport || name in state.exported || state.marked?.includes(name)) {
     state.exported[name] = value;
     delete state.plain[name];
   } else state.plain[name] = value;

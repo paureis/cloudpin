@@ -14,6 +14,12 @@ export const UNKNOWN_CWD = {
   fix: "change to a literal folder first, or run the command yourself",
 };
 
+/** Why, when the line ran something that can set any variable, so the identity can't be read (#163). */
+export const UNKNOWN_ENV = {
+  problem: `an earlier part of the line can set environment variables cloudpin can't read (. or source, or a name only known when it runs, as in export $(...)), ${CANT_TELL}`,
+  fix: "set the variables with literal values on the line, or run the command yourself",
+};
+
 /**
  * Why cloudpin can't tell the account when an argument is known only when the command runs (#160), or
  * undefined when none could pick it. Each reason names a flag, never a value:

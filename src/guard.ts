@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { envNameMatches } from "./cache.js";
-import { dynamicTarget, UNKNOWN_CWD } from "./dynamic-args.js";
+import { dynamicTarget, UNKNOWN_CWD, UNKNOWN_ENV } from "./dynamic-args.js";
 import { isReadOnly } from "./readonly.js";
 import { type Exec, type ProviderDef, type Resolution, UNKNOWN_FOLDER, UNKNOWN_VALUE } from "./types.js";
 
@@ -13,6 +13,8 @@ export interface GuardRequest {
   cwd: string;
   /** With `cwd` UNKNOWN_FOLDER: the last folder the line knew, where the search for a pin file starts (#163). */
   knownCwd?: string;
+  /** Something earlier on the line may have set any variable, which cloudpin can't read (#163). */
+  envUnknown?: boolean;
   /** "agent" ignores CLOUDPIN_SKIP and CLOUDPIN_CONFIRM, so an agent cannot opt itself out. */
   mode: "shell" | "agent";
 }
@@ -183,6 +185,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   // An argument only known when it runs (#160), before resolve, so no such value reaches a CLI.
   const dynamic = dynamicTarget(req.args, provider.targetFlags ?? []);
   if (dynamic) return { ...base, uncertain: true, problems: [dynamic.problem], fix: dynamic.fix };
+  if (req.envUnknown) return { ...base, uncertain: true, problems: [UNKNOWN_ENV.problem], fix: UNKNOWN_ENV.fix };
   // A variable the line sets from something only known when it runs (#86): if it
   // decides this CLI's account, cloudpin can't tell which account will be used.
   const identityVars = provider.cacheInputs(folded.env, platform).env;
@@ -192,7 +195,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
       ...base,
       uncertain: true,
       problems: [
-        `${unknown.join(", ")} ${unknown.length > 1 ? "are" : "is"} set by the command line from something cloudpin can't read in advance ($(...), backticks or another variable), so it can't tell which account this command would use`,
+        `${unknown.join(", ")} ${unknown.length > 1 ? "are" : "is"} set by the command line from something cloudpin can't read in advance ($(...), backticks, another variable, read or inside a block), so it can't tell which account this command would use`,
       ],
       fix: `set ${unknown[0]} to a literal value, or run the command yourself`,
     };

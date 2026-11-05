@@ -343,6 +343,7 @@ async function checkCommand(
         env: envFor(env, inv, { agent: true, platform: deps.platform }),
         cwd: inv.cwd ?? call.cwd,
         ...(inv.knownCwd === undefined ? {} : { knownCwd: inv.knownCwd }),
+        ...(inv.envUnknown ? { envUnknown: true } : {}),
         mode: "agent",
       },
       deps,

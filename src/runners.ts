@@ -65,6 +65,9 @@ export function runner(name: string, args: Arg[], dialect: Dialect): Run | undef
   return undefined;
 }
 
+// find options whose arguments, up to ";" or "+", are a command it runs.
+export const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
+
 // A file that is the shell's standard input.
 const STDIN_FILE = /^\/dev\/(stdin|fd\/0)$/;
 

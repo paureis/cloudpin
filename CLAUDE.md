@@ -43,7 +43,8 @@ The source layout is the table in `AGENTS.md`. `src/exec.ts` is the only place t
    Recorded findings go in HANDOFF.md under "Provider research".
 3. **Resolve the identity the specific command will use**, not the CLI's default: flags (`--subscription`,
    `--profile`, `--scope`, `--team`, `--project`, `--hostname`) beat env vars, which beat config files.
-   Pass the command's own `env` to the CLI so token env vars count.
+   Pass the command's own `env` to the CLI so token env vars count, except variables that can run code and a PATH set
+   on the line, which never reach the lookup (`src/line-code-env.ts`).
 4. **Pin and compare stable IDs**, case-insensitive only where the provider is (GUIDs, GitHub logins).
 5. **Never print, log, cache or put in an error message a token or a credential value.** Messages name
    env vars, never their values. Never run `aws configure list` (it prints key tails) or anything with `--show-token`.

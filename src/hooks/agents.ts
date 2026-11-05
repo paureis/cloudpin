@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import { cmdFileLookup } from "../cmd-reread.js";
 import { formatBlock, formatConfirm, maskArgv } from "../format.js";
 import { commandName, exemptCall, foldEnvNames, guard, type GuardDeps } from "../guard.js";
+import { codeVarsSet, lineMovedPath } from "../line-code-env.js";
 import { type Dialect, findInvocations, type Invocation } from "../shellwords.js";
 import { parseSwitchArgs } from "../switch.js";
 import { UNKNOWN_FOLDER } from "../types.js";
@@ -250,6 +251,22 @@ export function cloudpinConfirmation(inv: Invocation, deps: GuardDeps, cwd: stri
   return undefined;
 }
 
+/**
+ * Why an agent's `cloudpin switch` is refused outright: it starts the CLIs in its own process, with the environment
+ * the line gave it, so a variable that can run code there would run what the line chose, on the person's OK to a
+ * question that doesn't show it. PATH counts here: no lookup of the hook's own replaces it. Names, never values.
+ */
+export function cloudpinRefusal(inv: Invocation, deps: GuardDeps, base: NodeJS.ProcessEnv): string | undefined {
+  const args = inv.args[0] === "--" ? inv.args.slice(1) : inv.args;
+  const first = args[0];
+  if (first === undefined || (!isDynamic(first) && (first !== "switch" || "help" in parseSwitchArgs(args.slice(1))))) return undefined;
+  const platform = deps.platform ?? process.platform;
+  const env = envFor(base, inv, { platform });
+  const names = [...(lineMovedPath(base, env, platform) ? ["PATH"] : []), ...codeVarsSet(base, env, platform, "az")];
+  if (names.length === 0) return undefined;
+  return `cloudpin: \`${maskArgv(["cloudpin", ...args]).join(" ")}\` starts your cloud CLIs with this line's environment, and ${names.join(", ")} set on it can make them run code the line chose, so it is blocked.\n  Do not work around this; ask the human to run \`cloudpin switch\`.`;
+}
+
 export type AgentName = keyof typeof AGENTS;
 
 /**
@@ -333,7 +350,9 @@ async function checkCommand(
   for (const inv of agentCalls(call, bins, env, platform, deps)) {
     // findInvocations reads what `cloudpin exec` starts as the call it is, so any other cloudpin call stays here.
     if (commandName(inv.bin) === "cloudpin") {
-      const confirmation = cloudpinConfirmation(inv, deps, inv.cwd ?? call.cwd, env);
+      const refused = cloudpinRefusal(inv, deps, env);
+      if (refused) blocks.push(refused);
+      const confirmation = refused ? undefined : cloudpinConfirmation(inv, deps, inv.cwd ?? call.cwd, env);
       if (confirmation) confirmations.push(confirmation);
       continue;
     }
@@ -342,6 +361,7 @@ async function checkCommand(
         bin: inv.bin,
         args: inv.args,
         env: envFor(env, inv, { agent: true, platform: deps.platform }),
+        before: env,
         cwd: inv.cwd ?? call.cwd,
         ...(inv.knownCwd === undefined ? {} : { knownCwd: inv.knownCwd }),
         ...(inv.envUnknown ? { envUnknown: true } : {}),

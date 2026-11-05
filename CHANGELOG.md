@@ -45,6 +45,8 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Security
 
+- An agent's `cloudpin switch` on a line that sets a variable able to run code, or `PATH`, is refused (see 1.2.3), and the
+  rule reads every form the line reader follows, such as `set -a` and `Set-Item env:X`.
 - On Windows, cmd.exe reads the arguments of a `.cmd` or `.bat` CLI (az, npm's shims) again, so in PowerShell
   `--query 'x&kubectl'` also ran kubectl and `--subs^cription other` reached the CLI as `--subscription other`. An unquoted
   `&`, `|`, `<`, `>`, `^` or `)`, a newline or `%NAME%` there is now "can't tell" when a pin is in play. `gh.exe` and other
@@ -116,6 +118,21 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
   passing as an unguarded `bash` or `npx`.
 - Agent hooks: a `cloudpin` call whose subcommand is only known when it runs (`cloudpin $x`) asks you first (#14), since
   it may be `cloudpin use` or `cloudpin switch`. Cursor's matcher finds a CLI in any case (`AZ.CMD`).
+
+## [1.2.3] - 2026-11-05
+
+A security fix. Please upgrade.
+
+### Security
+
+- Agent hooks, `cloudpin explain` and MCP `cloudpin_check`: a variable the agent set on its own line reached the identity
+  lookup cloudpin starts to check a command, so `NODE_OPTIONS`, `PYTHONPATH` and other variables that make a program run
+  code, or a `PATH` pointing at a planted file, could run that code during the check. These variables now stop the call
+  as "can't tell", naming the variable and never its value, and the lookup finds the CLI on the PATH the line started
+  with. Variables set before the agent started are unchanged, and so is a person's own terminal.
+- A `PATH` built from `$PATH` on the line (`PATH=/x:$PATH az ...`) skipped the check, because the CLI read as not installed.
+  It is now checked.
+- `env` and `sudo` with a variable name that isn't an identifier, and `cmd /c "set X=y&& ..."`, are now followed.
 
 ## [1.2.2] - 2026-11-05
 

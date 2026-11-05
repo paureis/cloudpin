@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { envNameMatches } from "./cache.js";
 import { cmdReread, dynamicTarget, UNKNOWN_CWD, UNKNOWN_ENV } from "./dynamic-args.js";
+import { codeVarsSet, codeVarsStop, lineMovedPath, PATH_ONLY_ON_LINE, withHooksPath } from "./line-code-env.js";
 import { isReadOnly } from "./readonly.js";
 import { type Exec, type ProviderDef, type Resolution, UNKNOWN_FOLDER, UNKNOWN_VALUE } from "./types.js";
 
@@ -17,6 +18,11 @@ export interface GuardRequest {
   envUnknown?: boolean;
   /** What cmd.exe would act on in this call's command line, as a class of character (#168). */
   cmdReread?: string;
+  /**
+   * The environment the line starts in, when cloudpin read the call from a line: what `env` changes from it, the line
+   * set. Absent for `cloudpin exec`, whose whole environment is the person's.
+   */
+  before?: NodeJS.ProcessEnv;
   /** "agent" ignores CLOUDPIN_SKIP and CLOUDPIN_CONFIRM, so an agent cannot opt itself out. */
   mode: "shell" | "agent";
 }
@@ -193,6 +199,12 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
     const { problem, fix } = cmdReread(req.cmdReread);
     return { ...base, uncertain: true, problems: [problem], fix };
   }
+  // A variable the line set that can make the CLI run code, before resolve, so no process starts with it.
+  const codeVars = req.before ? codeVarsSet(req.before, req.env, platform, name) : [];
+  if (codeVars.length > 0) {
+    const { problem, fix } = codeVarsStop(codeVars);
+    return { ...base, uncertain: true, problems: [problem], fix };
+  }
   // An argument only known when it runs (#160), before resolve, so no such value reaches a CLI.
   const dynamic = dynamicTarget(req.args, provider.targetFlags ?? []);
   if (dynamic) return { ...base, uncertain: true, problems: [dynamic.problem], fix: dynamic.fix };
@@ -223,10 +235,15 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
     };
   }
   // Other unknown values don't decide the account; the CLI's identity check runs without them.
-  const env = Object.fromEntries(Object.entries(folded.env).filter(([, v]) => v !== UNKNOWN_VALUE));
+  const known = Object.fromEntries(Object.entries(folded.env).filter(([, v]) => v !== UNKNOWN_VALUE));
+  const env = req.before ? withHooksPath(known, foldEnvNames(req.before, platform).env, platform) : known;
   const res = await provider.resolve({ args: req.args, env, cwd: req.cwd, bin: name, platform }, exec);
   trace.resolution = res;
-  if (res.kind === "error" && cliMissing) return { action: "allow", reason: "not-installed" };
+  if (res.kind === "error" && cliMissing) {
+    // Where the line changed PATH the command may find a CLI the lookup can't, so there may be an account to protect.
+    if (req.before && lineMovedPath(req.before, req.env, platform)) return { ...base, uncertain: true, problems: [PATH_ONLY_ON_LINE.problem], fix: PATH_ONLY_ON_LINE.fix };
+    return { action: "allow", reason: "not-installed" };
+  }
   switch (res.kind) {
     case "logged-out":
       return { ...base, problems: ["not logged in"], fix: res.hint };

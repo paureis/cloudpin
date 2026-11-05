@@ -265,6 +265,22 @@ function packageRunner(words: readonly string[], from: number, t: Table, dynamic
   return { next: o.next, bin: binOf(spec), unknown: o.unknown };
 }
 
+/**
+ * What `wrapper` reads a word before the command as: env(1) and sudo take any word with an = in it as a variable,
+ * whatever its name (GNU env.c, checked with Git Bash's env and a printer: `env 'A^=1' printer`; sudo's parse_args.c,
+ * is_envar, except a word starting with /), where a shell needs an identifier. In the shape of ASSIGNMENT's match.
+ * "unknown" when the name has a part only known when the line runs, or the word may hold an = only then (unless it
+ * ends as a path to a command: `env "$DIR/gh"`); "none" when there is no name: `env =x` sets nothing.
+ */
+export function wrapperOperand(wrapper: string | undefined, word: string, dynamic: boolean | undefined): RegExpExecArray | "unknown" | "none" | null {
+  if (wrapper !== "env" && !(wrapper === "sudo" && !word.startsWith("/"))) return null;
+  const eq = word.indexOf("=");
+  if (eq === -1) return dynamic && !/[\\/][^\\/$<]+$/.test(word) ? "unknown" : null;
+  // A variable stays as typed in the word; a $( ) or backticks are already a marker.
+  if (dynamic && word.slice(0, eq).search(/[$<]/) !== -1) return "unknown";
+  return eq === 0 ? "none" : /^([^=]+)()=(.*)$/s.exec(word);
+}
+
 /** What a call's shell state holds of its environment and folder, as `shellwords.ts` keeps it. */
 export interface CallState {
   base?: string;

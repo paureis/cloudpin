@@ -4,27 +4,23 @@ import { commandName } from "./guard.js";
 import { cantTell, invocation, looksUpCli, namedClis, nextAliases, pipedText, psValue, readAlias, readTraps, wholeExpansion, withAlias } from "./hidden-calls.js";
 import type { Invocation } from "./invocation.js";
 import { ASSIGNMENT, assignedValue, assignInBranch, branchTracker, carryBlock, type EnvArg, isPsEnvWord, readEnvCommand, readPsAssignment, readPsEnvWords, readSetEnvironmentVariable } from "./line-env.js";
-import { assign, child, type Dialect, restoreEnv, restoreFolder, type State, variables } from "./line-state.js";
+import { assign, child, type Dialect, EXPORTERS, restoreEnv, restoreFolder, type State, variables } from "./line-state.js";
 import { tokenizePowerShell, windowsPowerShellArgv } from "./ps-tokens.js";
 import { pipedValues, psAssignment, type Words } from "./ps-words.js";
-import { type Arg, type Run, runner } from "./runners.js";
+import { type Arg, FIND_EXEC, type Run, runner } from "./runners.js";
 import { type Expansion, tokenize } from "./shell-tokens.js";
 import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_VALUE } from "./types.js";
 import { expandWord, isDynamic, substitute } from "./word-expansion.js";
-import { forCall, unwrap, wrappedWords } from "./wrappers.js";
+import { forCall, unwrap, wrappedWords, wrapperOperand } from "./wrappers.js";
 
 export type { Dialect, Invocation };
 export { UNKNOWN_VALUE };
 
 // Shell keywords that run the command after them; wrappers and runners are in wrappers.ts and runners.ts.
 const KEYWORDS = new Set(["{", "!", "if", "then", "else", "elif", "while", "until", "do"]);
-// find options whose arguments, up to ";" or "+", are a command it runs.
-const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
 
 // PowerShell assignment: `$name = <value>` or `$name=<value>`.
 const PS_ASSIGNMENT = /^\$([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/s;
-// Builtins that export: `export`, and `declare`/`typeset` with -x.
-const EXPORTERS = new Set(["export", "declare", "typeset"]);
 
 function analyse(
   words: string[],
@@ -83,6 +79,7 @@ function analyse(
   const env: Record<string, string> = {};
   let i = 0;
   let wrapper: string | undefined;
+  let last: string | undefined; // The wrapper just read.
   for (;;) {
     const word = words[i];
     if (word === undefined) {
@@ -90,9 +87,10 @@ function analyse(
       for (const [name, value] of Object.entries(env)) (state.inBranch ? assignInBranch(state, name, value) : assign(state, name, value, false));
       return;
     }
-    const assignment = ASSIGNMENT.exec(word);
+    const assignment = ASSIGNMENT.exec(word) ?? wrapperOperand(last, word, dynamic[i]);
+    if (assignment === "unknown") return cantTell(words.slice(i).join(" "), true, out, env, state);
     if (assignment) {
-      env[assignment[1]!] = valueOf(i, assignment);
+      if (assignment !== "none") env[assignment[1]!] = valueOf(i, assignment);
       i++;
       continue;
     }
@@ -114,6 +112,7 @@ function analyse(
       return;
     }
     wrapper ??= word;
+    last = commandName(word);
     if (step.clearEnv) for (const k of Object.keys(env)) delete env[k];
     for (const k of step.unset ?? []) delete env[k];
     state = forCall(state, step, child);

@@ -248,9 +248,9 @@ export const cloudflare: ProviderDef<"cloudflare"> = {
     if ("error" in dotenv) return { kind: "error", message: dotenv.error };
     const { env } = dotenv;
     const inFile = (name: string) => (dotenv.from[name] ? ` in ${dotenv.from[name]}` : "");
-    const given = flagValue(args, ["--config", "-c"]);
+    const given = flagValue(args, ["--config", "-c"], { shortEquals: true });
     const configPath = given !== undefined ? resolvePath(start, given) : CONFIG_NAMES.map((n) => findUp(n, start)).find(Boolean);
-    const envName = flagValue(args, ["--env", "-e"]) ?? (env.CLOUDFLARE_ENV || undefined);
+    const envName = flagValue(args, ["--env", "-e"], { shortEquals: true }) ?? (env.CLOUDFLARE_ENV || undefined);
     // The folder whose binding picks the profile: the --config file's, else the command's.
     const folder = bindingFolder(start, platform);
     const lookup = given !== undefined ? dirname(resolvePath(folder, given)) : folder;

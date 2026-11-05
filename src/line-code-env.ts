@@ -56,6 +56,33 @@ export function codeVarsSet(before: NodeJS.ProcessEnv, env: NodeJS.ProcessEnv, p
   return setOnLine(before, env, platform, (name) => RUNS_CODE.has(name) || RUNS_CODE_PREFIX.test(name));
 }
 
+/**
+ * PATH and PATHEXT choose the file that starts and, in a shim, what it starts by bare name (npm's cmd-shim runs `node`).
+ * Agents set PATH for honest reasons, so they don't stop a call: the lookup uses the ones the line started with. The
+ * identity can only differ if the line's PATH leads to another program named like the CLI, which THREAT_MODEL.md leaves
+ * out ("A compromised machine or PATH"); another install of the CLI reads the same account files.
+ */
+const FROM_THE_HOOK = ["PATH", "PATHEXT"];
+
+/** `env` with the PATH and PATHEXT of `before` and no others, in whichever spellings they have. */
+export function withHooksPath(env: NodeJS.ProcessEnv, before: NodeJS.ProcessEnv, platform: NodeJS.Platform): NodeJS.ProcessEnv {
+  const named = ([key]: [string, unknown]) => FROM_THE_HOOK.includes(platform === "win32" ? key.toUpperCase() : key);
+  return { ...Object.fromEntries(Object.entries(env).filter((entry) => !named(entry))), ...Object.fromEntries(Object.entries(before).filter(named)) };
+}
+
+/** Whether the line changed PATH or PATHEXT, in any spelling, removing it included. */
+export function lineMovedPath(before: NodeJS.ProcessEnv, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): boolean {
+  if (setOnLine(before, env, platform, (name) => FROM_THE_HOOK.includes(name)).length > 0) return true;
+  const kept = valuesByName(env, platform);
+  return [...valuesByName(before, platform).keys()].some((name) => FROM_THE_HOOK.includes(name) && !kept.has(name));
+}
+
+/** Why a call stops when its CLI isn't on the hook's PATH and the line changed it. */
+export const PATH_ONLY_ON_LINE = {
+  problem: "the command line changes PATH, and cloudpin only looks for the CLI on the PATH it started with, where it isn't, so it can't tell which account this command would use",
+  fix: "put the CLI's folder on PATH before starting the agent, or run the command yourself",
+};
+
 /** Why a call stops: the variables by name, never a value. */
 export const codeVarsStop = (names: string[]) => ({
   problem: `${names.join(", ")} ${names.length > 1 ? "are" : "is"} set by the command line and can make a program run code the line chose, so cloudpin won't start the CLI to ask, and can't tell which account this command would use`,

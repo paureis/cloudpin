@@ -8,6 +8,12 @@ export const DYNAMIC_FOLDER = {
   fix: "give the folder a literal value, or run the command yourself",
 };
 
+/** Why, when the line moved to a folder cloudpin can't read, so neither the pin file nor a link can be found (#163). */
+export const UNKNOWN_CWD = {
+  problem: `the folder this command runs in is only known when the command runs (a cd to $(...), a glob or a variable cloudpin can't read, or inside a block), ${CANT_TELL}`,
+  fix: "change to a literal folder first, or run the command yourself",
+};
+
 /**
  * Why cloudpin can't tell the account when an argument is known only when the command runs (#160), or
  * undefined when none could pick it. Each reason names a flag, never a value:

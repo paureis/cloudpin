@@ -6,7 +6,7 @@ import { home } from "./paths.js";
 import { type Dialect, findInvocations, type Invocation } from "./shellwords.js";
 import { envFor } from "./user-env.js";
 import { describe } from "./status.js";
-import type { Identity } from "./types.js";
+import { type Identity, UNKNOWN_FOLDER } from "./types.js";
 
 export interface ExplainedCall {
   /** The call's words, credential values masked as `***` in place (#134). */
@@ -63,7 +63,9 @@ function reasonFor(verdict: Verdict, trace: Trace, call: Invocation, mode: Expla
         case "not-guarded":
           return "cloudpin doesn't guard this command";
         case "no-config":
-          return "no .cloudpin.yml here or in any parent folder, so nothing is pinned";
+          return call.cwd === UNKNOWN_FOLDER
+            ? "the folder is only known when the command runs, and no .cloudpin.yml is in the last folder cloudpin could read or any parent of it, so it does nothing"
+            : "no .cloudpin.yml here or in any parent folder, so nothing is pinned";
         case "not-pinned":
           return `${trace.provider} is not pinned in ${trace.config?.path}`;
         case "exempt":
@@ -119,7 +121,7 @@ export async function explain(command: string | string[], opts: ExplainOptions, 
     }
     const cwd = call.cwd ?? opts.cwd;
     const trace: Trace = {};
-    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent", platform: deps.platform }), cwd, mode: opts.mode }, deps, trace);
+    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent", platform: deps.platform }), cwd, ...(call.knownCwd === undefined ? {} : { knownCwd: call.knownCwd }), mode: opts.mode }, deps, trace);
     const res = trace.resolution;
     out.push({
       // Masked for every output (text, --json, MCP); the guard above read the real words (#134).

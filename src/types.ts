@@ -91,3 +91,5 @@ export const UNKNOWN_VALUE = "<cloudpin: set by the command line, unknown in adv
 export const DYNAMIC_WORD = "<cloudpin: a word known only when the command runs>";
 /** An unquoted `$VAR` or `${...}`, `$*`, or `"$@"`: bash may split it into several words, flags included. */
 export const DYNAMIC_WORDS = "<cloudpin: words known only when the command runs>";
+/** An Invocation's `cwd` when the line moved to a folder cloudpin can't read in advance (#163): never a real path. */
+export const UNKNOWN_FOLDER = "<cloudpin: a folder known only when the command runs>";

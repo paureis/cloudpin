@@ -1,6 +1,6 @@
-import { resolve } from "node:path";
+import { joinFolder, setFolder } from "./folder.js";
 import type { Words } from "./ps-words.js";
-import { DYNAMIC_WORD, DYNAMIC_WORDS } from "./types.js";
+import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_FOLDER } from "./types.js";
 
 /**
  * Commands that run the command after their own flags (#162): Unix wrappers (env, sudo, nice, timeout...)
@@ -199,7 +199,7 @@ export function unwrap(name: string, words: readonly string[], at: number, dynam
     }
     case "sudo": {
       const o = read(SUDO);
-      const dir = opts(o).get("-D");
+      const dir = folderOption(o, "-D");
       return { next: o.next, unknown: o.unknown, ...(dir === undefined ? {} : { cwd: dir }) };
     }
     case "env": {
@@ -212,7 +212,7 @@ export function unwrap(name: string, words: readonly string[], at: number, dynam
       if (unset.length > 0) out.unset = unset;
       // The variable env -u removes, and the words env -S splits, must be known.
       if (o.dynamic.has("-u") || o.dynamic.has("-S")) out.unknown = true;
-      const dir = opts(o).get("-C");
+      const dir = folderOption(o, "-C");
       if (dir !== undefined) out.cwd = dir;
       const split = opts(o).get("-S");
       if (split !== undefined) out.split = split;
@@ -235,7 +235,7 @@ export function unwrap(name: string, words: readonly string[], at: number, dynam
     case "yarn": {
       // Global flags, then `exec`, `dlx`, yarn's `run`, or a bin (pnpm runs one that is not its own command).
       const o = read(name === "pnpm" ? PNPM : YARN);
-      const dir = opts(o).get("-C") ?? opts(o).get("--cwd");
+      const dir = folderOption(o, "-C") ?? folderOption(o, "--cwd");
       const sub = words[o.next];
       let out: Unwrapped;
       if (sub === "dlx") out = packageRunner(words, o.next + 1, name === "pnpm" ? PNPM_RUN : YARN_DLX, dynamic);
@@ -247,6 +247,11 @@ export function unwrap(name: string, words: readonly string[], at: number, dynam
     }
   }
   return undefined;
+}
+
+/** The folder an option names, as written; UNKNOWN_FOLDER when it is only known when the line runs (#163). */
+function folderOption(o: Options, key: string): string | undefined {
+  return o.dynamic.has(key) ? UNKNOWN_FOLDER : new Map(o.options).get(key);
 }
 
 /** npx, npm exec, pnpm dlx, yarn dlx, bunx: the first operand is the package, or with -p the command. */
@@ -264,6 +269,7 @@ function packageRunner(words: readonly string[], from: number, t: Table, dynamic
 export interface CallState {
   base?: string;
   cwd?: string;
+  known?: string;
   exported: Record<string, string>;
   plain: Record<string, string>;
   clearEnv?: boolean;
@@ -274,7 +280,7 @@ export interface CallState {
 export function forCall<S extends CallState>(state: S, step: Pick<Unwrapped, "cwd" | "clearEnv" | "unset">, copy: (s: S) => S): S {
   if (step.cwd === undefined && !step.clearEnv && !step.unset) return state;
   const next = copy(state);
-  if (step.cwd !== undefined) next.cwd = resolve(state.cwd ?? state.base ?? ".", step.cwd);
+  if (step.cwd !== undefined) setFolder(next, joinFolder(state.cwd ?? state.base ?? ".", step.cwd));
   if (step.clearEnv) [next.exported, next.plain, next.clearEnv] = [{}, {}, true];
   for (const name of step.unset ?? []) {
     delete next.exported[name];

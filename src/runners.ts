@@ -1,7 +1,7 @@
 import { cmdCommands } from "./cmd-line.js";
 import { splitCommandLine } from "./ps-tokens.js";
 import type { Dialect } from "./shellwords.js";
-import { DYNAMIC_WORDS } from "./types.js";
+import { DYNAMIC_WORDS, UNKNOWN_FOLDER } from "./types.js";
 import { readOptions, table } from "./wrappers.js";
 
 /**
@@ -31,6 +31,8 @@ export interface Run {
   unknown?: boolean;
   /** Folder the argvs run in, as written (Start-Process -WorkingDirectory). */
   cwd?: string;
+  /** Its lines run in this shell, not a child, so what they change stays (Invoke-Expression). */
+  here?: boolean;
 }
 
 const SHELLS = new Set(["bash", "sh", "zsh", "dash"]);
@@ -161,9 +163,9 @@ function powershell(args: Arg[], pwsh: boolean): Run {
 function invokeExpression(args: Arg[]): Run {
   const rest = args[0] && /^-c(o(m(m(a(n(d)?)?)?)?)?)?$/i.test(args[0].raw) ? args.slice(1) : args;
   const arg = rest[0];
-  if (arg === undefined) return { stdin: "powershell" };
+  if (arg === undefined) return { stdin: "powershell", here: true };
   if (arg.raw.startsWith("{")) return {};
-  return arg.value === undefined ? { unknown: true } : { lines: [{ text: arg.value, dialect: "powershell" }] };
+  return arg.value === undefined ? { unknown: true } : { lines: [{ text: arg.value, dialect: "powershell" }], here: true };
 }
 
 // Start-Process's parameters with their aliases (Microsoft.PowerShell.Management docs), and the common
@@ -204,7 +206,7 @@ function startProcess(args: Arg[]): Run {
       const value: Arg = named[2] !== undefined ? { ...arg, raw: named[2], value: arg.value === undefined ? undefined : named[2] } : args[++k]!;
       if (value === undefined) return {};
       if (takes === "file") file = value;
-      else if (takes === "cwd") cwd = value.value;
+      else if (takes === "cwd") cwd = value.value ?? UNKNOWN_FOLDER;
       else if (takes === "arg") list.push(value);
       continue;
     }

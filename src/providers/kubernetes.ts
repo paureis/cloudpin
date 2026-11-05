@@ -241,7 +241,8 @@ function allNamespaces(args: string[]): boolean {
   // spelling is on (or an error, and the command doesn't run).
   return own.some((a) => {
     const [name, value] = a.split(/=(.*)/s, 2);
-    return (name === "-A" || name === "--all-namespaces") && (value === undefined || !FALSE.has(value));
+    // kubectl reads "_" as "-" in a flag's name (pkg/cmd/cmd.go, WordSepNormalizeFunc); helm refuses the spelling.
+    return (name === "-A" || name!.replaceAll("_", "-") === "--all-namespaces") && (value === undefined || !FALSE.has(value));
   });
 }
 

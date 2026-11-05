@@ -59,6 +59,7 @@ Versions 1.0.0 to 1.1.2 are in [docs/changelog-1.0-1.1.md](docs/changelog-1.0-1.
 - Help no longer exempts a command that runs anyway (#153): a kubectl or helm plugin given `--help` (it gets the flag
   as an argument), a value flag that takes it (`gh secret set X --body --help`), and Wrangler's `--help false` and
   `--no-help`. `gh ... --web --help` is checked as well, at the cost of one check.
+- kubectl: `--all_namespaces` counts as `--all-namespaces`, as kubectl reads it (#153).
 - kubectl and helm: a long flag that may take the next word as its value no longer hides the target (#153).
   `kubectl logs pod --container -n x` sets no namespace, since `-n` is the container, but cloudpin read namespace `x`.
   cloudpin now knows the long flags that never take a value (`--watch`, `--all`, `--force`, ... for kubectl 1.36 and

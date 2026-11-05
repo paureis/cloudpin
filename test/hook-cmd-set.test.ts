@@ -51,12 +51,19 @@ describe("cmd /c: set before a call", () => {
   ])("%s: can't tell", async (line) => {
     const stopped = await hook(line, { platform: "win32" });
     expect(stopped.decision).toBe("deny");
+    expect(stopped.reason).toContain("could not tell");
     expect(calls).toEqual([]);
+  });
+
+  it("a set in quotes, which cmd.exe takes off", async () => {
+    expect(findInvocations(`cmd /c 'set "FOO=a b"&& gh pr list'`, ["gh"], undefined, undefined, "powershell")[0]!.env).toEqual({ FOO: "a b" });
+    expect((await hook(`cmd /c 'set "GH_TOKEN=${WRONG_TOKEN}"&& ${CALL}'`, { tool: "PowerShell", platform: "win32" })).reason).toContain("someone-else");
   });
 
   it("a set that only prints changes nothing, and neither does a line with no call", async () => {
     expect((await hook(`cmd /c "set&& ${CALL}"`, { platform: "win32" })).decision).toBe("allow");
-    expect((await hook(`cmd /c "set GH&& ${CALL}"`, { platform: "win32" })).decision).toBe("allow");
+    expect(calls).toHaveLength(1);
+    expect((await hook(`cmd /c "set ZZ&& ${CALL}"`, { platform: "win32" })).decision).toBe("allow");
     expect(calls).toHaveLength(1);
     expect((await hook(`cmd /c "set GH_TOKEN=${WRONG_TOKEN}&& dir"`, { platform: "win32" })).decision).toBe("allow");
     expect(calls).toEqual([]);

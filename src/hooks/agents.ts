@@ -342,6 +342,7 @@ async function checkCommand(
         bin: inv.bin,
         args: inv.args,
         env: envFor(env, inv, { agent: true, platform: deps.platform }),
+        before: env,
         cwd: inv.cwd ?? call.cwd,
         ...(inv.knownCwd === undefined ? {} : { knownCwd: inv.knownCwd }),
         ...(inv.envUnknown ? { envUnknown: true } : {}),

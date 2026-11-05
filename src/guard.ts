@@ -2,6 +2,7 @@ import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { envNameMatches } from "./cache.js";
 import { cmdReread, dynamicTarget, UNKNOWN_CWD, UNKNOWN_ENV } from "./dynamic-args.js";
+import { codeVarsSet, codeVarsStop } from "./line-code-env.js";
 import { isReadOnly } from "./readonly.js";
 import { type Exec, type ProviderDef, type Resolution, UNKNOWN_FOLDER, UNKNOWN_VALUE } from "./types.js";
 
@@ -17,6 +18,11 @@ export interface GuardRequest {
   envUnknown?: boolean;
   /** What cmd.exe would act on in this call's command line, as a class of character (#168). */
   cmdReread?: string;
+  /**
+   * The environment the line starts in, when cloudpin read the call from a line: what `env` changes from it, the line
+   * set. Absent for `cloudpin exec`, whose whole environment is the person's.
+   */
+  before?: NodeJS.ProcessEnv;
   /** "agent" ignores CLOUDPIN_SKIP and CLOUDPIN_CONFIRM, so an agent cannot opt itself out. */
   mode: "shell" | "agent";
 }
@@ -191,6 +197,12 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   // What cmd.exe would act on (#168), before resolve, so no CLI is asked with such a value.
   if (req.cmdReread) {
     const { problem, fix } = cmdReread(req.cmdReread);
+    return { ...base, uncertain: true, problems: [problem], fix };
+  }
+  // A variable the line set that can make the CLI run code, before resolve, so no process starts with it.
+  const codeVars = req.before ? codeVarsSet(req.before, req.env, platform) : [];
+  if (codeVars.length > 0) {
+    const { problem, fix } = codeVarsStop(codeVars);
     return { ...base, uncertain: true, problems: [problem], fix };
   }
   // An argument only known when it runs (#160), before resolve, so no such value reaches a CLI.

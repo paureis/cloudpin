@@ -129,6 +129,48 @@ function linkedTeams(dir: string, project: string | undefined, homeDir: string):
   return [];
 }
 
+// Config files only Vercel can read (default branch, 65.4: util/compile-vercel-config.ts,
+// util/config/constants.ts). They may turn services on, which only adds a check.
+const UNREADABLE_CONFIGS = ["vercel.toml", "vercel.ts", "vercel.mts", "vercel.js", "vercel.mjs", "vercel.cjs"];
+
+/**
+ * The parent projects a command in `dir` may link instead of `dir` when services are on (#153).
+ * vercel 50.35 packages/cli/src/util/projects/find-project-root.ts resolveProjectCwd: the root is the
+ * nearest folder above `dir` with .vercel, vercel.json or .git (65.4 adds vercel.toml), and it replaces
+ * `dir` when services are on there, by util/projects/detect-services.ts: VERCEL_USE_EXPERIMENTAL_SERVICES
+ * is "1" or "true" in any case, or its vercel.json has experimentalServices (65.4: services or
+ * experimentalServicesV2, in vercel.json or the compiled .vercel/vercel.json), and any service is found.
+ * getLinkedProject (util/projects/link.ts), ensureLink (util/link/ensure-link.ts) and build all call it,
+ * so this holds for every command that reads a link, and dev and ensureLink call it twice, hence two
+ * rounds. Finding the services takes Vercel's own detector, and Vercel also stops at a disk boundary;
+ * cloudpin skips both, because reading a link that wasn't used only adds a check.
+ */
+function servicesRoots(dir: string, env: NodeJS.ProcessEnv): string[] {
+  const flag = env.VERCEL_USE_EXPERIMENTAL_SERVICES;
+  const on = (root: string) =>
+    flag === "1" || flag?.toLowerCase() === "true" ||
+    [join(root, "vercel.json"), join(root, ".vercel", "vercel.json")].some((path) => {
+      const config = readJson(path);
+      return (config?.services ?? config?.experimentalServicesV2 ?? config?.experimentalServices) != null;
+    }) ||
+    UNREADABLE_CONFIGS.some((file) => existsSync(join(root, file)));
+  const nearest = (from: string) => {
+    for (let at = dirname(from); dirname(at) !== at; at = dirname(at)) {
+      if ([".vercel", "vercel.json", "vercel.toml", ".git"].some((name) => existsSync(join(at, name)))) return at;
+    }
+    return undefined;
+  };
+  const roots: string[] = [];
+  let from = dir;
+  for (let round = 0; round < 2; round++) {
+    const root = nearest(from);
+    if (root === undefined || !on(root)) break;
+    roots.push(root);
+    from = root;
+  }
+  return roots;
+}
+
 // Each page is one more CLI call; past this, something is wrong.
 const MAX_TEAM_PAGES = 25;
 
@@ -179,7 +221,10 @@ export const vercel: ProviderDef<"vercel"> = {
     // config.json holds currentTeam (`vercel switch` rewrites it); auth.json is
     // only stat'ed, never read. The linked project is read fresh every time.
     return {
-      env: ["VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID", "XDG_DATA_HOME", "APPDATA", "HOME"],
+      env: [
+        "VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID", "VERCEL_USE_EXPERIMENTAL_SERVICES", "XDG_DATA_HOME", "APPDATA",
+        "HOME",
+      ],
       files: loginDirs(env).flatMap((d) => [join(d, "config.json"), join(d, "auth.json")]),
       dirs: [],
     };
@@ -255,7 +300,7 @@ export const vercel: ProviderDef<"vercel"> = {
     } else {
       const linkFolders = linkDirs(typed, resolvePath(cwd, flagValue(args, ["--cwd"]) ?? "."));
       if (!linkFolders) return { kind: "error", message: DYNAMIC_FOLDER.problem, fix: DYNAMIC_FOLDER.fix };
-      for (const dir of linkFolders) {
+      for (const dir of [...linkFolders, ...linkFolders.flatMap((folder) => servicesRoots(folder, env))]) {
         const linked = linkedTeams(dir, flagValue(args, ["--project"]), home(env));
         if ("error" in linked) return { kind: "error", message: linked.error };
         projectTeams.push(...linked);

@@ -45,6 +45,8 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Security
 
+- On Windows, cloudpin's own identity checks and `cloudpin exec` no longer start a `.cmd` or `.bat` CLI when cmd.exe would
+  act on its arguments: the command stops as "can't tell", or `cloudpin exec` exits non-zero. `.exe` CLIs are unaffected.
 - On Windows, cmd.exe reads the arguments of a `.cmd` or `.bat` CLI (az, npm's shims) again, so in PowerShell
   `--query 'x&kubectl'` also ran kubectl and `--subs^cription other` reached the CLI as `--subscription other`. An unquoted
   `&`, `|`, `<`, `>`, `^` or `)`, a newline or `%NAME%` there is now "can't tell" when a pin is in play. `gh.exe` and other

@@ -68,8 +68,9 @@ cloudpin is a seatbelt, not a sandbox.
   so it shows its plan and asks first unless you pass `--yes`. An agent's attempt asks the person through its hook, or
   is denied where the agent can't ask, and `--yes` doesn't change that (`src/hooks/agents.ts`). It runs each CLI's own
   switch command without a shell, and never logs in. The MCP server has no tool that switches.
-- **No shell when spawning**: every process starts through `realExec` with arguments as a list
-  (`src/exec.ts`, cross-spawn), so a command line is never re-interpreted by a shell.
+- **No shell of its own when spawning**: every process starts through `src/exec.ts` with arguments as a list
+  (cross-spawn). An `.exe` meets no shell. A Windows `.cmd` or `.bat` goes through cmd.exe, which reads its line twice, so
+  cloudpin refuses to start one when cmd.exe would act on the line (`cmdWouldAct`): the check fails closed.
 - **A short cache that can't go stale on a switch**: a successful identity is reused for at most 5 minutes, keyed by a
   salted HMAC of the command, its identity-relevant environment variables and the CLI's account files, so
   `az account set` or a changed `GH_TOKEN` is seen immediately. Failures are never cached (`src/cache.ts`).

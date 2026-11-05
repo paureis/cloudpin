@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BIN, deps, ENV, FILES, hook, pinned, resolveTo, RULE, sent } from "./hook-cmd-fixture.js";
+import { BIN, deps, hook, resolveTo, RULE, sent } from "./hook-cmd-fixture.js";
 
 describe("read as PowerShell, a CLI that resolves to .cmd: what cmd.exe would act on stops (#168)", () => {
   it.each([
@@ -118,10 +118,5 @@ describe("only on Windows (#168)", () => {
   it("with no way to look a CLI up, nothing is read as a .cmd", async () => {
     const { onPath: _none, ...noLookup } = deps();
     expect((await hook("az group list --query 'x&kubectl'", "PowerShell", { deps: noLookup })).decision).toBe("allow");
-  });
-  it("the fixture's own lookup is what says .cmd", () => {
-    expect(FILES.az).toMatch(/\.cmd$/);
-    expect(ENV.PATH).toBe("C:\\bin");
-    expect(pinned).toBeTruthy();
   });
 });

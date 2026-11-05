@@ -90,14 +90,10 @@ export function codeVarsSet(before: NodeJS.ProcessEnv, env: NodeJS.ProcessEnv, p
  */
 const FROM_THE_HOOK = ["PATH", "PATHEXT"];
 
-/** `env`, folded as guard reads it, with the PATH and PATHEXT of `before`, folded the same way. */
-export function withHooksPath(env: NodeJS.ProcessEnv, before: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const out = { ...env };
-  for (const name of FROM_THE_HOOK) {
-    if (before[name] === undefined) delete out[name];
-    else out[name] = before[name];
-  }
-  return out;
+/** `env` with the PATH and PATHEXT of `before` and no others, in whichever spellings they have. */
+export function withHooksPath(env: NodeJS.ProcessEnv, before: NodeJS.ProcessEnv, platform: NodeJS.Platform): NodeJS.ProcessEnv {
+  const named = ([key]: [string, unknown]) => FROM_THE_HOOK.includes(platform === "win32" ? key.toUpperCase() : key);
+  return { ...Object.fromEntries(Object.entries(env).filter((entry) => !named(entry))), ...Object.fromEntries(Object.entries(before).filter(named)) };
 }
 
 /** Whether the line changed PATH or PATHEXT, in any spelling, removing it included. */

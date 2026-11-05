@@ -33,6 +33,8 @@ export interface Run {
   cwd?: string;
   /** Its lines run in this shell, not a child, so what they change stays (Invoke-Expression). */
   here?: boolean;
+  /** `bash -a` or `-o allexport`: its lines start as after `set -a` (#163). */
+  allexport?: boolean;
 }
 
 const SHELLS = new Set(["bash", "sh", "zsh", "dash"]);
@@ -49,7 +51,9 @@ export function runner(name: string, args: Arg[], dialect: Dialect): Run | undef
   if (SHELLS.has(name)) {
     const flag = args.findIndex((a) => /^-[a-z]*c$/.test(a.raw));
     const script = flag === -1 ? undefined : args[flag + 1]?.raw;
-    return script === undefined || script === "-" ? { stdin: "bash" } : { lines: [{ text: script, dialect: "bash" }] };
+    const options = flag === -1 ? args : args.slice(0, flag + 1);
+    const allexport = options.some((a, k) => /^-[a-z]*a/.test(a.raw) || (a.raw === "allexport" && /^-[a-z]*o$/.test(options[k - 1]?.raw ?? "")));
+    return { ...(script === undefined || script === "-" ? { stdin: "bash" as const } : { lines: [{ text: script, dialect: "bash" as const }] }), ...(allexport ? { allexport } : {}) };
   }
   if (name === "watch") {
     const o = readOptions(args.map((a) => a.raw), 0, WATCH, args.map((a) => a.dynamic));

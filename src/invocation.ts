@@ -16,6 +16,8 @@ export interface Invocation {
   cwd?: string;
   /** With UNKNOWN_FOLDER: the last folder the line knew, where a search for a pin file starts (#163). */
   knownCwd?: string;
+  /** Something earlier on the line may have set any variable, which cloudpin can't read (#163): `. file`, `export $(...)`. */
+  envUnknown?: boolean;
   /** The call starts with an empty environment (`env -i`, `exec -c`): only `env` reaches the CLI (#162). */
   clearEnv?: boolean;
 }

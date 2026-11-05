@@ -15,6 +15,15 @@ export const PS_KEYWORDS = new Set([
   "data", "break", "continue", "exit",
 ]);
 
+/** `$env:X = value` as `psAssignment` reads it: `env` as typed, `operator` with its `=`. */
+export interface PsEnvAssignment {
+  name: string;
+  env: string;
+  operator: string;
+  literal: boolean;
+  value: Words;
+}
+
 /** What a PowerShell line set, as `shellwords.ts` keeps it: its variables are stored as `$name`, in lower case. */
 export interface PsState {
   vars: Record<string, string>;
@@ -43,20 +52,23 @@ export function psVariables(state: PsState): Variables {
 }
 
 const ASSIGNMENT = /^\$(?:(?:script|global|local|private):)?([A-Za-z_]\w*)([-+*/%]?=)?/i;
+// `$env:X` and `${env:X}`, with a cast or not (#163): PowerShell takes them all.
+const ENV_ASSIGNMENT = /^(?:\[[\w.[\]]+\])*\$(?:env:([A-Za-z_]\w*)|\{env:([^}]+)\})([-+*/%]?=)?/i;
 const NUMBER = /^-?\d+(\.\d+)?$/;
 
 /**
  * `$name = value` (and `$name='value'`, `$s += x`) at the start of a statement: the name, and whether the
  * value is one literal ('x', "x", 5) or something that may be several words, with the value's words.
- * Undefined when the statement is not an assignment ($env: assignments are read apart).
+ * With `env`, it sets that environment variable. Undefined when the statement is not an assignment.
  */
-export function psAssignment([words, quoted, dynamic, expansions]: Words): { name: string; literal: boolean; value: Words } | undefined {
+export function psAssignment([words, quoted, dynamic, expansions]: Words): { name: string; literal: boolean; value: Words } | PsEnvAssignment | undefined {
   const first = words[0] ?? "";
-  const m = ASSIGNMENT.exec(first);
-  if (!m || /^\$env:/i.test(first)) return undefined;
+  const envSet = ENV_ASSIGNMENT.exec(first);
+  const m = envSet ? [envSet[0], envSet[1] ?? envSet[2], envSet[3]] : ASSIGNMENT.exec(first);
+  if (!m) return undefined;
   // The assignment operator ends the first word (`$s=x`), or starts the second (`$s = x`, `$s =x`).
   let at = 0;
-  let typed = m[0];
+  let typed = m[0]!;
   let operator = m[2];
   if (operator === undefined) {
     const op = /^[-+*/%]?=/.exec(words[1] ?? "");
@@ -77,7 +89,8 @@ export function psAssignment([words, quoted, dynamic, expansions]: Words): { nam
   ];
   const [w, q] = value;
   const literal = operator === "=" && w.length === 1 && (q[0] === true || NUMBER.test(w[0]!)) && !w[0]!.includes(",");
-  return { name: m[1]!.toLowerCase(), literal, value };
+  const name = m[1]!;
+  return envSet ? { name: name.toLowerCase(), env: name, operator, literal, value } : { name: name.toLowerCase(), literal, value };
 }
 
 /**

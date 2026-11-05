@@ -121,7 +121,7 @@ export async function explain(command: string | string[], opts: ExplainOptions, 
     }
     const cwd = call.cwd ?? opts.cwd;
     const trace: Trace = {};
-    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent", platform: deps.platform }), cwd, ...(call.knownCwd === undefined ? {} : { knownCwd: call.knownCwd }), mode: opts.mode }, deps, trace);
+    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent", platform: deps.platform }), cwd, ...(call.knownCwd === undefined ? {} : { knownCwd: call.knownCwd }), ...(call.envUnknown ? { envUnknown: true } : {}), mode: opts.mode }, deps, trace);
     const res = trace.resolution;
     out.push({
       // Masked for every output (text, --json, MCP); the guard above read the real words (#134).

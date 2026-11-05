@@ -14,6 +14,8 @@ export interface Invocation {
   unset?: string[];
   /** Folder the call runs in, when a `cd` earlier in the line changed it; UNKNOWN_FOLDER when it can't be read (#163). */
   cwd?: string;
+  /** With UNKNOWN_FOLDER: the last folder the line knew, where a search for a pin file starts (#163). */
+  knownCwd?: string;
   /** The call starts with an empty environment (`env -i`, `exec -c`): only `env` reaches the CLI (#162). */
   clearEnv?: boolean;
 }

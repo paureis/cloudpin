@@ -6,7 +6,7 @@ import { tokenizePowerShell, windowsPowerShellArgv } from "./ps-tokens.js";
 import { pipedValues, psAssignment } from "./ps-words.js";
 import { type Arg, type Run, runner } from "./runners.js";
 import { type Expansion, tokenize } from "./shell-tokens.js";
-import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_VALUE } from "./types.js";
+import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_FOLDER, UNKNOWN_VALUE } from "./types.js";
 import { expandWord, isDynamic, substitute } from "./word-expansion.js";
 import { forCall, unwrap, wrappedWords } from "./wrappers.js";
 
@@ -243,6 +243,7 @@ function invocation(bin: string, args: string[], env: Record<string, string>, st
   const unset = [...state.unset, ...(state.callUnset ?? [])];
   if (unset.length > 0) inv.unset = unset;
   if (state.cwd !== undefined) inv.cwd = state.cwd;
+  if (state.cwd === UNKNOWN_FOLDER && state.known !== undefined) inv.knownCwd = state.known;
   if (state.clearEnv) inv.clearEnv = true;
   return inv;
 }

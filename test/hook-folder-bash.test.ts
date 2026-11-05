@@ -1,8 +1,7 @@
-import { mkdirSync, realpathSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { CALL, CANT_TELL, followed, hook, refused, root, sent, SUB_PIN } from "./hook-folder-fixture.js";
-import { tempDir } from "./tmp.js";
 
 describe("bash: every spelling that can be read is followed (#163)", () => {
   followed("Bash", [
@@ -156,12 +155,6 @@ describe("bash: what can't be read stops later calls as can't tell (#163)", () =
     expect((await hook(`cd "$(cat f)"; pushd ${abs("other")}; popd; ${CALL}`)).reason).toContain(CANT_TELL);
     expect((await hook(`cd "$(cat f)"; cd ${abs("other")}; cd -; ${CALL}`)).reason).toContain(CANT_TELL);
     expect((await hook(`cd "$(cat f)"; cd ${abs("other")}; cd "$OLDPWD/x"; ${CALL}`)).reason).toContain(CANT_TELL);
-  });
-
-  it("stops the call even with no pin file in sight: the folder it goes to may have one", async () => {
-    const bare = realpathSync(tempDir("cloudpin-163-unpinned-"));
-    expect((await hook(CALL, "Bash", {}, bare)).decision).toBe("allow");
-    expect((await hook(`cd "$(cat f)"; ${CALL}`, "Bash", {}, bare)).reason).toContain(CANT_TELL);
   });
 
   it("a call before the folder is lost is checked where it runs; one after asks no CLI", async () => {

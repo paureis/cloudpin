@@ -1,4 +1,4 @@
-import { joinFolder } from "./folder.js";
+import { joinFolder, setFolder } from "./folder.js";
 import type { Words } from "./ps-words.js";
 import { DYNAMIC_WORD, DYNAMIC_WORDS, UNKNOWN_FOLDER } from "./types.js";
 
@@ -269,6 +269,7 @@ function packageRunner(words: readonly string[], from: number, t: Table, dynamic
 export interface CallState {
   base?: string;
   cwd?: string;
+  known?: string;
   exported: Record<string, string>;
   plain: Record<string, string>;
   clearEnv?: boolean;
@@ -279,7 +280,7 @@ export interface CallState {
 export function forCall<S extends CallState>(state: S, step: Pick<Unwrapped, "cwd" | "clearEnv" | "unset">, copy: (s: S) => S): S {
   if (step.cwd === undefined && !step.clearEnv && !step.unset) return state;
   const next = copy(state);
-  if (step.cwd !== undefined) next.cwd = joinFolder(state.cwd ?? state.base ?? ".", step.cwd);
+  if (step.cwd !== undefined) setFolder(next, joinFolder(state.cwd ?? state.base ?? ".", step.cwd));
   if (step.clearEnv) [next.exported, next.plain, next.clearEnv] = [{}, {}, true];
   for (const name of step.unset ?? []) {
     delete next.exported[name];

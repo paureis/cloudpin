@@ -8,7 +8,7 @@ import { expandWord, isDynamic, type Variables } from "./word-expansion.js";
 
 /**
  * The folder a line's commands move to (#163): each spelling is followed where it can be read, and anything
- * else makes the folder UNKNOWN_FOLDER, which guard stops as "can't tell". Each rule was checked against real Git
+ * else makes the folder UNKNOWN_FOLDER, which guard stops as "can't tell" with a pin file in sight. Each rule was checked against real Git
  * Bash and Windows PowerShell 5.1 with a printer (bash(1) SHELL BUILTIN COMMANDS; about_Locations,
  * Set-Location, Push-Location and Pop-Location in the PowerShell docs).
  *
@@ -189,9 +189,15 @@ export function joinFolder(current: string, to: string): string {
   return to === UNKNOWN_FOLDER || (current === UNKNOWN_FOLDER && !isAbsolute(to)) ? UNKNOWN_FOLDER : resolve(current, to);
 }
 
+/** The folder from here on, keeping the last one the line knew when this one is unknown. */
+export function setFolder(state: Pick<State, "cwd" | "base" | "known">, to: string): void {
+  if (to === UNKNOWN_FOLDER && state.cwd !== UNKNOWN_FOLDER) state.known = state.cwd ?? state.base;
+  state.cwd = to;
+}
+
 /** The line can't say where it is from here: its folder, and what it could go back to. */
 export function loseFolder(state: State): void {
-  state.cwd = UNKNOWN_FOLDER;
+  setFolder(state, UNKNOWN_FOLDER);
   delete state.previous;
   state.stack = [];
 }
@@ -226,5 +232,5 @@ export function moveFolder(state: State, command: Command, args: FolderArg[], va
   if (to === undefined) return loseFolder(state);
   state.previous = current;
   state.stack = next;
-  state.cwd = joinFolder(current, to);
+  setFolder(state, joinFolder(current, to));
 }

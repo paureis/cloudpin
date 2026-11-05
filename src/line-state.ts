@@ -11,6 +11,8 @@ export interface State {
   /** Working directory after any `cd` seen so far; undefined until one is, UNKNOWN_FOLDER once it can't be read. */
   cwd?: string;
   base?: string;
+  /** While `cwd` is UNKNOWN_FOLDER: the last folder the line knew (#163). */
+  known?: string;
   /** Where `cd -` goes; undefined when the line doesn't know (#163). */
   previous?: string;
   /** What `pushd` left in this line, for `popd`; below it the stack is unknown (#163). Never changed in place. */
@@ -61,8 +63,9 @@ export const child = (state: State): State => ({
 });
 
 /** Back to where `to` is: a child shell's or a job's folder doesn't come back (#163). */
-export function restoreFolder(state: State, to: Pick<State, "cwd" | "previous" | "stack">): void {
+export function restoreFolder(state: State, to: Pick<State, "cwd" | "known" | "previous" | "stack">): void {
   state.cwd = to.cwd;
+  state.known = to.known;
   state.previous = to.previous;
   state.stack = to.stack;
 }

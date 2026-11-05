@@ -11,6 +11,8 @@ export interface GuardRequest {
   args: string[];
   env: NodeJS.ProcessEnv;
   cwd: string;
+  /** With `cwd` UNKNOWN_FOLDER: the last folder the line knew, where the search for a pin file starts (#163). */
+  knownCwd?: string;
   /** "agent" ignores CLOUDPIN_SKIP and CLOUDPIN_CONFIRM, so an agent cannot opt itself out. */
   mode: "shell" | "agent";
 }
@@ -131,10 +133,13 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   const platform = deps.platform ?? process.platform;
   const folded = foldEnvNames(req.env, platform);
 
-  // No folder, so no pin file to read, not even "none": the folder it goes to may have one (#163).
+  // No folder, so no pin file to apply. With one in sight of the last folder the line knew, by the same search,
+  // the call stops: that one, or another where it goes, may pin it. With none, cloudpin does nothing, as anywhere
+  // else with no pin file (owner decision, #163). One it can't read counts as in sight, as for any call (#62).
   if (req.cwd === UNKNOWN_FOLDER) {
     if (provider.isExempt(req.args, name)) return { action: "allow", reason: "exempt" };
     if (req.mode === "shell" && folded.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
+    if (req.knownCwd !== undefined && !pinFileInSight(req.knownCwd, folded.env, deps)) return { action: "allow", reason: "no-config" };
     return { action: "block", uncertain: true, provider: provider.name, problems: [UNKNOWN_CWD.problem], fix: UNKNOWN_CWD.fix };
   }
 
@@ -230,6 +235,16 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
       }
       return protectedEnvironment(req, folded.env, provider.name, config, trace);
     }
+  }
+}
+
+/** True when `findConfig` finds a pin file from `cwd`, readable or not. */
+function pinFileInSight(cwd: string, env: NodeJS.ProcessEnv, deps: GuardDeps): boolean {
+  try {
+    return deps.findConfig(cwd, env) !== null;
+  } catch (err) {
+    if (err instanceof ConfigError) return true;
+    throw err;
   }
 }
 

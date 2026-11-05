@@ -25,7 +25,6 @@ describe("PowerShell: every literal way to set a variable is followed (#163)", (
     '$s=\'VALUE\'; ${env:GH_TOKEN}="x$s"',
     "Set-Item env:GH_TOKEN VALUE",
     "Set-Item env:GH_TOKEN 'VALUE'",
-    "Set-Item env:GH_TOKEN '-VALUE'",
     "$n='GH_TOKEN'; Set-Item -Path:env:$n VALUE",
     "Remove-Item env:GH_TOKEN; New-Item env:GH_TOKEN -Value VALUE",
     'Set-Item env:GH_TOKEN "VALUE"',
@@ -106,6 +105,9 @@ describe("PowerShell: every literal way to set a variable is followed (#163)", (
     asked.length = 0;
     await hook(`$env:GH_TOKEN='$x'; ${CALL}`, PS);
     expect(asked[0]?.token).toBe("$x");
+    asked.length = 0;
+    await hook(`Set-Item env:GH_TOKEN '-Value'; ${CALL}`, PS);
+    expect(asked[0]?.token).toBe("-Value");
   });
 
   it("a command on the right of the = is read as the call it is", async () => {
@@ -117,6 +119,7 @@ describe("PowerShell: every literal way to set a variable is followed (#163)", (
     expect((await hook(`New-Item env:GH_TOKEN -Value ${WRONG}; ${CALL}`, PS, { GH_TOKEN: RIGHT })).decision).toBe("allow");
     expect((await hook(`New-Item env:GH_TOKEN -Value ${WRONG} -Force; ${CALL}`, PS, { GH_TOKEN: RIGHT })).decision).toBe("deny");
     expect((await hook(`New-Item env:gh_token -Value ${WRONG}; ${CALL}`, PS, { GH_TOKEN: RIGHT })).decision).toBe("allow");
+    expect((await hook(`Remove-Item env:GH_TOKEN; New-Item env:GH_TOKEN -Value ${WRONG}; ${CALL}`, PS, { GH_TOKEN: RIGHT })).decision).toBe("deny");
     expect((await hook(`$env:GH_TOKEN='a'; New-Item env:GH_TOKEN -Value ${WRONG}; ${CALL}`, PS)).decision).toBe("allow");
   });
 });

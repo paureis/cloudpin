@@ -150,7 +150,7 @@ describe("bash: export X+=y and the other assignments (#163)", () => {
     expect((await hook(`export -n GH_TOKEN; export GH_TOKEN; ${CALL}`, BASH, env)).decision).toBe("deny");
     expect((await hook(`export GH_TOKEN=${WRONG}; export -n GH_TOKEN; ${CALL}`, BASH)).decision).toBe("allow");
     expect((await hook(`export -n FOO; ${CALL}`, BASH, env)).decision).toBe("deny");
-    expect((await hook(`export -n GH_TOKEN=x; ${CALL}`, BASH, env)).decision).toBe("allow");
+    expect((await hook(`export -n GH_TOKEN=${WRONG}; ${CALL}`, BASH)).decision).toBe("allow");
   });
 
   it("export -p, -f and declare -p, -f set nothing, whatever follows", async () => {

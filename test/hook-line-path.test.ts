@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { explain } from "../src/explain.js";
+import { withHooksPath } from "../src/line-code-env.js";
 import { calls, deps, hook, pinned, PIN_USER, type Shell, state, WRONG_TOKEN } from "./hook-line-env-fixture.js";
 
 beforeEach(() => {
@@ -109,6 +110,13 @@ describe("a CLI the hook's PATH doesn't have", () => {
     expect((await hook(`FOO=bar ${CALL}`, { env })).decision).toBe("allow");
     // The same value is no change.
     expect((await hook(`PATH=${HOOK_PATH} ${CALL}`, { env })).decision).toBe("allow");
+  });
+});
+
+describe("withHooksPath", () => {
+  it("replaces every spelling on Windows, and only the exact name elsewhere", () => {
+    expect(withHooksPath({ Path: "line", path: "line", FOO: "1" }, { PATH: "hook" }, "win32")).toEqual({ PATH: "hook", FOO: "1" });
+    expect(withHooksPath({ Path: "other", PATH: "line" }, { PATH: "hook" }, "linux")).toEqual({ Path: "other", PATH: "hook" });
   });
 });
 

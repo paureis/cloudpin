@@ -2,7 +2,7 @@ import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { envNameMatches } from "./cache.js";
 import { cmdReread, dynamicTarget, UNKNOWN_CWD, UNKNOWN_ENV } from "./dynamic-args.js";
-import { codeVarsSet, codeVarsStop } from "./line-code-env.js";
+import { codeVarsSet, codeVarsStop, lineMovedPath, PATH_ONLY_ON_LINE, withHooksPath } from "./line-code-env.js";
 import { isReadOnly } from "./readonly.js";
 import { type Exec, type ProviderDef, type Resolution, UNKNOWN_FOLDER, UNKNOWN_VALUE } from "./types.js";
 
@@ -235,10 +235,16 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
     };
   }
   // Other unknown values don't decide the account; the CLI's identity check runs without them.
-  const env = Object.fromEntries(Object.entries(folded.env).filter(([, v]) => v !== UNKNOWN_VALUE));
+  const known = Object.fromEntries(Object.entries(folded.env).filter(([, v]) => v !== UNKNOWN_VALUE));
+  const before = req.before && foldEnvNames(req.before, platform).env;
+  const env = before ? withHooksPath(known, before) : known;
   const res = await provider.resolve({ args: req.args, env, cwd: req.cwd, bin: name, platform }, exec);
   trace.resolution = res;
-  if (res.kind === "error" && cliMissing) return { action: "allow", reason: "not-installed" };
+  if (res.kind === "error" && cliMissing) {
+    // Where the line changed PATH the command may find a CLI the lookup can't, so there may be an account to protect.
+    if (before && lineMovedPath(folded.env, before)) return { ...base, uncertain: true, problems: [PATH_ONLY_ON_LINE.problem], fix: PATH_ONLY_ON_LINE.fix };
+    return { action: "allow", reason: "not-installed" };
+  }
   switch (res.kind) {
     case "logged-out":
       return { ...base, problems: ["not logged in"], fix: res.hint };

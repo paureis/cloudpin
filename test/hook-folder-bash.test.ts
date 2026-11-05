@@ -48,6 +48,8 @@ describe("bash: every spelling that can be read is followed (#163)", () => {
     expect((await hook(`pushd sub; pushd ../other; popd; ${CALL}`)).decision).toBe("deny");
     expect((await hook(`pushd sub; pushd ../other; pushd; ${CALL}`)).decision).toBe("deny");
     expect((await hook(`pushd other; pushd ../sub; pushd; ${CALL}`)).decision).toBe("allow");
+    expect((await hook(`pushd sub; pushd ../other; pushd ../other; popd; popd; ${CALL}`)).decision).toBe("deny");
+    expect((await hook(`cd sub; (cd ../other); cd -; ${CALL}`)).decision).toBe("allow");
   });
 
   it("goes home with a bare cd, and $HOME from the hook's environment", async () => {
@@ -69,9 +71,9 @@ describe("bash: every spelling that can be read is followed (#163)", () => {
   it("a folder with brackets in quotes is a folder, and a space in quotes one word", async () => {
     mkdirSync(join(root, "sub", "[id]"), { recursive: true });
     mkdirSync(join(root, "sub", "a b"), { recursive: true });
-    expect((await hook(`cd "sub/[id]"; ${CALL}`)).decision).toBe("deny");
-    expect((await hook(`cd "sub/a b"; ${CALL}`)).decision).toBe("deny");
-    expect((await hook(`D="sub/a b"; cd "$D"; ${CALL}`)).decision).toBe("deny");
+    expect((await hook(`cd "sub/[id]"; ${CALL}`)).reason).toContain(SUB_PIN);
+    expect((await hook(`cd "sub/a b"; ${CALL}`)).reason).toContain(SUB_PIN);
+    expect((await hook(`D="sub/a b"; cd "$D"; ${CALL}`)).reason).toContain(SUB_PIN);
   });
 });
 
@@ -118,6 +120,14 @@ describe("bash: what can't be read stops later calls as can't tell (#163)", () =
     'cd "$(cat f)"; cd sub',
     'cd "$(cat f)"; cd -',
     'pushd "$(cat f)"; popd',
+    // With a stack the line knows, and a folder to go back to: it still can't say.
+    "pushd other; popd -n",
+    "pushd other; popd +1",
+    "cd other; pushd -",
+    'cd sub; cd "$(cat f)"; cd -',
+    'pushd other; pushd "$(cat f)"; popd',
+    // A glob beside what a variable gave, where a quote doesn't say which part is text.
+    'D=sub; cd "$D"/s[u]b',
   ]);
 
   it("a variable the line unset or set from a command isn't read from the hook's environment", async () => {
@@ -145,6 +155,7 @@ describe("bash: what can't be read stops later calls as can't tell (#163)", () =
     expect((await hook(`cd "$(cat f)"; cd ${abs("other")}; cd ../sub; ${CALL}`)).reason).toContain(SUB_PIN);
     expect((await hook(`cd "$(cat f)"; pushd ${abs("other")}; popd; ${CALL}`)).reason).toContain(CANT_TELL);
     expect((await hook(`cd "$(cat f)"; cd ${abs("other")}; cd -; ${CALL}`)).reason).toContain(CANT_TELL);
+    expect((await hook(`cd "$(cat f)"; cd ${abs("other")}; cd "$OLDPWD/x"; ${CALL}`)).reason).toContain(CANT_TELL);
   });
 
   it("stops the call even with no pin file in sight: the folder it goes to may have one", async () => {
@@ -208,6 +219,7 @@ describe("bash: a subshell or a job keeps its folder to itself (#163)", () => {
     ["bash -c 'cd sub; CALL'", "deny"],
     ["bash -c 'cd \"$(cat f)\"'; CALL", "allow"],
     ["eval cd sub; CALL", "deny"],
+    ["eval 'true | cd sub'; CALL", "allow"],
     ["cd sub | cat; CALL", "allow"],
     ["cd sub & CALL", "allow"],
     ["cd sub && CALL", "deny"],

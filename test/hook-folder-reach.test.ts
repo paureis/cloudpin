@@ -96,6 +96,53 @@ describe("cloudpin switch after a folder it can't read (#163)", () => {
     // The control: from a folder it knows, the question names them.
     expect((await hook("cloudpin switch")).reason).toContain(PINNED);
   });
+
+  it("doesn't look for a pin file at a folder it can't read", async () => {
+    const asked: string[] = [];
+    const spy: GuardDeps = { ...deps, findConfig: (cwd, env) => (asked.push(cwd), defaultFindConfig(root, env)) };
+    const input = JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: 'cd "$(cat f)"; cloudpin switch' }, cwd: root });
+    const out = await runHook(AGENTS.claude, input, spy, {}, undefined, "linux");
+    expect(JSON.parse(out).hookSpecificOutput.permissionDecision).toBe("ask");
+    expect(asked).toEqual([]);
+  });
+});
+
+describe("a line read both ways, on Windows with no shell named (#163)", () => {
+  const codex = async (command: string) => {
+    const input = JSON.stringify({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command }, cwd: root });
+    const out = await runHook(AGENTS.codex, input, deps, {}, undefined, "win32");
+    return out ? JSON.parse(out).hookSpecificOutput.permissionDecisionReason as string : "";
+  };
+
+  it.each(["cd -- DIR", "cd -P DIR", "cd -L DIR", "pushd DIR", "cd -Path DIR", "cd -LiteralPath DIR", "Set-Location DIR", "sl DIR", "Push-Location DIR"])(
+    "the other shell's spelling doesn't stop it: %j",
+    async (shape) => {
+      expect(await codex(`${shape.split("DIR").join("other")}; ${CALL}`)).toBe("");
+      expect(await codex(`${shape.split("DIR").join("sub")}; ${CALL}`)).toContain(SUB_PIN);
+    },
+  );
+
+  it("what either shell can't read stops it", async () => {
+    expect(await codex(`cd "$(cat f)"; ${CALL}`)).toContain(CANT_TELL);
+    expect(await codex(`chdir other; ${CALL}`)).toContain(CANT_TELL);
+    // The price, as for any variable a line read both ways sets: PowerShell doesn't know a bash variable.
+    expect(await codex(`D=other; cd "$D"; ${CALL}`)).toContain(CANT_TELL);
+  });
+});
+
+describe("CLOUDPIN_SKIP after a folder it can't read (#163)", () => {
+  const line = `cd "$(cat f)"; ${CALL}`;
+  const env = { CLOUDPIN_SKIP: "1" };
+
+  it("counts in a terminal, as it does anywhere", async () => {
+    expect((await explain(line, { mode: "shell", cwd: root, env }, deps)).map((c) => c.verdict)).toEqual(["allow"]);
+    expect((await explain(line, { mode: "shell", cwd: root, env: {} }, deps)).map((c) => c.verdict)).toEqual(["block"]);
+  });
+
+  it("doesn't count for an agent", async () => {
+    expect((await explain(line, { mode: "agent", cwd: root, env }, deps)).map((c) => c.verdict)).toEqual(["block"]);
+    expect((await hook(line, "Bash", env)).reason).toContain(CANT_TELL);
+  });
 });
 
 describe("what the parser makes of each (#163)", () => {

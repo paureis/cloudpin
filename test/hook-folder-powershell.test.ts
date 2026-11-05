@@ -1,6 +1,8 @@
 import { mkdirSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { findInvocations } from "../src/shellwords.js";
 import { CALL, CANT_TELL, followed, hook, refused, root, SUB_PIN } from "./hook-folder-fixture.js";
 
 describe("PowerShell: every spelling that can be read is followed, in any case (#163)", () => {
@@ -55,6 +57,7 @@ describe("PowerShell: every spelling that can be read is followed, in any case (
     'cd "$PWD/DIR"',
     "iex 'cd DIR'",
     "Invoke-Expression 'cd DIR'",
+    "'cd DIR' | iex",
     "$x = cd DIR",
     "cd DIR | Out-Null",
     "Push-Location sub; Push-Location ../DIR; Push-Location ../other; Pop-Location",
@@ -66,6 +69,7 @@ describe("PowerShell: every spelling that can be read is followed, in any case (
     expect((await hook(`cd $env:HOOK_DIR; ${CALL}`, "PowerShell", { HOOK_DIR: "sub" })).decision).toBe("deny");
     expect((await hook(`cd $env:hook_dir; ${CALL}`, "PowerShell", { HOOK_DIR: "other" })).decision).toBe("allow");
     expect((await hook(`cd $HOOK_DIR; ${CALL}`, "PowerShell", { HOOK_DIR: "other" })).reason).toContain(CANT_TELL);
+    expect((await hook(`cd $xxxxHOOK_DIR; ${CALL}`, "PowerShell", { HOOK_DIR: "other" })).reason).toContain(CANT_TELL);
     expect((await hook(`$env:HOOK_DIR=(Get-Item x); cd $env:HOOK_DIR; ${CALL}`, "PowerShell", { HOOK_DIR: "other" })).reason).toContain(CANT_TELL);
   });
 
@@ -81,9 +85,9 @@ describe("PowerShell: every spelling that can be read is followed, in any case (
   });
 
   it("~ and $HOME are home, even ~ in quotes, as Set-Location reads it", async () => {
-    for (const line of ["cd ~", "cd '~'", "cd $HOME", "cd ~/x"]) {
-      expect((await hook(`${line}; ${CALL}`, "PowerShell")).reason, line).not.toContain(CANT_TELL);
-    }
+    const cwdOf = (line: string) => findInvocations(`${line}; gh a`, ["gh"], root, {}, "powershell")[0]?.cwd;
+    for (const line of ["cd ~", "cd '~'", 'cd "~"', "cd $HOME"]) expect(cwdOf(line), line).toBe(homedir());
+    expect(cwdOf("cd ~/x")).toBe(join(homedir(), "x"));
   });
 
   it("a parameter 5.1 rejects leaves the folder where it was", async () => {
@@ -139,6 +143,10 @@ describe("PowerShell: what can't be read stops later calls as can't tell (#163)"
     "cd C:",
     "cd C:sub",
     "cd FileSystem::C:\\x",
+    "cd Microsoft.PowerShell.Core\\FileSystem::C:\\x",
+    // A variable may be anything, here a value the parameter rejects.
+    "Set-Location -ea $x sub",
+    "Push-Location sub; & { Push-Location . }; Pop-Location",
     "& { cd sub }",
     ". { cd sub }",
     "if ($x) { cd sub }",

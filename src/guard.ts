@@ -1,7 +1,7 @@
 import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { envNameMatches } from "./cache.js";
-import { dynamicTarget, UNKNOWN_CWD, UNKNOWN_ENV } from "./dynamic-args.js";
+import { cmdReread, dynamicTarget, UNKNOWN_CWD, UNKNOWN_ENV } from "./dynamic-args.js";
 import { isReadOnly } from "./readonly.js";
 import { type Exec, type ProviderDef, type Resolution, UNKNOWN_FOLDER, UNKNOWN_VALUE } from "./types.js";
 
@@ -15,6 +15,8 @@ export interface GuardRequest {
   knownCwd?: string;
   /** Something earlier on the line may have set any variable, which cloudpin can't read (#163). */
   envUnknown?: boolean;
+  /** What cmd.exe would act on in this call's command line, as a class of character (#168). */
+  cmdReread?: string;
   /** "agent" ignores CLOUDPIN_SKIP and CLOUDPIN_CONFIRM, so an agent cannot opt itself out. */
   mode: "shell" | "agent";
 }
@@ -186,6 +188,11 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
     if (result.notFound) cliMissing = true;
     return result;
   };
+  // What cmd.exe would act on (#168), before resolve, so no CLI is asked with such a value.
+  if (req.cmdReread) {
+    const { problem, fix } = cmdReread(req.cmdReread);
+    return { ...base, uncertain: true, problems: [problem], fix };
+  }
   // An argument only known when it runs (#160), before resolve, so no such value reaches a CLI.
   const dynamic = dynamicTarget(req.args, provider.targetFlags ?? []);
   if (dynamic) return { ...base, uncertain: true, problems: [dynamic.problem], fix: dynamic.fix };

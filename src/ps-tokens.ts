@@ -295,17 +295,18 @@ function scan(input: string, from: number, closer: string): Scanned {
 function stopParsing(input: string, from: number, tokens: Token[]): number {
   let end = from;
   while (end < input.length && !"\r\n|".includes(input[end]!)) end++;
-  tokens.push(...splitCommandLine(input.slice(from, end), true));
+  const typed = input.slice(from, end);
+  const words = splitCommandLine(typed, true);
+  if (words[0]) words[0].typed = typed;
+  tokens.push(...words);
   return end;
 }
 
 /**
- * The arguments a CLI gets from Windows PowerShell 5.1, which joins them into one command line without
- * escaping the quotes inside them, quoting only an argument with a space outside quotes (and dropping an
- * empty one): `'x "y --subscription z"'` reaches the CLI as `x y`, `--subscription`, `z`. PowerShell 7.3+
- * passes them as they are, except to .cmd and .bat files (az is az.cmd), so both readings are checked.
+ * The command line Windows PowerShell 5.1 builds: it joins the arguments without escaping the quotes inside
+ * them, quoting only an argument with a space outside quotes (and dropping an empty one).
  */
-export function windowsPowerShellArgv(args: readonly string[]): string[] {
+export function windowsPowerShellLine(args: readonly string[]): string {
   const needsQuotes = (arg: string) => {
     let inQuotes = false;
     for (const c of arg) {
@@ -314,7 +315,15 @@ export function windowsPowerShellArgv(args: readonly string[]): string[] {
     }
     return false;
   };
-  return splitCommandLine(args.map((a) => (needsQuotes(a) ? `"${a}"` : a)).join(" "), false).map((t) => t.value);
+  return args.map((a) => (needsQuotes(a) ? `"${a}"` : a)).join(" ");
+}
+
+/**
+ * The arguments a CLI gets from that line: `'x "y --subscription z"'` reaches the CLI as `x y`, `--subscription`, `z`.
+ * PowerShell 7.3+ passes them as they are, except to .cmd and .bat files (az is az.cmd), so both readings are checked.
+ */
+export function windowsPowerShellArgv(args: readonly string[]): string[] {
+  return splitCommandLine(windowsPowerShellLine(args), false).map((t) => t.value);
 }
 
 /**

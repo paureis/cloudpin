@@ -20,6 +20,12 @@ export const UNKNOWN_ENV = {
   fix: "set the variables with literal values on the line, or run the command yourself",
 };
 
+/** Why, when cmd.exe would act on part of the command line of a .cmd or .bat CLI (#168). `what` is a class of character, never a value. */
+export const cmdReread = (what: string) => ({
+  problem: `on Windows this command goes through cmd.exe (a .cmd or .bat file), which acts on ${what} in the arguments itself: it can start another command, lose the flags after it or change a flag, ${CANT_TELL}`,
+  fix: `write the value so cmd.exe reads it as text (in PowerShell, with double quotes inside the single ones; a %NAME% has no such form), or run the command yourself`,
+});
+
 /**
  * Why cloudpin can't tell the account when an argument is known only when the command runs (#160), or
  * undefined when none could pick it. Each reason names a flag, never a value:

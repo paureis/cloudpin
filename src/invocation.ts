@@ -20,4 +20,6 @@ export interface Invocation {
   envUnknown?: boolean;
   /** The call starts with an empty environment (`env -i`, `exec -c`): only `env` reaches the CLI (#162). */
   clearEnv?: boolean;
+  /** cmd.exe re-reads this call's command line and would act on this class of character, never a value (#168). */
+  cmdReread?: string;
 }

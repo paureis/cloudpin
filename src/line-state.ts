@@ -58,7 +58,14 @@ export interface State {
   atExit?: string[];
   /** Whether a call is one that never acts on an account; only the check knows (#163). */
   exempt?: (name: string, args: string[]) => boolean;
+  /** Whether a name runs through cmd.exe, on Windows; only the check knows (#168). */
+  cmdFile?: CmdFile;
+  /** PowerShell's text after --% in the statement being read, as typed (#168). */
+  typed?: string;
 }
+
+/** Whether `name`, in the call's own environment, runs through cmd.exe when `dialect` reads the line (#168). */
+export type CmdFile = (name: string, env: NodeJS.ProcessEnv, dialect: Dialect, cwd: string | undefined) => boolean;
 
 /** The variables the line set, as word expansion reads them (#160). */
 export const variables = (state: State): Variables => (state.dialect === "powershell" ? psVariables(state) : {

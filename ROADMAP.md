@@ -55,8 +55,8 @@ issues it ships. Open an [issue](https://github.com/paureis/cloudpin/issues) to 
 - **Fail closed where the parser can't follow the line** ([#163](https://github.com/paureis/cloudpin/issues/163)): in
   progress. Follow what can be read and refuse the rest as "can't tell", one family at a time: the folder a line moves
   to (done), its environment (done), text that runs unread (done), and words a shell rewrites.
-- **cmd.exe re-reading** ([#168](https://github.com/paureis/cloudpin/issues/168)): what PowerShell hands a `.cmd` shim
-  is read again by cmd.exe, so an unquoted `&`, `^` or `%NAME%` there is "can't tell".
+- **cmd.exe re-reading** ([#168](https://github.com/paureis/cloudpin/issues/168)): done. What PowerShell hands a `.cmd` or
+  `.bat` CLI is read again by cmd.exe, so an unquoted `&`, `|`, `<`, `>`, `^` or `)`, a newline or `%NAME%` there is "can't tell".
 - **A CLI's own switch command** ([#180](https://github.com/paureis/cloudpin/issues/180)): an agent asks the person
   before running one, since which account the work is for is their call.
 

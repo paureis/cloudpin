@@ -21,8 +21,9 @@ export type Token =
    * `quoted`: some of it was in quotes, so `"vercel"` is a string, not a command.
    * `dynamic`: it contains `$(...)`, `<(...)`, backticks or a `$NAME` expansion, so its value is only known when it runs.
    * `expansions`: where, when it is dynamic.
+   * `typed`: on the first word after PowerShell's --%, the text from there on, as typed.
    */
-  | { kind: "word"; value: string; quoted: boolean; dynamic: boolean; expansions?: Expansion[] }
+  | { kind: "word"; value: string; quoted: boolean; dynamic: boolean; expansions?: Expansion[]; typed?: string }
   /** A control operator: ; & | newline, or ( and ) which open and close a subshell. */
   | { kind: "op"; op: string }
   /** $( ... ), <( ... ), >( ... ) or backticks: a command line run in a subshell. */

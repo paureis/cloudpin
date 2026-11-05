@@ -1,3 +1,4 @@
+import { cmdRereads } from "./cmd-reread.js";
 import { folderCommand, loseFolder, moveFolder } from "./folder.js";
 import { commandName } from "./guard.js";
 import { cantTell, invocation, looksUpCli, namedClis, nextAliases, pipedText, psValue, readAlias, readTraps, wholeExpansion, withAlias } from "./hidden-calls.js";
@@ -81,6 +82,7 @@ function analyse(
   }
   const env: Record<string, string> = {};
   let i = 0;
+  let wrapper: string | undefined;
   for (;;) {
     const word = words[i];
     if (word === undefined) {
@@ -111,6 +113,7 @@ function analyse(
       runLine(step.script, "bash", out, env, state);
       return;
     }
+    wrapper ??= word;
     if (step.clearEnv) for (const k of Object.keys(env)) delete env[k];
     for (const k of step.unset ?? []) delete env[k];
     state = forCall(state, step, child);
@@ -157,10 +160,12 @@ function analyse(
           else analyse(run, stdin, out, { ...child(state), exported: { ...state.exported, ...env }, dialect: "bash" }, [], run.map(isDynamic));
         } else out.push(invocation(bin, argv, env, state));
       };
+      const reread = cmdRereads(bin, wrapper, [words, quoted, dynamic, expansions], i + 1, vars, env, out, state);
       call(expanded.slice(1));
       // Windows PowerShell 5.1 passes quotes inside an argument unescaped, and the CLI splits it again (#159).
       const legacy = state.dialect === "powershell" ? windowsPowerShellArgv(expanded.slice(1)) : [];
       if (state.dialect === "powershell" && JSON.stringify(legacy) !== JSON.stringify(expanded.slice(1))) call(legacy);
+      reread?.();
       return;
     }
     // eval, shells, find and script blocks get the words as typed, which the code they run expands;
@@ -274,6 +279,7 @@ function collect(input: string, out: Invocation[], state: State): void {
     dynamic = [];
     expansions = [];
     stdin = [];
+    delete state.typed;
   };
   const tokens = state.dialect === "powershell" ? tokenizePowerShell(input) : tokenize(input);
   const isOp = (t: number, op: string) => tokens[t]?.kind === "op" && (tokens[t] as { op: string }).op === op;
@@ -287,6 +293,7 @@ function collect(input: string, out: Invocation[], state: State): void {
       quoted.push(token.quoted);
       dynamic.push(token.dynamic);
       expansions.push(token.expansions);
+      if (token.typed !== undefined) state.typed = token.typed;
     }
     else if (token.kind === "stdin") {
       // A heredoc or a redirection wins over the pipe.
@@ -355,6 +362,7 @@ export function findInvocations(
   env?: NodeJS.ProcessEnv,
   dialect: Dialect = "bash",
   exempt?: State["exempt"],
+  cmdFile?: State["cmdFile"],
 ): Invocation[] {
   const out: Invocation[] = [];
   collect(command, out, {
@@ -369,6 +377,7 @@ export function findInvocations(
     lists: new Set(),
     ...(env ? { env } : {}),
     ...(exempt ? { exempt } : {}),
+    ...(cmdFile ? { cmdFile } : {}),
   });
   return out;
 }

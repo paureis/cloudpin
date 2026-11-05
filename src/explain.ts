@@ -1,3 +1,4 @@
+import { cmdFileLookup } from "./cmd-reread.js";
 import type { ActiveEnvironment } from "./config.js";
 import { maskArgv } from "./format.js";
 import { commandName, exemptCall, guard, type GuardDeps, type Trace, type Verdict } from "./guard.js";
@@ -103,7 +104,7 @@ export async function explain(command: string | string[], opts: ExplainOptions, 
   const bins = [...deps.providers.flatMap((p) => p.bins), "cloudpin"];
   const calls: Invocation[] =
     typeof command === "string"
-      ? findInvocations(command, bins, opts.cwd, opts.env, opts.shell, exemptCall(deps.providers))
+      ? findInvocations(command, bins, opts.cwd, opts.env, opts.shell, exemptCall(deps.providers), cmdFileLookup(deps.onPath, deps.platform ?? process.platform))
       : command.length > 0
         ? [{ bin: command[0]!, args: command.slice(1), env: {} }]
         : [];
@@ -121,7 +122,7 @@ export async function explain(command: string | string[], opts: ExplainOptions, 
     }
     const cwd = call.cwd ?? opts.cwd;
     const trace: Trace = {};
-    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent", platform: deps.platform }), cwd, ...(call.knownCwd === undefined ? {} : { knownCwd: call.knownCwd }), ...(call.envUnknown ? { envUnknown: true } : {}), mode: opts.mode }, deps, trace);
+    const verdict = await guard({ bin: call.bin, args: call.args, env: envFor(opts.env, call, { agent: opts.mode === "agent", platform: deps.platform }), cwd, ...(call.knownCwd === undefined ? {} : { knownCwd: call.knownCwd }), ...(call.envUnknown ? { envUnknown: true } : {}), ...(call.cmdReread ? { cmdReread: call.cmdReread } : {}), mode: opts.mode }, deps, trace);
     const res = trace.resolution;
     out.push({
       // Masked for every output (text, --json, MCP); the guard above read the real words (#134).

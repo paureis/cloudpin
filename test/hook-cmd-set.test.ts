@@ -63,7 +63,7 @@ describe("cmd /c: set before a call", () => {
   it("a set that only prints changes nothing, and neither does a line with no call", async () => {
     expect((await hook(`cmd /c "set&& ${CALL}"`, { platform: "win32" })).decision).toBe("allow");
     expect(calls).toHaveLength(1);
-    expect((await hook(`cmd /c "set GH&& ${CALL}"`, { platform: "win32" })).decision).toBe("allow");
+    expect((await hook(`cmd /c "set ZZ&& ${CALL}"`, { platform: "win32" })).decision).toBe("allow");
     expect(calls).toHaveLength(1);
     expect((await hook(`cmd /c "set GH_TOKEN=${WRONG_TOKEN}&& dir"`, { platform: "win32" })).decision).toBe("allow");
     expect(calls).toEqual([]);

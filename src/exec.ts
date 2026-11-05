@@ -84,9 +84,9 @@ const refusal = (what: string) =>
   `not run: on Windows this command goes through cmd.exe (a .cmd or .bat file), which would act on ${what} and change the command. Give the value without it, run the CLI's .exe, or run the command yourself.`;
 
 /**
- * Runs a CLI without a shell. cross-spawn handles Windows .cmd shims (az,
- * vercel) by escaping each argument, so values taken from the user's command
- * line (a --hostname, a --scope) can never be interpreted by cmd.exe.
+ * Runs a CLI without a shell of its own. On Windows cross-spawn sends a .cmd shim (az, vercel) through cmd.exe, escaping
+ * each argument, and that holds for a value from the user's command line (a --hostname, a --scope) unless `cmdWouldAct`
+ * finds something it would not hold for. Such a call fails without running anything, so the check fails closed.
  */
 export const realExec: Exec = (bin, args, env) =>
   new Promise((resolve) => {

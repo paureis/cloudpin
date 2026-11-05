@@ -45,7 +45,9 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Security
 
-- Follow or refuse a line's folder (#163).
+- A call after `cd -- x`, `pushd x` or `Set-Location x` was checked against the wrong pin file. Each spelling is now
+  followed, and a folder cloudpin can't read in advance (`cd "$(...)"`) stops later calls as "can't tell" when a pin
+  file is in sight (#163).
 - An agent's `cloudpin exec -- bash -c 'gh ...'` or `cloudpin exec -- npx gh ...` was read as an unguarded `bash` or `npx`,
   so it could run on the wrong account. What `cloudpin exec` starts is now read as a call of its own (#14).
 - `cloudpin explain` (text and `--json`) and the MCP `cloudpin_check` tool no longer repeat a token or password from

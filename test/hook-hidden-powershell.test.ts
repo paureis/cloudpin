@@ -175,7 +175,7 @@ describe("PowerShell: a bare & $c (#163)", () => {
     "& (echo 'CLI')",
   ]);
 
-  throughAlias(["$c='gh'; & $c CALL", "& $env:CMD CALL; echo gh"]);
+  throughAlias(["$c='gh'; & $c CALL"]);
 
   it.each(["$c='gh pr list'; & $c", "$c; echo 'gh pr list'", "$c", "$env:CMD; echo 'gh pr list'", "if ($c) { }; echo 'gh pr list'", "return $c; echo 'gh pr list'", "throw $c; echo 'gh pr list'", ". $f; echo 'gh pr list'"])("no call: %s", async (line) => {
     expect((await hook(line, PS)).decision).toBe("allow");

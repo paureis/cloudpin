@@ -53,7 +53,7 @@ describe("findInvocations: cloudpin exec", () => {
   });
 
   it("a command known only when it runs is checked against the guarded CLIs the line names", () => {
-    expect(calls("cloudpin exec -- $x pr list")).toEqual([["cloudpin", "pr", "list"]]);
+    expect(calls("cloudpin exec -- $x pr list")).toEqual([["cloudpin", DYNAMIC_WORDS]]);
     expect(calls("cloudpin exec -- nice $x")).toEqual([["cloudpin", DYNAMIC_WORDS]]);
   });
 

@@ -37,7 +37,9 @@ const END_OF_CALL = /\d*[<>]|[;&|\n)}"'`\\]/;
 function onlyExempt(name: string, state: State): boolean {
   const { exempt, line } = state;
   if (!exempt) return false;
-  const calls = [...line.matchAll(mention(name, "g"))].map((m) => line.slice(m.index + name.length).split(END_OF_CALL)[0]!.trim().split(/\s+/).filter(Boolean));
+  // `${CLI:-gh} --version`: the words go on after its brace.
+  const after = (at: number) => line.slice(at).replace(/^\}"?/, "");
+  const calls = [...line.matchAll(mention(name, "g"))].map((m) => after(m.index + name.length).split(END_OF_CALL)[0]!.trim().split(/\s+/).filter(Boolean));
   return calls.length > 0 && calls.every((args) => exempt(name, args));
 }
 
@@ -68,6 +70,11 @@ export function psValue(tokens: Token[], t: number): boolean {
   if (op(t) === "|") return op(t - 1) !== "|" && op(t + 1) !== "|";
   const before = tokens[t - 3];
   return op(t) === ")" && op(t - 2) === "(" && before?.kind === "word" && ["if", "elif", "elseif", "while", "until", "switch"].includes(before.value);
+}
+
+/** The line looks a named CLI up: `"$(command -v az)" ...`, `& (Get-Command az).Source ...`. That word runs that CLI. */
+export function looksUpCli(state: State): boolean {
+  return namedClis(state).some((name) => new RegExp(`(command\\s+-v|which|type\\s+-[pP]|Get-Command|gcm)\\s+${name}\\b`, "i").test(state.line));
 }
 
 /**

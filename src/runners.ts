@@ -199,7 +199,10 @@ function powershell(args: Arg[], pwsh: boolean): Run {
     if (value === undefined) return raw.startsWith("{") ? {} : { unknown: true };
     const key = /^(?:--?|\/)(.*)$/s.exec(value)?.[1]?.toLowerCase();
     const param = key === undefined ? undefined : PS_PARAMS.find(([full, shortest]) => full.startsWith(key) && key.length >= shortest.length);
-    // The first argument it doesn't know starts the script: a command in 5.1, a file in pwsh, where `-` is still input.
+    // The first argument it doesn't know starts the script: a command in 5.1, a file in pwsh. about_Pwsh: -File "is the
+    // default parameter if no parameters are present but values are present", and "if the value of File is `-`, then
+    // commands are read from standard input" (learn.microsoft.com/powershell/module/microsoft.powershell.core/about/about_pwsh).
+    // pwsh isn't installed here, so that is the docs alone.
     if (!param) return pwsh && value !== "-" ? {} : script(k);
     const takes = param[2];
     if (takes === "none") continue;
@@ -215,7 +218,8 @@ function powershell(args: Arg[], pwsh: boolean): Run {
       return { lines: [{ text: Buffer.from(text, "base64").toString("utf16le"), dialect: "powershell" }] };
     }
   }
-  // With no script it reads its commands from standard input (real 5.1).
+  // With no script it reads its commands from standard input (real 5.1). about_Pwsh says it of `-File -`, not of no
+  // script at all; read the same, which only adds a check.
   return { stdin: "powershell" };
 }
 

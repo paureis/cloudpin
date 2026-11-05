@@ -213,12 +213,16 @@ describe("bash: ${x:-...} (#163)", () => {
     ": ${y:=$(GH_TOKEN=VALUE gh pr list)}",
     "echo ${y:-$(echo $(GH_TOKEN=VALUE gh pr list))}",
     "echo ${y:-$(echo '}' $(GH_TOKEN=VALUE gh pr list))}",
-    "GH_TOKEN=VALUE ${CLI:-gh} pr list",
-    "GH_TOKEN=VALUE \"${CLI:-gh}\" pr list",
-    "GH_TOKEN=VALUE ${CLI-gh} pr list",
-    "GH_TOKEN=VALUE ${CLI:=gh} pr list",
-    "GH_TOKEN=VALUE ${CLI:+gh} pr list",
   ]);
+
+  // Another word known only when it runs, which falls back on a name.
+  it.each(["${CLI:-gh} pr list", "\"${CLI:-gh}\" pr list", "${CLI-gh} pr list", "${CLI:=gh} pr list", "${CLI:+gh} pr list"])("%s", async (line) => {
+    const stopped = await hook(line, BASH);
+    expect(stopped.decision).toBe("deny");
+    expect(stopped.reason).toContain(HIDDEN);
+    expect((await hook(line, BASH, {}, bare)).decision).toBe("allow");
+    expect((await hook(line.replace(" pr list", " --version"), BASH)).decision).toBe("allow");
+  });
 
   it("only as a command word, alone", async () => {
     const stopped = await hook("${CLI:-gh}", BASH);

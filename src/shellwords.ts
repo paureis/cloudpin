@@ -1,6 +1,6 @@
 import { folderCommand, loseFolder, moveFolder } from "./folder.js";
 import { commandName } from "./guard.js";
-import { cantTell, invocation, namedClis, nextAliases, pipedText, psValue, readAlias, readTraps, wholeExpansion, withAlias } from "./hidden-calls.js";
+import { cantTell, invocation, looksUpCli, namedClis, nextAliases, pipedText, psValue, readAlias, readTraps, wholeExpansion, withAlias } from "./hidden-calls.js";
 import type { Invocation } from "./invocation.js";
 import { ASSIGNMENT, assignedValue, carryBlock, type EnvArg, isPsEnvWord, readEnvCommand, readPsAssignment, readPsEnvWords, readSetEnvironmentVariable } from "./line-env.js";
 import { assign, child, type Dialect, restoreEnv, restoreFolder, type State, variables } from "./line-state.js";
@@ -36,7 +36,7 @@ function analyse(
 ): void {
   const vars = variables(state);
   // PowerShell's first word runs only after & (`$c` prints, `if ($c)` tests, `. $f` is a script, not read).
-  let runsWord = state.dialect === "bash" && !state.asValue;
+  let runsWord = state.dialect === "bash" && !(state.asValue && words.length === 1);
   // An assignment word's value with the variables the line set; UNKNOWN_VALUE when a part isn't known.
   const valueOf = (k: number, set: RegExpExecArray): string =>
     assignedValue({ raw: words[k]!, quoted: false, expansions: dynamic[k] ? (expansions[k] ?? []) : undefined }, set, state, vars);
@@ -139,9 +139,10 @@ function analyse(
       .flatMap((w, k) => (expansions[i + k] ? expandWord(w, expansions[i + k]!, quoted[i + k] ?? false, vars) : [w]));
     if (expanded.length === 0) return;
     if (expanded[0] === DYNAMIC_WORD || expanded[0] === DYNAMIC_WORDS) {
-      // A command held in a variable set elsewhere: check every guarded CLI the line names; alone, it can't tell (#163).
-      if (expanded.length > 1) for (const named of namedClis(state)) out.push(invocation(named, expanded.slice(1), env, state));
-      else if (runsWord && wholeExpansion(words[i]!, quoted[i] ?? false, expansions[i], state)) cantTell("", true, out, env, state);
+      // A command only known when it runs: every guarded CLI the line names can't tell (#163). With text around it, it is
+      // a path to a script, and its arguments are still read as the CLI's.
+      if (runsWord && wholeExpansion(words[i]!, quoted[i] ?? false, expansions[i], state) && !looksUpCli(state)) cantTell("", true, out, env, state);
+      else if (expanded.length > 1) for (const named of namedClis(state)) out.push(invocation(named, expanded.slice(1), env, state));
       return;
     }
     bin = expanded[0]!;
@@ -152,7 +153,8 @@ function analyse(
         // so that command is read as the words it is: a CLI, `npx` or `bash -c` around one, `cloudpin switch` (#14).
         if (name === "cloudpin" && argv[0] === "exec") {
           const run = argv.slice(argv[1] === "--" ? 2 : 1);
-          analyse(run, stdin, out, { ...child(state), exported: { ...state.exported, ...env }, dialect: "bash" }, [], run.map(isDynamic));
+          if (run[0] !== undefined && isDynamic(run[0])) cantTell("", true, out, env, state);
+          else analyse(run, stdin, out, { ...child(state), exported: { ...state.exported, ...env }, dialect: "bash" }, [], run.map(isDynamic));
         } else out.push(invocation(bin, argv, env, state));
       };
       call(expanded.slice(1));

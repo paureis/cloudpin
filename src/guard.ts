@@ -1,9 +1,9 @@
 import { basename } from "node:path";
 import { type ActiveEnvironment, ConfigError, findConfig, type FoundConfig, type Provider } from "./config.js";
 import { envNameMatches } from "./cache.js";
-import { dynamicTarget } from "./dynamic-args.js";
+import { dynamicTarget, UNKNOWN_CWD } from "./dynamic-args.js";
 import { isReadOnly } from "./readonly.js";
-import { type Exec, type ProviderDef, type Resolution, UNKNOWN_VALUE } from "./types.js";
+import { type Exec, type ProviderDef, type Resolution, UNKNOWN_FOLDER, UNKNOWN_VALUE } from "./types.js";
 
 export interface GuardRequest {
   /** The executable as typed or resolved, e.g. "az" or "C:\\...\\gh.exe". */
@@ -130,6 +130,13 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   // (#136; envFor keeps an agent from setting those in any spelling).
   const platform = deps.platform ?? process.platform;
   const folded = foldEnvNames(req.env, platform);
+
+  // No folder, so no pin file to read, not even "none": the folder it goes to may have one (#163).
+  if (req.cwd === UNKNOWN_FOLDER) {
+    if (provider.isExempt(req.args, name)) return { action: "allow", reason: "exempt" };
+    if (req.mode === "shell" && folded.env.CLOUDPIN_SKIP === "1") return { action: "allow", reason: "skipped" };
+    return { action: "block", uncertain: true, provider: provider.name, problems: [UNKNOWN_CWD.problem], fix: UNKNOWN_CWD.fix };
+  }
 
   let config: FoundConfig | null;
   try {

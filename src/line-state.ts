@@ -8,9 +8,13 @@ import type { Variables } from "./word-expansion.js";
 export type Dialect = "bash" | "powershell";
 
 export interface State {
-  /** Working directory after any `cd` seen so far; undefined until one is. */
+  /** Working directory after any `cd` seen so far; undefined until one is, UNKNOWN_FOLDER once it can't be read. */
   cwd?: string;
   base?: string;
+  /** Where `cd -` goes; undefined when the line doesn't know (#163). */
+  previous?: string;
+  /** What `pushd` left in this line, for `popd`; below it the stack is unknown (#163). Never changed in place. */
+  stack?: readonly string[];
   /** Variables set by plain `NAME=value` commands earlier in the line. */
   vars: Record<string, string>;
   /** Of those, the ones the shell passes to the commands it runs: `export`ed, or PowerShell `$env:` (#86). */
@@ -55,6 +59,13 @@ export const child = (state: State): State => ({
   unset: new Set(state.unset),
   lists: new Set(state.lists),
 });
+
+/** Back to where `to` is: a child shell's or a job's folder doesn't come back (#163). */
+export function restoreFolder(state: State, to: Pick<State, "cwd" | "previous" | "stack">): void {
+  state.cwd = to.cwd;
+  state.previous = to.previous;
+  state.stack = to.stack;
+}
 
 /** Sets NAME for the rest of the line, exported or not. */
 export function assign(state: State, name: string, value: string, exported: boolean): void {

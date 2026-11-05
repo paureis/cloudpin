@@ -12,7 +12,7 @@ export interface Invocation {
   ifExported?: Record<string, string>;
   /** Names `unset` earlier in the line. */
   unset?: string[];
-  /** Folder the call runs in, when a `cd` earlier in the line changed it. */
+  /** Folder the call runs in, when a `cd` earlier in the line changed it; UNKNOWN_FOLDER when it can't be read (#163). */
   cwd?: string;
   /** The call starts with an empty environment (`env -i`, `exec -c`): only `env` reaches the CLI (#162). */
   clearEnv?: boolean;

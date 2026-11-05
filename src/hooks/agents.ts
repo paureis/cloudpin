@@ -3,6 +3,7 @@ import { formatBlock, formatConfirm, maskArgv } from "../format.js";
 import { commandName, foldEnvNames, guard, type GuardDeps } from "../guard.js";
 import { type Dialect, findInvocations, type Invocation } from "../shellwords.js";
 import { parseSwitchArgs } from "../switch.js";
+import { UNKNOWN_FOLDER } from "../types.js";
 import { envFor, USER_ONLY_VARS } from "../user-env.js";
 import { isDynamic } from "../word-expansion.js";
 
@@ -204,7 +205,8 @@ function switchConfirmation(args: string[], deps: GuardDeps, cwd: string, base: 
   const command = [...prefix, ...maskArgv(["cloudpin", ...args])].join(" ");
   let target = "";
   try {
-    const config = deps.findConfig(cwd, env);
+    // From a folder it can't read, the pins it would name may not be the ones that apply (#163).
+    const config = cwd === UNKNOWN_FOLDER ? null : deps.findConfig(cwd, env);
     if (config) {
       const parsed = parseSwitchArgs(args.slice(1));
       const only = "only" in parsed && parsed.only ? parsed.only.map((n) => n.trim().toLowerCase()) : undefined;

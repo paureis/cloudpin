@@ -75,9 +75,8 @@ describe("PowerShell: the audit's repro lines (#159)", () => {
     expect(call?.env).toEqual({ AZURE_CONFIG_DIR: "zzdir" });
   });
 
-  // Not this issue: environment state and the working folder are #163; other runners are in shellwords-runners.test.ts (#162).
+  // Not this issue: environment state is #163 (the working folder is in hook-folder-powershell.test.ts); other runners are in shellwords-runners.test.ts (#162).
   it.todo("${env:X} = ..., Set-Item env:, [Environment]::SetEnvironmentVariable, Remove-Item Env:, $env: set in if / & { } (#163)");
-  it.todo("Set-Location, sl, Push-Location, cd -Path (#163)");
 });
 
 describe("PowerShell: rules checked against Windows PowerShell 5.1 (#159)", () => {

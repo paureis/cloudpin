@@ -110,7 +110,8 @@ describe("findInvocations with cd", () => {
   });
 
   it("follows an absolute cd and later cds", () => {
-    const calls = findInvocations("cd /srv/a; gh pr list; cd b && az vm list", GUARDED, base);
+    // The path as this platform writes it: on Windows, Git Bash's /srv/a is under a mount only it knows (#163).
+    const calls = findInvocations(`cd ${JSON.stringify(resolve("/srv/a"))}; gh pr list; cd b && az vm list`, GUARDED, base);
     expect(calls.map((c) => c.cwd)).toEqual([resolve("/srv/a"), resolve("/srv/a/b")]);
   });
 

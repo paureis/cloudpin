@@ -94,6 +94,7 @@ describe("bash: text piped into a shell (#163)", () => {
       expect((await hook(`echo 'GH_TOKEN=${WRONG} gh pr list' | ${reader}`, BASH)).decision).toBe("deny");
       expect((await hook("echo 'gh --version' | " + reader, BASH)).decision).toBe("allow");
       expect((await hook("echo 'ls' | " + reader, BASH)).decision).toBe("allow");
+      expect((await hook(`echo 'GH_TOKEN=${WRONG} gh pr list' | ${reader}`, BASH, {}, bare)).decision).toBe("allow");
     }
   });
 
@@ -163,11 +164,8 @@ describe("bash: bash -c reads its options as bash does (#163)", () => {
     "bash -c",
   ]);
 
-  it("a flag only known when it runs refuses, as the string may be read or not", async () => {
-    const stopped = await hook(`bash $F -c '${CALL}'`, BASH);
-    expect(stopped.decision).toBe("deny");
-    expect(stopped.reason).toContain(HIDDEN);
-  });
+  // A flag only known when it runs: the string may be read or not.
+  refused(BASH, ["bash $F -c 'CLI'"]);
 });
 
 describe("bash: trap runs its string later (#163)", () => {

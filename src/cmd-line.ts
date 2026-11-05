@@ -75,11 +75,33 @@ function split(line: string): string[][] | undefined {
   }
   commands.push(current);
   const out: string[][] = [];
+  // What `set` gave the commands after it, as `env` would give them.
+  const sets: string[] = [];
   for (const command of commands) {
+    const set = setCommand(command);
+    if (set === undefined) return undefined;
+    if (set !== null) {
+      if (set !== "") sets.push(set);
+      continue;
+    }
     const words = splitCommandLine(command.trim().replace(/^[@\s]+/, () => ""), false).map((t) => t.value);
     if (words.length === 0 || /^rem$/i.test(words[0]!)) continue;
     if (/^(if|for|start)$/i.test(words[0]!)) return undefined;
-    out.push(/^call$/i.test(words[0]!) ? words.slice(1) : words);
+    const call = /^call$/i.test(words[0]!) ? words.slice(1) : words;
+    out.push(sets.length > 0 ? ["env", ...sets, ...call] : call);
   }
   return out;
+}
+
+/**
+ * cmd.exe's `set` (`set /?`, measured with a printer), kept as typed since its value runs to the `&`, spaces included:
+ * null when `command` is no `set`, "NAME=value" for one that sets, "" for one that only prints, undefined for /a and /p.
+ */
+function setCommand(command: string): string | null | undefined {
+  const set = /^[@\s]*set(?=[\s/"]|$)\s*(.*)$/is.exec(command);
+  if (!set) return null;
+  const typed = set[1]!;
+  if (typed.startsWith("/")) return undefined;
+  const text = typed.startsWith('"') ? typed.slice(1, typed.lastIndexOf('"') > 0 ? typed.lastIndexOf('"') : undefined) : typed;
+  return text.indexOf("=") > 0 ? text : "";
 }

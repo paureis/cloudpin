@@ -88,6 +88,10 @@ These are real limits, stated so nobody relies on cloudpin for them:
 - **Which resource inside the account.** cloudpin checks the identity a command acts as and the account or project it
   lands in, not which repository, Vercel project, region or resource group it targets. `gh repo delete other/repo`
   passes if you are logged in as the pinned user. (A pinned Kubernetes namespace is the exception.)
+- **An agent that runs a CLI's own switch command.** `gh auth switch` or `az account set` is exempt, so a person is never
+  locked out of fixing a mismatch, and that holds for an agent too. `cloudpin switch` asks; those don't.
+- **A name Cursor's hook filter can't see.** Cursor runs the hook only when its text matcher finds a guarded name on the
+  line, so `"cloud"pin` or `-EncodedCommand <base64>` never reach cloudpin there. Other agents have no such filter.
 - **A command cloudpin doesn't guard.** Only the CLIs above are checked. A cloud SDK called from a program, `curl` to a
   cloud API, a Terraform run, or an agent's MCP tools for a cloud provider (which never go through the shell hook) act
   on whatever credentials they find.

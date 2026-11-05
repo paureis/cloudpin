@@ -329,3 +329,25 @@ export function readEnvCommand(name: string, args: EnvArg[], state: State, vars:
   else return false;
   return true;
 }
+
+// PowerShell environment variable: `$env:NAME = <value>` or `$env:NAME=<value>` (#86).
+const PS_ENV = /^\$(?:env:([A-Za-z_][A-Za-z0-9_]*)|\{env:([A-Za-z_][A-Za-z0-9_]*)\})(?:=(.*))?$/is;
+export const isPsEnvWord = (word: string | undefined): boolean => PS_ENV.test(word ?? "");
+
+/** The whole statement is `$env:X=value` or `$env:X = value`, as a line read as bash has it: sets X. */
+export function readPsEnvWords(words: string[], dynamic: boolean[], state: State): boolean {
+  const psEnv = PS_ENV.exec(words[0] ?? "");
+  if (psEnv && (psEnv[3] !== undefined || words[1] === "=")) {
+    // A single literal (`'other'`, `other`) is known; anything else (an expression,
+    // a command, `(Get-Content f)`, `$x`) is only known when it runs.
+    const inline = psEnv[3] !== undefined && psEnv[3] !== "";
+    const from = inline ? 1 : psEnv[3] !== undefined ? 1 : 2;
+    const value = inline ? psEnv[3]! : words[from];
+    // Inline, the word's own `$env:` counts as an expansion, so look at the value part alone.
+    const expandsValue = inline ? /\$[A-Za-z_{(]/.test(value!) || isDynamic(value!) : dynamic[from];
+    const known = value !== undefined && words.length === (inline ? 1 : from + 1) && !expandsValue;
+    assign(state, psEnv[1] ?? psEnv[2]!, known ? value : UNKNOWN_VALUE, true);
+    return true;
+  }
+  return false;
+}

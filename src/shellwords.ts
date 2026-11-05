@@ -2,7 +2,7 @@ import { folderCommand, loseFolder, moveFolder } from "./folder.js";
 import { commandName } from "./guard.js";
 import { cantTell, invocation, namedClis, nextAliases, pipedText, psValue, readAlias, readTraps, wholeExpansion, withAlias } from "./hidden-calls.js";
 import type { Invocation } from "./invocation.js";
-import { ASSIGNMENT, assignedValue, carryBlock, type EnvArg, readEnvCommand, readPsAssignment, readSetEnvironmentVariable } from "./line-env.js";
+import { ASSIGNMENT, assignedValue, carryBlock, type EnvArg, isPsEnvWord, readEnvCommand, readPsAssignment, readPsEnvWords, readSetEnvironmentVariable } from "./line-env.js";
 import { assign, child, type Dialect, restoreEnv, restoreFolder, type State, variables } from "./line-state.js";
 import { tokenizePowerShell, windowsPowerShellArgv } from "./ps-tokens.js";
 import { pipedValues, psAssignment, type Words } from "./ps-words.js";
@@ -22,8 +22,6 @@ const FIND_EXEC = new Set(["-exec", "-execdir", "-ok", "-okdir"]);
 
 // PowerShell assignment: `$name = <value>` or `$name=<value>`.
 const PS_ASSIGNMENT = /^\$([A-Za-z_][A-Za-z0-9_]*)(?:=(.*))?$/s;
-// PowerShell environment variable: `$env:NAME = <value>` or `$env:NAME=<value>` (#86).
-const PS_ENV = /^\$(?:env:([A-Za-z_][A-Za-z0-9_]*)|\{env:([A-Za-z_][A-Za-z0-9_]*)\})(?:=(.*))?$/is;
 // Builtins that export: `export`, and `declare`/`typeset` with -x.
 const EXPORTERS = new Set(["export", "declare", "typeset"]);
 
@@ -61,22 +59,10 @@ function analyse(
         return;
       }
       // An expression is not a command (`$cli x` is a parse error); its ( ) and $( ) parts were read already.
-      if (!PS_ENV.test(words[0] ?? "") && dynamic[0]) return;
+      if (!isPsEnvWord(words[0]) && dynamic[0]) return;
     }
   }
-  const psEnv = PS_ENV.exec(words[0] ?? "");
-  if (psEnv && (psEnv[3] !== undefined || words[1] === "=")) {
-    // A single literal (`'other'`, `other`) is known; anything else (an expression,
-    // a command, `(Get-Content f)`, `$x`) is only known when it runs.
-    const inline = psEnv[3] !== undefined && psEnv[3] !== "";
-    const from = inline ? 1 : psEnv[3] !== undefined ? 1 : 2;
-    const value = inline ? psEnv[3]! : words[from];
-    // Inline, the word's own `$env:` counts as an expansion, so look at the value part alone.
-    const expandsValue = inline ? /\$[A-Za-z_{(]/.test(value!) || isDynamic(value!) : dynamic[from];
-    const known = value !== undefined && words.length === (inline ? 1 : from + 1) && !expandsValue;
-    assign(state, psEnv[1] ?? psEnv[2]!, known ? value : UNKNOWN_VALUE, true);
-    return;
-  }
+  if (readPsEnvWords(words, dynamic, state)) return;
   const ps = state.dialect === "bash" ? PS_ASSIGNMENT.exec(words[0] ?? "") : null;
   if (ps && (ps[2] !== undefined || words[1] === "=")) {
     // `$x = "vercel"` stores a string; `$x = vercel ls` runs vercel and stores its output.

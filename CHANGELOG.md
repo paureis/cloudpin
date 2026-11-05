@@ -8,6 +8,19 @@ Versions 0.1.0 to 0.4.2 (2026-10-08 to 2026-10-10) are in [docs/changelog-0.x.md
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-11-05
+
+A security fix for Windows. Please upgrade.
+
+### Security
+
+- Windows: a value in a command could start another command through cmd.exe while cloudpin checked or ran that
+  command, when the CLI is a `.cmd` or `.bat` file (the Azure CLI, and CLIs installed by npm such as Vercel). cloudpin's
+  dependency escapes arguments for cmd.exe, but a batch file reads them a second time. A value could also lose or change
+  the flags after it. cloudpin now refuses to start such a file when cmd.exe would act on its arguments: the check stops
+  the command as "can't tell", and `cloudpin exec` exits non-zero. Values that arrive intact keep working, including
+  JMESPath with double quotes. `.exe` CLIs, Linux and macOS are not affected.
+
 ## [1.2.1] - 2026-10-29
 
 Fixes agent-hook gaps where a command could run on the wrong account without being checked (1.2.0 and earlier have

@@ -59,6 +59,15 @@ Versions 1.0.0 to 1.1.2 are in [docs/changelog-1.0-1.1.md](docs/changelog-1.0-1.
 - Help no longer exempts a command that runs anyway (#153): a kubectl or helm plugin given `--help` (it gets the flag
   as an argument), a value flag that takes it (`gh secret set X --body --help`), and Wrangler's `--help false` and
   `--no-help`. `gh ... --web --help` is checked as well, at the cost of one check.
+- kubectl and helm: a long flag that may take the next word as its value no longer hides the target (#153).
+  `kubectl logs pod --container -n x` sets no namespace, since `-n` is the container, but cloudpin read namespace `x`.
+  cloudpin now knows the long flags that never take a value (`--watch`, `--all`, `--force`, ... for kubectl 1.36 and
+  helm 3 and 4). After any other long flag without `=`, when the next word starts with `-` and it or a later word would
+  pick the target, the command stops as "can't tell" and names the flag, which reads fine as `--flag=value`.
+- Vercel: with services on, a command in a service's folder is also checked against the link of the parent project,
+  which is the one Vercel uses (#153). That holds for every command that reads a link, `vercel dev` included.
+  Services are on with `VERCEL_USE_EXPERIMENTAL_SERVICES`, or the parent's config setting them, and a config only Vercel
+  can read (`vercel.toml`, `vercel.ts`, ...) counts too, at the cost of one check.
 - Vercel: `vercel deploy <dir>`, a bare `vercel <dir>`, `vercel pull <dir>` and `vercel dev <dir>` are checked against
   the link of the folder they name, not the one they run in (#147). A folder known only when the command runs
   (`vercel deploy "$D"`) stops as "can't tell".

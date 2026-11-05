@@ -46,8 +46,9 @@ issues it ships. Open an [issue](https://github.com/paureis/cloudpin/issues) to 
   flag group is read as kubectl reads it, and a short flag's value that looks like a flag stays a value.
 - **Vercel folder arguments** ([#147](https://github.com/paureis/cloudpin/issues/147)): done. `vercel deploy <dir>`,
   `pull <dir>` and `dev <dir>` are checked against the link of the folder they name.
-- **Exemption leftovers** ([#153](https://github.com/paureis/cloudpin/issues/153)): plugins given `--help`, value flags
-  that take it and Wrangler's `--no-help` are done; kubectl per-command long values and `vercel dev` services remain.
+- **Exemption leftovers** ([#153](https://github.com/paureis/cloudpin/issues/153)): done. Plugins given `--help`, value
+  flags that take it, Wrangler's `--no-help`, kubectl and helm per-command long values, and Vercel's services (the
+  parent project's link counts).
 - **Vercel `-y` in a group and `teams change`** ([#148](https://github.com/paureis/cloudpin/issues/148)): done.
 - **Windows case gaps** ([#136](https://github.com/paureis/cloudpin/issues/136)): done. cloudpin's own variables
   and the read-only check read names without regard to case (Wrangler's per-platform login folder came with #103).

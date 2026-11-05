@@ -97,7 +97,10 @@ export function psAssignment([words, quoted, dynamic, expansions]: Words): { nam
  * What a pipeline element passes to the next command's input (#162): its literal strings and variables the
  * line set (`'az ...' | iex`, `$c | iex`), or else one value cloudpin can't read (a command's output).
  */
-export function pipedValues([words, quoted, dynamic, expansions]: Words, state: PsState): string[] {
+export function pipedValues(statement: Words, state: PsState): string[] {
+  // echo is Write-Output's alias, and passes on what it is given.
+  const passes = /^(echo|write-output)$/i.test(statement[0][0] ?? "") && !statement[1][0];
+  const [words, quoted, dynamic, expansions] = statement.map((list) => list.slice(passes ? 1 : 0)) as Words;
   const vars = psVariables(state);
   const values = words.map((w, k) => (expansions[k] ? substitute(w, expansions[k]!, vars) : quoted[k] ? w : undefined));
   const literal = values.length > 0 && words.every((_, k) => quoted[k] || dynamic[k]) && !values.includes(undefined);

@@ -119,7 +119,7 @@ describe("agent hook: a wrapper or a runner no longer hides the call (#162)", ()
     "echo other | xargs az group list --subscription",
     "echo x | xargs -I{} az group list --subscription {}",
     "sudo -Z az group list --subscription pinned",
-    "Get-Content cmd.txt | iex; az version",
+    "Get-Content cmd.txt | iex; az group list",
     "cmd /c 'az group list --subscription %SUB%'",
     "Start-Process az -ArgumentList $a",
   ])("can't tell for %j", async (line) => {

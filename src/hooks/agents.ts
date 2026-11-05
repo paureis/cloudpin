@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { formatBlock, formatConfirm, maskArgv } from "../format.js";
-import { commandName, foldEnvNames, guard, type GuardDeps } from "../guard.js";
+import { commandName, exemptCall, foldEnvNames, guard, type GuardDeps } from "../guard.js";
 import { type Dialect, findInvocations, type Invocation } from "../shellwords.js";
 import { parseSwitchArgs } from "../switch.js";
 import { UNKNOWN_FOLDER } from "../types.js";
@@ -299,11 +299,11 @@ export async function runHook(
  * payload doesn't name the shell, Windows may run it in PowerShell or in bash, so it is read both ways and
  * every call either reading finds is checked; elsewhere it is bash.
  */
-function agentCalls(call: AgentCall, bins: string[], env: NodeJS.ProcessEnv, platform: NodeJS.Platform): Invocation[] {
+function agentCalls(call: AgentCall, bins: string[], env: NodeJS.ProcessEnv, platform: NodeJS.Platform, exempt: (name: string, args: string[]) => boolean): Invocation[] {
   const shells: Dialect[] = call.shell ? [call.shell] : platform === "win32" ? ["bash", "powershell"] : ["bash"];
   const seen = new Set<string>();
   return shells
-    .flatMap((shell) => findInvocations(call.command, bins, call.cwd, env, shell))
+    .flatMap((shell) => findInvocations(call.command, bins, call.cwd, env, shell, exempt))
     .filter((inv) => !seen.has(JSON.stringify(inv)) && seen.add(JSON.stringify(inv)));
 }
 
@@ -329,7 +329,7 @@ async function checkCommand(
   const bins = [...deps.providers.flatMap((p) => p.bins), "cloudpin"];
   const blocks: string[] = [];
   const confirmations: Confirmation[] = [];
-  for (const inv of agentCalls(call, bins, env, platform)) {
+  for (const inv of agentCalls(call, bins, env, platform, exemptCall(deps.providers))) {
     // findInvocations reads what `cloudpin exec` starts as the call it is, so any other cloudpin call stays here.
     if (commandName(inv.bin) === "cloudpin") {
       const confirmation = cloudpinConfirmation(inv, deps, inv.cwd ?? call.cwd, env);

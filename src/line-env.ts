@@ -292,12 +292,25 @@ export function readSetEnvironmentVariable(text: string, state: State): void {
   psSet(state, key, where === "process" || where === "0" ? (value === undefined ? undefined : literalArgument(value)) : undefined);
 }
 
-/** A PowerShell ( ), $( ), @( ) or { } is not a child shell, and may or may not run: what it set can't tell. */
-export function carryBlock(state: State, inner: State): void {
+/**
+ * A PowerShell ( ), $( ), @( ) or { } is not a child shell, and may or may not run: what it set can't tell. A plain
+ * variable stays in a scope of its own when the block is called with & or is a function's (about_Scopes), and in
+ * `foreach ($x in ...)` the loop sets $x. `words` are the statement's so far, `text` the block's.
+ */
+export function carryBlock(state: State, inner: State, words: readonly string[], text: string): void {
   if (inner.envUnknown) state.envUnknown = true;
   for (const name of new Set([...Object.keys(inner.exported), ...Object.keys(state.exported), ...inner.unset])) {
     if (inner.exported[name] !== state.exported[name] || (inner.unset.has(name) && !state.unset.has(name))) assign(state, name, UNKNOWN_VALUE, true);
   }
+  const first = words[0]?.toLowerCase() ?? "";
+  if (["&", "function", "filter"].includes(first)) return;
+  const loop = first === "foreach" ? /^\s*(\$\w+)\s/.exec(text)?.[1]?.toLowerCase() : undefined;
+  for (const key of Object.keys(inner.vars)) {
+    if (key.startsWith("$") && inner.vars[key] !== state.vars[key]) state.vars[key] = UNKNOWN_VALUE;
+  }
+  if (loop) state.vars[loop] = UNKNOWN_VALUE;
+  for (const name of inner.lists) state.lists.add(name);
+  if (inner.aliases) state.aliases = inner.aliases;
 }
 
 /** Applies a command that changes the line's variables; false when `name` isn't one. */

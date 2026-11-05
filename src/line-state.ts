@@ -44,6 +44,16 @@ export interface State {
   marked?: string[];
   /** Names `local` set, which end with their function (#163). */
   locals?: string[];
+  /** What each alias of this line stands for (#163), by name; DYNAMIC_WORDS when the line can't say. */
+  aliases?: Record<string, string>;
+  /** bash reads a whole line before it runs any of it: the aliases the next line will see (#163). */
+  aliasesNext?: Record<string, string>;
+  /** The statement being read is a bare value in what looks like PowerShell's writing: see `psValue` (#163). */
+  asValue?: boolean;
+  /** The strings `trap` keeps, which run later (#163). */
+  atExit?: string[];
+  /** Whether a call is one that never acts on an account; only the check knows (#163). */
+  exempt?: (name: string, args: string[]) => boolean;
 }
 
 /** The variables the line set, as word expansion reads them (#160). */

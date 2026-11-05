@@ -64,6 +64,11 @@ cloudpin is a seatbelt, not a sandbox.
   and the `.env` files Wrangler loads, which can hold `CLOUDFLARE_API_TOKEN` (it takes the account variables, and keys
   its cache on a salted hash of the credential variables). For `cloudpin switch` it also reads the AWS config file, only
   profile names, `sso_account_id` and `role_arn`; it never reads the AWS credentials file.
+- **The check starts nothing the line chose**: variables a line sets reach the CLI's identity lookup, so the ones that
+  can make a program run code (`NODE_OPTIONS`, `PYTHONPATH`, `BASH_ENV`, `LD_PRELOAD`, `AWS_CONFIG_FILE`, `HOME` and more,
+  listed in `src/line-code-env.ts`) stop the call as "can't tell" before anything starts, and so does an `AZURE_CONFIG_DIR`
+  whose folder holds extensions. The lookup finds the CLI on the `PATH` the line started with, not the line's. An agent's
+  `cloudpin switch` with one of them, or with a `PATH` of its own, is refused.
 - **Switching is the person's decision**: `cloudpin switch` changes the active account of the CLIs, for every terminal,
   so it shows its plan and asks first unless you pass `--yes`. An agent's attempt asks the person through its hook, or
   is denied where the agent can't ask, and `--yes` doesn't change that (`src/hooks/agents.ts`). It runs each CLI's own
@@ -102,9 +107,16 @@ These are real limits, stated so nobody relies on cloudpin for them:
   cloud API, a Terraform run, or an agent's MCP tools for a cloud provider (which never go through the shell hook) act
   on whatever credentials they find.
 - **A compromised machine or PATH.** A fake `az` earlier on PATH, a tampered kubeconfig or a malicious shell profile
-  can make the CLI report any identity.
+  can make the CLI report any identity. An agent's `PATH=x az ...` is checked on the hook's PATH, and then runs what the
+  line's PATH finds, which the check doesn't judge; the agent's own permission system is still asked.
 - **Environment set up by someone else.** Variables set before the agent starts are the user's choice and are
-  honoured, including `CLOUDPIN_ENV` and an `AWS_PROFILE` pointing at another account.
+  honoured, including `CLOUDPIN_ENV`, an `AWS_PROFILE` pointing at another account, and a `NODE_OPTIONS` the identity
+  lookup then starts with.
+- **A person's own line in a terminal.** `cloudpin exec`, `status`, `doctor` and `switch` start the CLIs with the
+  environment they started with, all of it the person's, so `PATH=x az ...` there runs what that PATH finds, during the
+  check too, and `NODE_OPTIONS` runs in cloudpin's own process first. An agent's line is read by the hook before that.
+- **Code a variable nobody has listed can reach.** The list is of what the CLIs and their runtimes document. A config
+  folder the line picks is read as an account folder, apart from `AZURE_CONFIG_DIR`'s check.
 - **A shell without the wrapper.** In a terminal, protection exists only where `cloudpin shell-init` was loaded; an
   alias that runs another program instead of the CLI bypasses it, and cloudpin warns about that at shell start (#69).
 - **CLIs not tested on a real account**: Wrangler (#56) and Gemini CLI are built to their documentation and tested

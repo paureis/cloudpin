@@ -45,6 +45,11 @@ Versions 1.0.0 to 1.2.0 are in [docs/changelog-1.0-1.2.md](docs/changelog-1.0-1.
 
 ### Security
 
+- To check a command cloudpin starts the CLI's identity lookup with the command's environment, so a variable set on the
+  line (`NODE_OPTIONS`, `PYTHONPATH`, `BASH_ENV`, `PATH`...) could run code of the line's choosing during the check. A
+  call with one of them now stops as "can't tell" with nothing started, and the lookup finds the CLI on the `PATH` the line
+  started with. A `PATH` built from `$PATH` on the line read as a CLI not installed and passed unchecked; it is checked now.
+  An agent's `cloudpin switch` with such a variable is refused. `env 'A^=1' cli` and `cmd /c "set X=y&& cli"` are followed.
 - On Windows, cmd.exe reads the arguments of a `.cmd` or `.bat` CLI (az, npm's shims) again, so in PowerShell
   `--query 'x&kubectl'` also ran kubectl and `--subs^cription other` reached the CLI as `--subscription other`. An unquoted
   `&`, `|`, `<`, `>`, `^` or `)`, a newline or `%NAME%` there is now "can't tell" when a pin is in play. `gh.exe` and other

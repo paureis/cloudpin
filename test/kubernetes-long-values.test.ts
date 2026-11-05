@@ -183,6 +183,8 @@ describe("controls: long flags that are read as before (#153)", () => {
   it.each([
     // Nothing after the flag picks a target, so both readings agree.
     "get pods --from-the-future -o wide",
+    "get pods --from-the-future -ojsonpath={.n}",
+    "get pods --from-the-future -w=n",
     "get pods --from-the-future",
     "get pods --from-the-future=x",
     "exec pod --from-the-future -- sh -c true",

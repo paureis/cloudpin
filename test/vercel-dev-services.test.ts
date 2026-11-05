@@ -124,6 +124,19 @@ describe("services on: the parent project's link counts (#153)", () => {
     expectWrongRoot(await check("dev", service));
   });
 
+  it("a root marked only by vercel.toml, under a repository link of the wrong team", async () => {
+    const top = tempDir("cloudpin-vercel-services-");
+    mkdirSync(join(top, ".vercel"));
+    writeFileSync(
+      join(top, ".vercel", "repo.json"),
+      JSON.stringify({ orgId: "team_side", projects: [{ id: "prj", name: "p", directory: "." }] }),
+    );
+    const middle = join(top, "apps");
+    mkdirSync(middle);
+    writeFileSync(join(middle, "vercel.toml"), "");
+    expectWrongRoot(await check("dev", link(join(middle, "api"), "team_main")));
+  });
+
   it("goes up a second time, as dev and ensureLink do", async () => {
     const top = tempDir("cloudpin-vercel-services-");
     link(top, "team_side");
@@ -182,10 +195,12 @@ describe("controls (#153)", () => {
     expect(await check("dev", service, { VERCEL_USE_EXPERIMENTAL_SERVICES: value })).toMatchObject(ALLOW);
   });
 
-  it("only the nearest marker counts: one without services stops the walk", async () => {
+  it.each([".git", ".vercel", "vercel.json"])("only the nearest marker counts: %s without services stops the walk", async (marker) => {
     const { root } = tree("team_side", SERVICES);
     const middle = join(root, "packages");
-    mkdirSync(join(middle, ".git"), { recursive: true });
+    mkdirSync(middle);
+    if (marker === "vercel.json") writeFileSync(join(middle, marker), "{}");
+    else mkdirSync(join(middle, marker));
     const service = link(join(middle, "api"), "team_main");
     expect(await check("dev", service)).toMatchObject(ALLOW);
   });

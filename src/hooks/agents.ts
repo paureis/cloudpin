@@ -262,7 +262,7 @@ export function cloudpinRefusal(inv: Invocation, deps: GuardDeps, base: NodeJS.P
   if (first === undefined || (!isDynamic(first) && (first !== "switch" || "help" in parseSwitchArgs(args.slice(1))))) return undefined;
   const platform = deps.platform ?? process.platform;
   const env = envFor(base, inv, { platform });
-  const names = [...(lineMovedPath(base, env, platform) ? ["PATH"] : []), ...codeVarsSet(base, env, platform)];
+  const names = [...(lineMovedPath(base, env, platform) ? ["PATH"] : []), ...codeVarsSet(base, env, platform, "az")];
   if (names.length === 0) return undefined;
   return `cloudpin: \`${maskArgv(["cloudpin", ...args]).join(" ")}\` starts your cloud CLIs with this line's environment, and ${names.join(", ")} set on it can make them run code the line chose, so it is blocked.\n  Do not work around this; ask the human to run \`cloudpin switch\`.`;
 }

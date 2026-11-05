@@ -200,7 +200,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
     return { ...base, uncertain: true, problems: [problem], fix };
   }
   // A variable the line set that can make the CLI run code, before resolve, so no process starts with it.
-  const codeVars = req.before ? codeVarsSet(req.before, req.env, platform) : [];
+  const codeVars = req.before ? codeVarsSet(req.before, req.env, platform, name) : [];
   if (codeVars.length > 0) {
     const { problem, fix } = codeVarsStop(codeVars);
     return { ...base, uncertain: true, problems: [problem], fix };

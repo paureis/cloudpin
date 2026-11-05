@@ -43,6 +43,7 @@ Run the type-check and the tests as separate commands and read each exit code.
 | `src/line-state.ts` | What `shellwords.ts` keeps while it reads a line: the shell, the folder and the variables so far |
 | `src/folder.ts` | The folder a line moves to (`cd`, `pushd`, `Set-Location`...): followed where it can be read, otherwise "can't tell" |
 | `src/line-env.ts` | The variables a line's commands set (`set -a`, `export X+=y`, `Set-Item env:X`...): followed where they can be read, otherwise "can't tell" |
+| `src/hidden-calls.ts` | Text a line runs without cloudpin reading it (a pipe into a shell, an alias, a bare `$c`): read where it can be, otherwise "can't tell" for the CLIs the line names |
 | `src/shell-tokens.ts` | The tokenizer behind it: words, operators, `$( )` and heredocs, read as bash reads them |
 | `src/ps-tokens.ts` | The same tokens from a PowerShell line, read as PowerShell reads it, and the arguments Windows PowerShell 5.1 hands a CLI |
 | `src/ps-words.ts` | PowerShell variables, assignments and keywords, for `shellwords.ts` |

@@ -76,6 +76,9 @@ describe("bash: text piped into a shell (#163)", () => {
     expect((await hook(`gh --version; cat f | bash; ${CALL}`, BASH)).decision).toBe("deny");
   });
 
+  // Not a pipe, so what follows runs in this shell.
+  followed(BASH, ["false ||\nexport GH_TOKEN=VALUE"]);
+
   it("a call already read ran before the text, and is why the line names it", async () => {
     expect((await hook(`${CALL}; cat f | bash`, BASH)).decision).toBe("allow");
     expect((await hook(`${CALL}; eval "$(cat f)"`, BASH)).decision).toBe("allow");

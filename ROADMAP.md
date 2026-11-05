@@ -54,7 +54,7 @@ issues it ships. Open an [issue](https://github.com/paureis/cloudpin/issues) to 
   and the read-only check read names without regard to case (Wrangler's per-platform login folder came with #103).
 - **Fail closed where the parser can't follow the line** ([#163](https://github.com/paureis/cloudpin/issues/163)): in
   progress. Follow what can be read and refuse the rest as "can't tell", one family at a time: the folder a line moves
-  to (done), its environment (done), text that runs unread, and words a shell rewrites.
+  to (done), its environment (done), text that runs unread (done), and words a shell rewrites.
 - **cmd.exe re-reading** ([#168](https://github.com/paureis/cloudpin/issues/168)): what PowerShell hands a `.cmd` shim
   is read again by cmd.exe, so an unquoted `&`, `^` or `%NAME%` there is "can't tell".
 - **A CLI's own switch command** ([#180](https://github.com/paureis/cloudpin/issues/180)): an agent asks the person

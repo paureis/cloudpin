@@ -45,6 +45,7 @@ Versions 1.0.0 to 1.1.2 are in [docs/changelog-1.0-1.1.md](docs/changelog-1.0-1.
 
 ### Security
 
+- Follow or refuse a line's folder (#163).
 - An agent's `cloudpin exec -- bash -c 'gh ...'` or `cloudpin exec -- npx gh ...` was read as an unguarded `bash` or `npx`,
   so it could run on the wrong account. What `cloudpin exec` starts is now read as a call of its own (#14).
 - `cloudpin explain` (text and `--json`) and the MCP `cloudpin_check` tool no longer repeat a token or password from

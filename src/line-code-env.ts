@@ -74,8 +74,12 @@ export function withHooksPath(env: NodeJS.ProcessEnv, before: NodeJS.ProcessEnv)
   return out;
 }
 
-/** Whether the line changed PATH or PATHEXT, removing it included: both folded as guard reads them. */
-export const lineMovedPath = (env: NodeJS.ProcessEnv, before: NodeJS.ProcessEnv): boolean => FROM_THE_HOOK.some((name) => env[name] !== before[name]);
+/** Whether the line changed PATH or PATHEXT, in any spelling, removing it included. */
+export function lineMovedPath(before: NodeJS.ProcessEnv, env: NodeJS.ProcessEnv, platform: NodeJS.Platform): boolean {
+  if (setOnLine(before, env, platform, (name) => FROM_THE_HOOK.includes(name)).length > 0) return true;
+  const kept = valuesByName(env, platform);
+  return [...valuesByName(before, platform).keys()].some((name) => FROM_THE_HOOK.includes(name) && !kept.has(name));
+}
 
 /** Why a call stops when its CLI isn't on the hook's PATH and the line changed it. */
 export const PATH_ONLY_ON_LINE = {

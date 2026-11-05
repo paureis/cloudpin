@@ -242,7 +242,7 @@ export async function guard(req: GuardRequest, deps: GuardDeps, trace: Trace = {
   trace.resolution = res;
   if (res.kind === "error" && cliMissing) {
     // Where the line changed PATH the command may find a CLI the lookup can't, so there may be an account to protect.
-    if (before && lineMovedPath(folded.env, before)) return { ...base, uncertain: true, problems: [PATH_ONLY_ON_LINE.problem], fix: PATH_ONLY_ON_LINE.fix };
+    if (req.before && lineMovedPath(req.before, req.env, platform)) return { ...base, uncertain: true, problems: [PATH_ONLY_ON_LINE.problem], fix: PATH_ONLY_ON_LINE.fix };
     return { action: "allow", reason: "not-installed" };
   }
   switch (res.kind) {

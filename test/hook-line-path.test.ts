@@ -97,6 +97,12 @@ describe("a CLI the hook's PATH doesn't have", () => {
     expect((await hook(`$env:PATHEXT='.X'; ${CALL}`, { tool: "PowerShell", env: { Path: "C:\\hook", PATHEXT: ".EXE" }, platform: "win32" })).decision).toBe("deny");
   });
 
+  it("with PATH in another spelling on Windows, which guard's folding would lose", async () => {
+    state.missing = true;
+    expect((await hook(`$env:path='C:\\there'; ${CALL}`, { tool: "PowerShell", env: { Path: "C:\\hook" }, platform: "win32" })).decision).toBe("deny");
+    expect((await hook(`Remove-Item env:PATH; ${CALL}`, { tool: "PowerShell", env: { Path: "C:\\hook" }, platform: "win32" })).decision).toBe("deny");
+  });
+
   it("not installed when the line left PATH alone: the command would fail on its own", async () => {
     state.missing = true;
     expect((await hook(CALL, { env })).decision).toBe("allow");

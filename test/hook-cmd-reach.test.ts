@@ -204,7 +204,31 @@ describe("a value only known when it runs is read at its worst (#168)", () => {
   it("text around it that cmd.exe acts on stops: the placeholder holds no space or quote", async () => {
     expect((await hook('az group list --query "$v&kubectl"')).reason).toContain(RULE);
   });
+  it("a URL with & after a variable: 5.1 adds no quotes, and cmd.exe cuts it", async () => {
+    expect((await hook('az rest --url "https://x.example/a?b=$v&c=d"')).reason).toContain("an unquoted &");
+  });
+  it("a value the line set is read as itself around one it didn't", async () => {
+    expect((await hook(`$s='a b'; az group list --query "$s$v&kubectl"`)).reason).not.toContain(RULE);
+  });
   it("alone it is a value cloudpin doesn't need, as elsewhere", async () => {
     expect((await hook("az group list --query $v")).reason).not.toContain(RULE);
+  });
+  it("a word bash splits is read split", async () => {
+    expect((await hook("Q='a b'; az.cmd group list --query $Q", "Bash")).reason).not.toContain(RULE);
+    expect((await hook("Q='a b&c'; az.cmd group list --query $Q", "Bash")).reason).toContain(RULE);
+    expect((await hook(`Q='a b&c'; az.cmd group list --query "$Q"`, "Bash")).reason).not.toContain(RULE);
+  });
+});
+
+describe("what --% typed belongs to its own statement (#168)", () => {
+  it("the next one is read without it", async () => {
+    expect((await hook("gh pr list --% --jq a^b | az group list")).decision).toBe("allow");
+  });
+  it("control: the text itself, on a .cmd", async () => {
+    expect((await hook("az group list --% --jq a^b | gh pr list")).reason).toContain(RULE);
+  });
+  it("the words before --% are rebuilt, the text after it is not", async () => {
+    expect((await hook(`az 'a b' --% "c&d"`)).decision).toBe("allow");
+    expect((await hook(`az 'a&b' --% "c d"`)).reason).toContain(RULE);
   });
 });
